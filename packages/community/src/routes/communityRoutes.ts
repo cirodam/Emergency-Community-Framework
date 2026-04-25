@@ -12,11 +12,11 @@ router.post(  "/persons",                persons.addPerson);
 router.patch( "/persons/:id",            persons.updatePerson);
 router.delete("/persons/:id",            persons.dischargePerson);
 router.post(  "/persons/:id/credential", persons.issueCredential);
-router.post(  "/persons/:id/pin",        auth.setPin);
+router.post(  "/persons/:id/password",   auth.setPassword);
 
 // Auth
+router.post("/auth/login",  auth.login);
 router.post("/auth/verify", auth.verifyCredential);
-router.post("/auth/pin",    auth.verifyPin);
 
 // Domains
 router.get(  "/domains",     domains.listDomains);

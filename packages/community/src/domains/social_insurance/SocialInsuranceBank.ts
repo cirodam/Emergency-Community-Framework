@@ -27,6 +27,7 @@ export class SocialInsuranceBank {
     private _ownerId!: string;
     private _poolAccountId!: string;
     private _bank!: BankClient;
+    private _ready = false;
 
     private records: Map<string, SocialInsuranceMember> = new Map();
     private memberLoader!: SocialInsuranceMemberLoader;
@@ -40,8 +41,9 @@ export class SocialInsuranceBank {
         return SocialInsuranceBank.instance;
     }
 
-    get ownerId(): string       { return this._ownerId; }
-    get poolAccountId(): string { return this._poolAccountId; }
+    isReady(): boolean          { return this._ready; }
+    get ownerId(): string       { if (!this._ready) throw new Error("SocialInsuranceBank not ready"); return this._ownerId; }
+    get poolAccountId(): string { if (!this._ready) throw new Error("SocialInsuranceBank not ready"); return this._poolAccountId; }
 
     async init(
         bank: BankClient,
@@ -59,6 +61,7 @@ export class SocialInsuranceBank {
             const record      = loader.load();
             this._ownerId     = record.ownerId;
             this._poolAccountId = record.poolAccountId;
+            this._ready = true;
             return;
         }
 
@@ -80,6 +83,7 @@ export class SocialInsuranceBank {
             poolAccountId: this._poolAccountId,
             registeredAt:  new Date().toISOString(),
         });
+        this._ready = true;
     }
 
     // ── Pool accounting ───────────────────────────────────────────────────────

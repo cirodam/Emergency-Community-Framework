@@ -71,21 +71,48 @@ async function main(): Promise<void> {
     //   import { FoodDomain } from "./domains/FoodDomain.js";
     //   domainSvc.registerDomain(FoodDomain.getInstance());
 
-    // ── Monetary institutions ──────────────────────────────────────────────
+    // ── Monetary institutions (non-fatal — bank may be unreachable) ────────
     const bank = new BankClient(BANK_URL);
-    await CentralBank.getInstance().init(bank, new CentralBankLoader(DATA_DIR));
-    await CurrencyBoard.getInstance().init(bank, new CurrencyBoardLoader(DATA_DIR));
-    await SocialInsuranceBank.getInstance().init(
-        bank,
-        new SocialInsuranceBankLoader(DATA_DIR),
-        new SocialInsuranceMemberLoader(resolve(DATA_DIR, "si_members")),
-    );
+    const centralBankLoader      = new CentralBankLoader(DATA_DIR);
+    const currencyBoardLoader    = new CurrencyBoardLoader(DATA_DIR);
+    const siBankLoader           = new SocialInsuranceBankLoader(DATA_DIR);
+    const siMemberLoader         = new SocialInsuranceMemberLoader(resolve(DATA_DIR, "si_members"));
+
+    async function initMonetaryInstitutions(): Promise<void> {
+        await CentralBank.getInstance().init(bank, centralBankLoader);
+        await CurrencyBoard.getInstance().init(bank, currencyBoardLoader);
+        await SocialInsuranceBank.getInstance().init(bank, siBankLoader, siMemberLoader);
+        console.log("[community] monetary institutions ready");
+    }
+
+    async function tryInitMonetary(attempt = 1): Promise<void> {
+        try {
+            await initMonetaryInstitutions();
+        } catch (err) {
+            const delay = Math.min(30_000, attempt * 5_000);
+            console.warn(
+                `[community] bank unreachable (attempt ${attempt}), ` +
+                `running in degraded mode — retrying in ${delay / 1000}s. ` +
+                `Error: ${(err as Error).message}`,
+            );
+            setTimeout(() => tryInitMonetary(attempt + 1), delay);
+        }
+    }
+
+    // Start without awaiting — governance routes come up immediately.
+    void tryInitMonetary();
 
     // ── Routes ─────────────────────────────────────────────────────────────
     app.use("/api",       communityRoutes);
     app.use("/api/node",  networkRouter);
 
-    app.get("/health", (_req, res) => { res.json({ status: "ok" }); });
+    app.get("/health", (_req, res) => {
+        const bankReady = CentralBank.getInstance().isReady();
+        res.status(bankReady ? 200 : 206).json({
+            status: bankReady ? "ok" : "degraded",
+            bank: bankReady ? "connected" : "unreachable",
+        });
+    });
 
     // Expose the community's public key so federation / other nodes can verify credentials
     app.get("/api/identity", (_req, res) => {

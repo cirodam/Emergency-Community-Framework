@@ -1,4 +1,5 @@
-import { createHash } from "crypto";
+import { createHash, scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
 import { NodeService, NodeSigner } from "@ecf/core";
 import { Person, PersonCredential, LanguageProficiency } from "./Person.js";
 import { PersonLoader } from "./PersonLoader.js";
@@ -13,6 +14,26 @@ export interface PersonPatch {
 }
 
 const DEFAULT_CREDENTIAL_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+
+const scryptAsync = promisify(scrypt);
+const SCRYPT_KEYLEN = 64;
+
+async function hashSecret(secret: string): Promise<string> {
+    const salt    = randomBytes(16).toString("hex");
+    const derived = (await scryptAsync(secret, salt, SCRYPT_KEYLEN)) as Buffer;
+    return `${salt}:${derived.toString("hex")}`;
+}
+
+async function verifySecret(secret: string, stored: string): Promise<boolean> {
+    const colonIdx = stored.indexOf(":");
+    if (colonIdx === -1) return false;
+    const salt    = stored.slice(0, colonIdx);
+    const hashHex = stored.slice(colonIdx + 1);
+    const derived   = (await scryptAsync(secret, salt, SCRYPT_KEYLEN)) as Buffer;
+    const expected  = Buffer.from(hashHex, "hex");
+    if (derived.length !== expected.length) return false;
+    return timingSafeEqual(derived, expected);
+}
 
 export class PersonService {
     private static instance: PersonService;
@@ -198,19 +219,24 @@ export class PersonService {
         return person.matchesPinHash(createHash("sha256").update(pin).digest("hex"));
     }
 
-    setPassword(handle: string, password: string): boolean {
-        const person = this.getByHandle(handle);
-        if (!person) return false;
-        person.setPasswordHash(createHash("sha256").update(password).digest("hex"));
+    async setPassword(personId: string, password: string): Promise<void> {
+        const person = this.persons.get(personId);
+        if (!person) throw new Error(`Person ${personId} not found`);
+        if (password.length < 8) throw new Error("Password must be at least 8 characters");
+        person.setPasswordHash(await hashSecret(password));
         this.save(person);
-        return true;
     }
 
-    verifyPassword(handle: string, password: string): string | null {
+    /**
+     * Verify a password by handle. Always runs the full scrypt comparison
+     * to avoid timing oracle. Returns the Person on success, null on failure.
+     */
+    async verifyPassword(handle: string, password: string): Promise<Person | null> {
         const person = this.getByHandle(handle);
-        if (!person) return null;
-        const hash = createHash("sha256").update(password).digest("hex");
-        return person.matchesPasswordHash(hash) ? person.id : null;
+        // Run scrypt even if person not found / no hash, to avoid timing oracle
+        const stored = person?.getCredentialsForPersistence().passwordHash ?? `${randomBytes(16).toString("hex")}:${randomBytes(64).toString("hex")}`;
+        const ok = await verifySecret(password, stored);
+        return (ok && person?.getCredentialsForPersistence().passwordHash) ? person : null;
     }
 
     /** Call once per day. Fires anniversary handlers for every person whose birthday matches today. */

@@ -20,6 +20,7 @@ export class CentralBank {
     private _ownerId!: string;
     private _issuanceAccountId!: string;
     private _bank!: BankClient;
+    private _ready = false;
 
     private constructor() {}
 
@@ -28,8 +29,9 @@ export class CentralBank {
         return CentralBank.instance;
     }
 
-    get ownerId(): string           { return this._ownerId; }
-    get issuanceAccountId(): string { return this._issuanceAccountId; }
+    isReady(): boolean              { return this._ready; }
+    get ownerId(): string           { if (!this._ready) throw new Error("CentralBank not ready"); return this._ownerId; }
+    get issuanceAccountId(): string { if (!this._ready) throw new Error("CentralBank not ready"); return this._issuanceAccountId; }
 
     async init(bank: BankClient, loader: CentralBankLoader): Promise<void> {
         this._bank = bank;
@@ -38,6 +40,7 @@ export class CentralBank {
             const record = loader.load();
             this._ownerId           = record.ownerId;
             this._issuanceAccountId = record.issuanceAccountId;
+            this._ready = true;
             return;
         }
 
@@ -58,6 +61,7 @@ export class CentralBank {
             issuanceAccountId: this._issuanceAccountId,
             registeredAt:      new Date().toISOString(),
         });
+        this._ready = true;
     }
 
     // ── Money operations ────────────────────────────────────────────────────
