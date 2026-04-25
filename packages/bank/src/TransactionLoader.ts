@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { readdirSync, existsSync, readFileSync, writeFileSync } from "fs";
+import { mkdirSync, readdirSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 import { BankTransaction, Currency } from "./BankTransaction.js";
 import { FileStore, DataManifest } from "@ecf/core";
@@ -25,6 +25,16 @@ interface TransactionRecord {
 
 type RecordWithoutHash = Omit<TransactionRecord, "hash">;
 
+/**
+ * Account index: maps accountId → sorted array of month buckets that contain
+ * at least one transaction for that account.
+ *
+ * Stored in _account_index.json alongside the chain head file. Updated on
+ * every save(). Allows account-scoped queries to skip unrelated month buckets
+ * entirely instead of scanning the full ledger.
+ */
+type AccountIndex = Record<string, string[]>;
+
 function computeHash(record: RecordWithoutHash): string {
     return createHash("sha256").update(JSON.stringify(record), "utf-8").digest("hex");
 }
@@ -37,20 +47,118 @@ function monthBucket(date: Date): string {
 export class TransactionLoader {
     private readonly baseDir: string;
     private readonly chainFile: string;
+    private readonly indexFile: string;
+
+    // Cached bucket store per month — avoids re-constructing FileStore on every save()
+    private bucketStores: Map<string, FileStore> = new Map();
 
     constructor(baseDir: string) {
-        this.baseDir = baseDir;
+        this.baseDir   = baseDir;
         this.chainFile = join(baseDir, ".chain.json");
+        this.indexFile = join(baseDir, "_account_index.json");
     }
 
-    /** Append a transaction to the current month's bucket with hash chain fields. */
+    // ── Write ─────────────────────────────────────────────────────────────────
+
+    /** Append a transaction to the current month's bucket, updating the chain head and account index. */
     save(tx: BankTransaction): void {
         const previousHash = this.readChainHead();
         const base: RecordWithoutHash = { ...this.toBaseRecord(tx), previousHash };
         const hash = computeHash(base);
-        const store = new FileStore(`${this.baseDir}/${monthBucket(tx.timestamp)}`);
-        store.write(tx.id, { ...base, hash });
+
+        const bucket = monthBucket(tx.timestamp);
+        this.getBucketStore(bucket).write(tx.id, { ...base, hash });
         this.writeChainHead(hash);
+        this.updateAccountIndex(tx.fromAccountId, tx.toAccountId, bucket);
+    }
+
+    // ── Read ──────────────────────────────────────────────────────────────────
+
+    query(options: TransactionQuery = {}): BankTransaction[] {
+        if (!existsSync(this.baseDir)) return [];
+
+        const bucketsToScan = this.resolveBuckets(options);
+        if (bucketsToScan.length === 0) return [];
+
+        const rawRecords: TransactionRecord[] = [];
+        for (const bucket of bucketsToScan) {
+            rawRecords.push(...this.getBucketStore(bucket).readAll<TransactionRecord>());
+        }
+
+        rawRecords.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+        // Always verify chain integrity — whether querying all records or a subset.
+        // A subset that spans multiple months still validates its own internal ordering.
+        this.verifyChain(rawRecords);
+
+        return rawRecords
+            .filter(r => !options.accountId || r.fromAccountId === options.accountId || r.toAccountId === options.accountId)
+            .map(r => this.fromRecord(r));
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * Resolve which month buckets to read for a given query.
+     *
+     * - Both `accountId` and `month` provided → single bucket if index confirms it
+     * - `accountId` only → buckets from the account index (O(buckets-for-account))
+     * - `month` only → single named bucket
+     * - Neither → all buckets (full ledger scan)
+     */
+    private resolveBuckets(options: TransactionQuery): string[] {
+        const allBuckets = existsSync(this.baseDir)
+            ? readdirSync(this.baseDir, { withFileTypes: true })
+                .filter(d => d.isDirectory())
+                .map(d => d.name)
+                .sort()
+            : [];
+
+        if (options.month && options.accountId) {
+            const indexed = this.readAccountIndex()[options.accountId] ?? [];
+            return indexed.includes(options.month) ? [options.month] : [];
+        }
+        if (options.accountId) {
+            const indexed = this.readAccountIndex()[options.accountId] ?? [];
+            // Intersect with directories that actually exist on disk
+            const existing = new Set(allBuckets);
+            return indexed.filter(b => existing.has(b));
+        }
+        if (options.month) {
+            return allBuckets.filter(b => b === options.month);
+        }
+        return allBuckets;
+    }
+
+    private verifyChain(records: TransactionRecord[]): void {
+        let prevHash: string | null = null;
+
+        for (const record of records) {
+            if (!record.hash || record.previousHash === undefined) continue;
+
+            if (prevHash === null) {
+                if (record.previousHash !== GENESIS_HASH) {
+                    console.warn(
+                        `[chain] First chained transaction ${record.id} links to a prior record. ` +
+                        `Chain verification starts here.`
+                    );
+                }
+            } else if (record.previousHash !== prevHash) {
+                throw new Error(
+                    `[chain] Transaction chain is broken at ${record.id} — ` +
+                    `a transaction may have been deleted or reordered.`
+                );
+            }
+
+            const { hash, ...rest } = record;
+            if (computeHash(rest) !== hash) {
+                throw new Error(
+                    `[chain] Transaction ${record.id} hash mismatch — the record may have been tampered with.`
+                );
+            }
+
+            prevHash = record.hash;
+        }
     }
 
     private readChainHead(): string {
@@ -65,62 +173,45 @@ export class TransactionLoader {
     }
 
     private writeChainHead(hash: string): void {
+        mkdirSync(this.baseDir, { recursive: true });
         const content = JSON.stringify({ headHash: hash });
         writeFileSync(this.chainFile, content, "utf-8");
         DataManifest.getInstance().record(resolve(this.chainFile), content);
     }
 
-    query(options: TransactionQuery = {}): BankTransaction[] {
-        if (!existsSync(this.baseDir)) return [];
-
-        const allBuckets = readdirSync(this.baseDir, { withFileTypes: true })
-            .filter(d => d.isDirectory())
-            .map(d => d.name)
-            .sort();
-
-        const buckets = options.month
-            ? allBuckets.filter(b => b === options.month)
-            : allBuckets;
-
-        const rawRecords: TransactionRecord[] = [];
-        for (const bucket of buckets) {
-            const store = new FileStore(`${this.baseDir}/${bucket}`);
-            rawRecords.push(...store.readAll<TransactionRecord>());
+    private readAccountIndex(): AccountIndex {
+        if (!existsSync(this.indexFile)) return {};
+        try {
+            const content = readFileSync(this.indexFile, "utf-8");
+            DataManifest.getInstance().verify(resolve(this.indexFile), content);
+            return JSON.parse(content) as AccountIndex;
+        } catch {
+            return {};
         }
-
-        rawRecords.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-        if (!options.month) this.verifyChain(rawRecords);
-
-        return rawRecords
-            .filter(r => !options.accountId || r.fromAccountId === options.accountId || r.toAccountId === options.accountId)
-            .map(r => this.fromRecord(r));
     }
 
-    private verifyChain(records: TransactionRecord[]): void {
-        let prevHash: string | null = null;
-
-        for (const record of records) {
-            if (!record.hash || record.previousHash === undefined) continue;
-
-            if (prevHash === null) {
-                if (record.previousHash !== GENESIS_HASH) {
-                    console.warn(`[chain] First chained transaction ${record.id} links to a legacy record. Chain verification starts here.`);
-                }
-            } else if (record.previousHash !== prevHash) {
-                throw new Error(
-                    `[chain] Transaction chain is broken at ${record.id} — ` +
-                    `a transaction may have been deleted or reordered.`
-                );
+    private updateAccountIndex(fromAccountId: string, toAccountId: string, bucket: string): void {
+        const index = this.readAccountIndex();
+        for (const id of [fromAccountId, toAccountId]) {
+            const buckets = index[id] ?? [];
+            if (!buckets.includes(bucket)) {
+                buckets.push(bucket);
+                buckets.sort();
+                index[id] = buckets;
             }
-
-            const { hash, ...rest } = record;
-            if (computeHash(rest) !== hash) {
-                throw new Error(`[chain] Transaction ${record.id} hash mismatch — the record may have been tampered with.`);
-            }
-
-            prevHash = record.hash;
         }
+        const content = JSON.stringify(index);
+        writeFileSync(this.indexFile, content, "utf-8");
+        DataManifest.getInstance().record(resolve(this.indexFile), content);
+    }
+
+    private getBucketStore(bucket: string): FileStore {
+        let store = this.bucketStores.get(bucket);
+        if (!store) {
+            store = new FileStore(join(this.baseDir, bucket));
+            this.bucketStores.set(bucket, store);
+        }
+        return store;
     }
 
     private toBaseRecord(tx: BankTransaction): Omit<TransactionRecord, "previousHash" | "hash"> {
