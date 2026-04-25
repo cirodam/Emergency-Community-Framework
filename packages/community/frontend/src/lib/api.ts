@@ -163,3 +163,43 @@ export async function getConstitution(): Promise<ConstitutionDocument> {
     if (!res.ok) throw new Error("Failed to load constitution");
     return res.json() as Promise<ConstitutionDocument>;
 }
+
+// ── Domains ───────────────────────────────────────────────────────────────────
+
+export interface DomainDto {
+    id: string;
+    name: string;
+    handle: string;
+    description: string;
+    unitIds: string[];
+    roleIds: string[];
+    poolId: string | null;
+}
+
+export interface UnitDto {
+    id: string;
+    name: string;
+    description: string;
+    type: string;
+    personIds: string[];
+    roleIds: string[];
+    createdAt: string;
+}
+
+export async function listDomains(): Promise<DomainDto[]> {
+    const res = await fetch("/api/domains");
+    if (!res.ok) throw new Error("Failed to load domains");
+    return res.json() as Promise<DomainDto[]>;
+}
+
+export async function getDomain(id: string): Promise<DomainDto> {
+    const res = await fetch(`/api/domains/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error("Domain not found");
+    return res.json() as Promise<DomainDto>;
+}
+
+export async function listUnits(): Promise<UnitDto[]> {
+    const res = await fetch("/api/units");
+    if (!res.ok) throw new Error("Failed to load units");
+    return res.json() as Promise<UnitDto[]>;
+}

@@ -6,6 +6,7 @@
     const items: NavItem[] = [
         { id: "profile",      label: "Profile",      icon: "◉" },
         { id: "directory",    label: "Directory",    icon: "⊞" },
+        { id: "domains",      label: "Governance",   icon: "⊛" },
         { id: "constitution", label: "Constitution", icon: "§" },
         { id: "economy",      label: "Economy",      icon: "⊕" },
         { id: "settings",     label: "Settings",     icon: "⚙" },

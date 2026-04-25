@@ -1,9 +1,13 @@
 import { BankClient } from "../../BankClient.js";
 import { CurrencyBoardLoader } from "./CurrencyBoardLoader.js";
+import { FunctionalDomain } from "../../common/domain/FunctionalDomain.js";
+
+export const CURRENCY_BOARD_DOMAIN_ID = "ecf-domain-currency-board-000000002";
 
 /**
  * The Currency Board is the sole issuer of kithe.
  *
+ * As a FunctionalDomain it participates fully in community governance.
  * Kithe is a stable, reserve-backed currency. The currency board issues kithe
  * only against deposited reserves (e.g. kin, goods, labour pledges) and
  * retires kithe when reserves are withdrawn.
@@ -14,7 +18,7 @@ import { CurrencyBoardLoader } from "./CurrencyBoardLoader.js";
  * Lifecycle: identical to CentralBank — first boot registers the institution
  * with the bank and opens the issuance account; subsequent boots load from disk.
  */
-export class CurrencyBoard {
+export class CurrencyBoard extends FunctionalDomain {
     private static instance: CurrencyBoard;
 
     private _ownerId!: string;
@@ -22,7 +26,9 @@ export class CurrencyBoard {
     private _bank!: BankClient;
     private _ready = false;
 
-    private constructor() {}
+    private constructor() {
+        super("Currency Board", "Sole issuer of kithe, the community's stable reserve-backed currency.", CURRENCY_BOARD_DOMAIN_ID);
+    }
 
     static getInstance(): CurrencyBoard {
         if (!CurrencyBoard.instance) CurrencyBoard.instance = new CurrencyBoard();

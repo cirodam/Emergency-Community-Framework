@@ -3,9 +3,14 @@ import { Person } from "../../person/Person.js";
 import { SocialInsuranceMember } from "./SocialInsuranceMember.js";
 import { SocialInsuranceMemberLoader } from "./SocialInsuranceMemberLoader.js";
 import { SocialInsuranceBankLoader } from "./SocialInsuranceBankLoader.js";
+import { FunctionalDomain } from "../../common/domain/FunctionalDomain.js";
+
+export const SOCIAL_INSURANCE_DOMAIN_ID = "ecf-domain-social-insurance-000003";
 
 /**
  * The Social Insurance Bank maintains the community retirement pool.
+ *
+ * As a FunctionalDomain it participates fully in community governance.
  *
  * Every member contributes to the pool on joining (join endowment) and on each
  * birthday (one person-year of kin). On retirement, members receive equal monthly
@@ -21,7 +26,7 @@ import { SocialInsuranceBankLoader } from "./SocialInsuranceBankLoader.js";
  * performed by the caller (CentralBank) using `BankClient.transfer()`. This
  * class is responsible only for pool accounting and payout mechanics.
  */
-export class SocialInsuranceBank {
+export class SocialInsuranceBank extends FunctionalDomain {
     private static instance: SocialInsuranceBank;
 
     private _ownerId!: string;
@@ -32,7 +37,9 @@ export class SocialInsuranceBank {
     private records: Map<string, SocialInsuranceMember> = new Map();
     private memberLoader!: SocialInsuranceMemberLoader;
 
-    private constructor() {}
+    private constructor() {
+        super("Social Insurance", "Community retirement pool. Members contribute throughout their working life and draw equal monthly payments in retirement.", SOCIAL_INSURANCE_DOMAIN_ID);
+    }
 
     static getInstance(): SocialInsuranceBank {
         if (!SocialInsuranceBank.instance) {

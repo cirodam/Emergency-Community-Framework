@@ -11,11 +11,11 @@ const requireAuth = requirePersonCredential(getCommunityIdentity);
 // Admin / infrastructure routes — no user auth required
 router.get( "/accounts",                         getAllAccounts);
 router.post("/accounts",                         createAccount);
+router.get( "/account/:accountId",               getAccountById);
 router.post("/demurrage",                        applyDemurrage);
 
 // Member routes — require a valid community-issued credential
 router.get( "/accounts/:ownerId",                requireAuth, getAccounts);
-router.get( "/account/:accountId",               requireAuth, getAccountById);
 router.get( "/accounts/:accountId/transactions", requireAuth, getTransactions);
 router.post("/transfers",                        requireAuth, createTransfer);
 

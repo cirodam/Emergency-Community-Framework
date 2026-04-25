@@ -168,12 +168,13 @@ export function deletePool(req: Request, res: Response): void {
 
 function toDomainDto(d: FunctionalDomain) {
     return {
-        id:      d.getId(),
-        name:    d.getDisplayName(),
-        handle:  d.getHandle(),
-        unitIds: d.unitIds,
-        roleIds: d.roleIds,
-        poolId:  d.poolId,
+        id:          d.getId(),
+        name:        d.getDisplayName(),
+        handle:      d.getHandle(),
+        description: d.description,
+        unitIds:     d.unitIds,
+        roleIds:     d.roleIds,
+        poolId:      d.poolId,
     };
 }
 

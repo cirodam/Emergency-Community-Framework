@@ -20,6 +20,7 @@ import { SocialInsuranceBank } from "./domains/social_insurance/SocialInsuranceB
 import { SocialInsuranceBankLoader } from "./domains/social_insurance/SocialInsuranceBankLoader.js";
 import { SocialInsuranceMemberLoader } from "./domains/social_insurance/SocialInsuranceMemberLoader.js";
 import communityRoutes from "./routes/communityRoutes.js";
+import { CommunityBankDomain } from "./domains/community_bank/CommunityBankDomain.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -66,10 +67,13 @@ async function main(): Promise<void> {
         new LeaderPoolLoader(resolve(DATA_DIR, "pools")),
     );
 
-    // Domains are code-defined. Import and register them here as they are created.
-    // Example (uncomment when domain subclasses exist):
-    //   import { FoodDomain } from "./domains/FoodDomain.js";
-    //   domainSvc.registerDomain(FoodDomain.getInstance());
+    // Register the four monetary/financial domains so they participate in
+    // governance — they get leader pools, roles, and appear in the domain API.
+    // Monetary init (async bank connection) happens separately below.
+    domainSvc.registerDomain(CentralBank.getInstance());
+    domainSvc.registerDomain(CurrencyBoard.getInstance());
+    domainSvc.registerDomain(SocialInsuranceBank.getInstance());
+    domainSvc.registerDomain(CommunityBankDomain.getInstance());
 
     // ── Monetary institutions (non-fatal — bank may be unreachable) ────────
     const bank = new BankClient(BANK_URL);

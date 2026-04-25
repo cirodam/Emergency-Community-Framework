@@ -1,8 +1,19 @@
 import { BankClient } from "../../BankClient.js";
 import { CentralBankLoader } from "./CentralBankLoader.js";
+import { FunctionalDomain } from "../../common/domain/FunctionalDomain.js";
+
+/**
+ * Stable domain ID — fixed so FunctionalDomainLoader can persist/restore
+ * governance state (pools, roles) across restarts.
+ */
+export const CENTRAL_BANK_DOMAIN_ID = "ecf-domain-central-bank-0000000001";
 
 /**
  * The Central Bank is the sole issuer of kin.
+ *
+ * As a FunctionalDomain it participates fully in community governance —
+ * it can have a leader pool and community roles assigned to it. Its monetary
+ * operations (issuance, demurrage) are the economic layer on top.
  *
  * It holds one issuance account with overdraftLimit = -Infinity. Going negative
  * on this account means kin is in circulation; returning to zero means it has
@@ -14,7 +25,7 @@ import { CentralBankLoader } from "./CentralBankLoader.js";
  *   2. On subsequent boots, `init()` loads the persisted IDs and verifies
  *      the issuance account still exists.
  */
-export class CentralBank {
+export class CentralBank extends FunctionalDomain {
     private static instance: CentralBank;
 
     private _ownerId!: string;
@@ -22,7 +33,9 @@ export class CentralBank {
     private _bank!: BankClient;
     private _ready = false;
 
-    private constructor() {}
+    private constructor() {
+        super("Central Bank", "Sole issuer of kin. Issues one person-year of kin per person per year.", CENTRAL_BANK_DOMAIN_ID);
+    }
 
     static getInstance(): CentralBank {
         if (!CentralBank.instance) CentralBank.instance = new CentralBank();

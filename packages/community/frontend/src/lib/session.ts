@@ -68,7 +68,7 @@ function createSessionStore() {
 
 export const session = createSessionStore();
 
-export type Page = "profile" | "directory" | "constitution" | "economy" | "settings";
+export type Page = "profile" | "directory" | "constitution" | "economy" | "settings" | "domains" | "domain";
 
 function createPageStore() {
     const { subscribe, set } = writable<Page>("profile");
@@ -76,3 +76,6 @@ function createPageStore() {
 }
 
 export const currentPage = createPageStore();
+
+/** ID of the domain currently being viewed in the domain detail page. */
+export const selectedDomainId = writable<string | null>(null);

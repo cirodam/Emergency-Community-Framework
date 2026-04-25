@@ -9,6 +9,8 @@
     import ConstitutionPage from "./pages/ConstitutionPage.svelte";
     import EconomicsPage   from "./pages/EconomicsPage.svelte";
     import SettingsPage    from "./pages/SettingsPage.svelte";
+    import DomainsPage     from "./pages/DomainsPage.svelte";
+    import DomainPage      from "./pages/DomainPage.svelte";
     import BottomNav       from "./components/BottomNav.svelte";
 
     type AppState = "loading" | "setup" | "login" | "app";
@@ -56,6 +58,10 @@
             <EconomicsPage />
         {:else if $currentPage === "settings"}
             <SettingsPage />
+        {:else if $currentPage === "domains"}
+            <DomainsPage />
+        {:else if $currentPage === "domain"}
+            <DomainPage />
         {/if}
     </main>
     <BottomNav />
