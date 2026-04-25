@@ -7,6 +7,7 @@
     import ProfilePage     from "./pages/ProfilePage.svelte";
     import DirectoryPage   from "./pages/DirectoryPage.svelte";
     import ConstitutionPage from "./pages/ConstitutionPage.svelte";
+    import EconomicsPage   from "./pages/EconomicsPage.svelte";
     import SettingsPage    from "./pages/SettingsPage.svelte";
     import BottomNav       from "./components/BottomNav.svelte";
 
@@ -51,6 +52,8 @@
             <DirectoryPage />
         {:else if $currentPage === "constitution"}
             <ConstitutionPage />
+        {:else if $currentPage === "economy"}
+            <EconomicsPage />
         {:else if $currentPage === "settings"}
             <SettingsPage />
         {/if}
@@ -71,6 +74,10 @@
 
     main {
         min-height: 100dvh;
+    }
+
+    @media (min-width: 768px) {
+        main { margin-left: 220px; }
     }
 
     .splash {

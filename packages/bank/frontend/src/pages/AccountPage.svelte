@@ -63,6 +63,11 @@
         margin: 0 auto;
     }
 
+    @media (min-width: 768px) {
+        .account-page { padding-bottom: 2rem; max-width: 640px; }
+        .quick-actions { grid-template-columns: repeat(2, minmax(0, 200px)); }
+    }
+
     .account-header {
         display: flex;
         justify-content: space-between;

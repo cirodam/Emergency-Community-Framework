@@ -12,6 +12,10 @@
 </script>
 
 <nav class="bottom-nav">
+    <div class="nav-brand">
+        <span class="brand-icon">◈</span>
+        <span class="brand-name">Bank</span>
+    </div>
     {#each items as item}
         <button
             class="nav-item"
@@ -57,4 +61,51 @@
 
     .nav-icon  { font-size: 1.3rem; line-height: 1; }
     .nav-label { font-size: 0.65rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .nav-brand { display: none; }
+
+    @media (min-width: 768px) {
+        .bottom-nav {
+            flex-direction: column;
+            width: 220px;
+            height: 100dvh;
+            top: 0;
+            bottom: auto;
+            right: auto;
+            border-top: none;
+            border-right: 1px solid #e2e8f0;
+            padding: 1.5rem 0 1rem;
+            justify-content: flex-start;
+            gap: 0.15rem;
+            align-items: stretch;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.25rem 1.25rem 1.25rem;
+            border-bottom: 1px solid #f1f5f9;
+            margin-bottom: 0.5rem;
+        }
+
+        .brand-icon { font-size: 1.4rem; color: #2563eb; }
+        .brand-name { font-size: 0.95rem; font-weight: 700; color: #0f172a; }
+
+        .nav-item {
+            flex-direction: row;
+            justify-content: flex-start;
+            padding: 0.7rem 1rem;
+            gap: 0.75rem;
+            margin: 0 0.5rem;
+            border-radius: 10px;
+            flex: none;
+            width: auto;
+        }
+
+        .nav-item.active { background: #eff6ff; }
+
+        .nav-icon  { font-size: 1.1rem; }
+        .nav-label { font-size: 0.9rem; text-transform: none; letter-spacing: 0; font-weight: 500; }
+    }
 </style>

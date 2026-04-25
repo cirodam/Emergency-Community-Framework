@@ -6,29 +6,15 @@ import {
     createHash,
     type KeyObject,
 } from "crypto";
-import { IEconomicActor } from "@ecf/core";
+import { IEconomicActor, type PersonCredential } from "@ecf/core";
+
+export type { PersonCredential };
 
 export interface LanguageProficiency {
     language: string;   // BCP 47, e.g. "en", "es", "zh-Hans"
     reading: boolean;
     writing: boolean;
     speaking: boolean;
-}
-
-/**
- * A credential issued by the community node to a person.
- * Attests that the public key belongs to an active person in this community.
- * The community's NodeSigner signs over the six non-signature fields as
- * deterministic JSON. Credentials expire; the community reissues them periodically.
- */
-export interface PersonCredential {
-    personId: string;
-    personPublicKey: string;    // hex SPKI DER
-    communityNodeId: string;
-    communityPublicKey: string; // hex SPKI DER
-    issuedAt: string;           // ISO 8601
-    expiresAt: string;          // ISO 8601
-    signature: string;          // hex Ed25519
 }
 
 /**

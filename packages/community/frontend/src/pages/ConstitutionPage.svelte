@@ -89,6 +89,20 @@
         margin: 0 auto;
     }
 
+    @media (min-width: 768px) {
+        .constitution-page { padding-bottom: 2rem; max-width: 900px; }
+        .param-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+        .action-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.6rem;
+        }
+    }
+
     .page-title    { font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0 0 1rem; }
     .section-title { font-size: 1rem; font-weight: 600; color: #475569; margin: 1.5rem 0 0.75rem; }
 

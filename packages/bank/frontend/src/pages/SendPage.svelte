@@ -99,6 +99,10 @@
         margin: 0 auto;
     }
 
+    @media (min-width: 768px) {
+        .send-page { padding-bottom: 2rem; max-width: 560px; }
+    }
+
     .page-title { font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0 0 1.5rem; }
 
     .field { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.1rem; }

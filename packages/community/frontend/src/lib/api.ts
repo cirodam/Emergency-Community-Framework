@@ -1,6 +1,20 @@
 // Typed API wrappers for the community backend.
 // All calls use relative URLs — Vite proxies /api → http://localhost:3002 in dev.
 
+import { getToken } from "./session.js";
+
+/**
+ * Authenticated fetch — attaches the Bearer credential token when present.
+ * Use for all calls that require a logged-in user.
+ */
+function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
+    const token = getToken();
+    const headers = new Headers(init.headers);
+    headers.set("Content-Type", "application/json");
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return fetch(input, { ...init, headers });
+}
+
 export interface PersonDto {
     id: string;
     firstName: string;
@@ -36,6 +50,33 @@ export interface ConstitutionDocument {
         body: string;
         description: string;
     }[];
+}
+
+// ── Economics ─────────────────────────────────────────────────────────────────
+
+export interface EconomicsDto {
+    ready: boolean;
+    centralBank: {
+        kinInCirculation: number;
+        issuanceAccountId: string;
+    } | null;
+    currencyBoard: {
+        kitheInCirculation: number;
+        issuanceAccountId: string;
+    } | null;
+    socialInsurance: {
+        poolBalance: number;
+        totalContributed: number;
+        totalPaidOut: number;
+        memberCount: number;
+        poolAccountId: string;
+    } | null;
+}
+
+export async function getEconomics(): Promise<EconomicsDto> {
+    const res = await fetch("/api/economics");
+    if (!res.ok) throw new Error("Failed to load economics data");
+    return res.json() as Promise<EconomicsDto>;
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
@@ -75,7 +116,7 @@ export async function runSetup(payload: SetupPayload): Promise<SetupResult> {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-export async function login(handle: string, password: string): Promise<PersonDto> {
+export async function login(handle: string, password: string): Promise<PersonDto & { token: string }> {
     const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -85,19 +126,19 @@ export async function login(handle: string, password: string): Promise<PersonDto
         const body = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Login failed");
     }
-    return res.json() as Promise<PersonDto>;
+    return res.json() as Promise<PersonDto & { token: string }>;
 }
 
 // ── Persons ───────────────────────────────────────────────────────────────────
 
 export async function listPersons(): Promise<PersonDto[]> {
-    const res = await fetch("/api/persons");
+    const res = await apiFetch("/api/persons");
     if (!res.ok) throw new Error("Failed to load members");
     return res.json() as Promise<PersonDto[]>;
 }
 
 export async function getPerson(id: string): Promise<PersonDto> {
-    const res = await fetch(`/api/persons/${encodeURIComponent(id)}`);
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(id)}`);
     if (!res.ok) throw new Error("Member not found");
     return res.json() as Promise<PersonDto>;
 }
@@ -105,9 +146,8 @@ export async function getPerson(id: string): Promise<PersonDto> {
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 export async function setPassword(personId: string, password: string): Promise<void> {
-    const res = await fetch(`/api/persons/${encodeURIComponent(personId)}/password`, {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(personId)}/password`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
     });
     if (!res.ok) {

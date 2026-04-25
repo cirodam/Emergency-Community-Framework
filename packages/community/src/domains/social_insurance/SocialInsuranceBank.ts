@@ -95,6 +95,18 @@ export class SocialInsuranceBank {
         return total;
     }
 
+    /** Sum of all poolReceived across every member record. */
+    getTotalPaidOut(): number {
+        let total = 0;
+        for (const r of this.records.values()) total += r.poolReceived;
+        return total;
+    }
+
+    /** Number of members who have a pool record. */
+    getMemberCount(): number {
+        return this.records.size;
+    }
+
     /**
      * Record that `amount` kin has been minted into the pool on behalf of a
      * member. Called by CentralBank after each deposit to the pool account.

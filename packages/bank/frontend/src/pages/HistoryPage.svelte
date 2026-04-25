@@ -76,6 +76,10 @@
         margin: 0 auto;
     }
 
+    @media (min-width: 768px) {
+        .history-page { padding-bottom: 2rem; max-width: 720px; }
+    }
+
     .page-title { font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0 0 1rem; }
 
     .filter-row { margin-bottom: 1.25rem; }

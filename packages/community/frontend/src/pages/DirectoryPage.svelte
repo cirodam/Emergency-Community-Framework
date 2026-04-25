@@ -80,6 +80,16 @@
         margin: 0 auto;
     }
 
+    @media (min-width: 768px) {
+        .directory-page { padding-bottom: 2rem; max-width: 800px; }
+        .member-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+        .member-row:nth-last-child(-n+2) { border-bottom: none; }
+        .member-row:nth-child(odd):not(:last-child) { border-right: 1px solid #f1f5f9; }
+    }
+
     .page-title { font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0 0 1rem; }
 
     .search-row { margin-bottom: 1.25rem; }

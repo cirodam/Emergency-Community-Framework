@@ -19,3 +19,4 @@ export * from "./storage/DataManifest.js";
 // auth
 export * from "./auth/OwnershipCertificate.js";
 export * from "./auth/CertificateAuthority.js";
+export * from "./auth/PersonCredential.js";

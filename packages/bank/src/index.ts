@@ -10,6 +10,7 @@ import { AccountOwnerLoader } from "./AccountOwnerLoader.js";
 import { AccountOwnerService } from "./AccountOwnerService.js";
 import bankRoutes from "./routes/bankRoutes.js";
 import ownerRoutes from "./routes/ownerRoutes.js";
+import { setCommunityIdentity } from "./communityIdentity.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -26,19 +27,19 @@ app.use(express.json({
 }));
 
 /**
- * Resolve the owning node's ID.
- * If OWNER_NODE_ID is set explicitly, use it directly.
- * Otherwise fetch it from COMMUNITY_URL/api/identity, retrying with backoff
- * until the community node is reachable.
+ * Resolve the owning community node's ID and public key.
+ * If OWNER_NODE_ID + COMMUNITY_PUBLIC_KEY are set explicitly, use them.
+ * Otherwise fetch from COMMUNITY_URL/api/identity with backoff.
  */
-async function resolveOwnerNodeId(): Promise<string> {
-    const explicit = process.env.OWNER_NODE_ID;
-    if (explicit) return explicit;
+async function resolveCommunityIdentity(): Promise<{ id: string; publicKey: string }> {
+    const explicitId  = process.env.OWNER_NODE_ID;
+    const explicitKey = process.env.COMMUNITY_PUBLIC_KEY;
+    if (explicitId && explicitKey) return { id: explicitId, publicKey: explicitKey };
 
     const communityUrl = process.env.COMMUNITY_URL;
     if (!communityUrl) {
         throw new Error(
-            "[bank] Either OWNER_NODE_ID or COMMUNITY_URL must be set"
+            "[bank] Either OWNER_NODE_ID+COMMUNITY_PUBLIC_KEY or COMMUNITY_URL must be set"
         );
     }
 
@@ -47,10 +48,11 @@ async function resolveOwnerNodeId(): Promise<string> {
         try {
             const res = await fetch(url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const body = await res.json() as { id?: string };
-            if (!body.id) throw new Error("identity response missing id");
-            console.log(`[bank] resolved owner node ID from community: ${body.id}`);
-            return body.id;
+            const body = await res.json() as { id?: string; publicKey?: string };
+            if (!body.id)        throw new Error("identity response missing id");
+            if (!body.publicKey) throw new Error("identity response missing publicKey");
+            console.log(`[bank] resolved community identity: ${body.id}`);
+            return { id: body.id, publicKey: body.publicKey };
         } catch (err) {
             const wait = Math.min(30_000, attempt * 5_000);
             console.warn(`[bank] community not reachable (attempt ${attempt}), retrying in ${wait / 1000}s — ${err}`);
@@ -79,12 +81,13 @@ async function main(): Promise<void> {
     Bank.getInstance().init(accountLoader, transactionLoader);
     AccountOwnerService.getInstance().init(ownerLoader);
 
-    const ownerNodeId = await resolveOwnerNodeId();
-    const ownerType   = process.env.OWNER_TYPE as "community" | "federation" | undefined ?? "community";
+    const community  = await resolveCommunityIdentity();
+    const ownerType  = process.env.OWNER_TYPE as "community" | "federation" | undefined ?? "community";
     if (ownerType !== "community" && ownerType !== "federation") {
         throw new Error(`[bank] OWNER_TYPE must be "community" or "federation", got "${ownerType}"`);
     }
-    const charter = new BankCharterLoader(DATA_DIR).load(ownerNodeId, ownerType);
+    setCommunityIdentity(community.id, community.publicKey);
+    const charter = new BankCharterLoader(DATA_DIR).load(community.id, ownerType);
 
     // API routes
     app.use("/api", bankRoutes);

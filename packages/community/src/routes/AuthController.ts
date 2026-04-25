@@ -20,6 +20,7 @@ function toPersonDto(p: Person) {
 
 // POST /api/auth/login
 // Body: { handle, password }
+// Returns person DTO + a base64url-encoded PersonCredential token.
 export async function login(req: Request, res: Response): Promise<void> {
     const { handle, password } = req.body ?? {};
     if (typeof handle !== "string" || typeof password !== "string") {
@@ -27,7 +28,11 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
     const person = await svc().verifyPassword(handle, password);
     if (!person) { res.status(401).json({ error: "Invalid handle or password" }); return; }
-    res.json(toPersonDto(person));
+
+    const credential = svc().issueCredential(person);
+    const token = Buffer.from(JSON.stringify(credential)).toString("base64url");
+
+    res.json({ ...toPersonDto(person), token });
 }
 
 // POST /api/persons/:id/password

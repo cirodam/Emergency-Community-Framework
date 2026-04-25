@@ -70,6 +70,10 @@
         margin: 0 auto;
     }
 
+    @media (min-width: 768px) {
+        .profile-page { padding-bottom: 2rem; max-width: 640px; }
+    }
+
     .profile-header {
         display: flex;
         flex-direction: column;

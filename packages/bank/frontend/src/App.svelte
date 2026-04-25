@@ -41,5 +41,9 @@
     main {
         min-height: 100dvh;
     }
+
+    @media (min-width: 768px) {
+        main { margin-left: 220px; }
+    }
 </style>
 
