@@ -73,6 +73,18 @@ async function main(): Promise<void> {
 
     // ── Monetary institutions (non-fatal — bank may be unreachable) ────────
     const bank = new BankClient(BANK_URL);
+
+    // Automatically open a primary kin account whenever a new person joins.
+    // Non-fatal: if the bank is temporarily unreachable the join still succeeds.
+    PersonService.getInstance().onPersonJoined(async (person) => {
+        const displayName = `${person.firstName} ${person.lastName}`;
+        try {
+            await bank.openAccount(person.id, displayName, "kin");
+            console.log(`[community] opened bank account for @${person.handle}`);
+        } catch (err) {
+            console.warn(`[community] could not open bank account for @${person.handle}: ${(err as Error).message}`);
+        }
+    });
     const centralBankLoader      = new CentralBankLoader(DATA_DIR);
     const currencyBoardLoader    = new CurrencyBoardLoader(DATA_DIR);
     const siBankLoader           = new SocialInsuranceBankLoader(DATA_DIR);

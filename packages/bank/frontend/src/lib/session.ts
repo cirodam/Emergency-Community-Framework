@@ -1,31 +1,21 @@
 /**
  * Session store — persisted to sessionStorage so it survives page refreshes
  * but clears when the tab closes (appropriate for a banking app).
- *
- * Usage:
- *   import { session, login, logout } from './session.js';
- *
- *   // read (reactive in Svelte via $session)
- *   if ($session) { ... }
- *
- *   // write
- *   login(ownerDto, primaryAccountId);
- *   logout();
  */
 
 import { writable } from "svelte/store";
-import type { OwnerDto } from "./api.js";
 
 export interface SessionData {
-    ownerId: string;
+    personId: string;
+    handle: string;
     displayName: string;
-    phone: string | undefined;
+    /** base64url-encoded PersonCredential — sent as Bearer token on every API call. */
+    token: string;
     primaryAccountId: string;
-    hasPin: boolean;
-    hasPassword: boolean;
 }
 
 const SESSION_KEY = "ecf_bank_session";
+const TOKEN_KEY   = "ecf_bank_token";
 
 function loadFromStorage(): SessionData | null {
     try {
@@ -36,27 +26,26 @@ function loadFromStorage(): SessionData | null {
     }
 }
 
+/** Returns the current credential token, or null if not logged in. */
+export function getToken(): string | null {
+    return sessionStorage.getItem(TOKEN_KEY);
+}
+
 function createSessionStore() {
     const { subscribe, set } = writable<SessionData | null>(loadFromStorage());
 
     return {
         subscribe,
 
-        login(owner: OwnerDto, primaryAccountId: string): void {
-            const data: SessionData = {
-                ownerId:          owner.ownerId,
-                displayName:      owner.displayName,
-                phone:            owner.phone,
-                primaryAccountId,
-                hasPin:           owner.hasPin,
-                hasPassword:      owner.hasPassword,
-            };
+        login(data: SessionData): void {
             sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
+            sessionStorage.setItem(TOKEN_KEY, data.token);
             set(data);
         },
 
         logout(): void {
             sessionStorage.removeItem(SESSION_KEY);
+            sessionStorage.removeItem(TOKEN_KEY);
             set(null);
         },
 
@@ -65,6 +54,7 @@ function createSessionStore() {
             if (!current) return;
             const updated = { ...current, ...updates };
             sessionStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+            if (updates.token) sessionStorage.setItem(TOKEN_KEY, updates.token);
             set(updated);
         },
     };

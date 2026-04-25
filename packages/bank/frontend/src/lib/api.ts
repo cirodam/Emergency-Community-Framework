@@ -2,14 +2,18 @@
 // All calls use relative URLs — Vite proxies /api → http://localhost:3001 in dev,
 // and the Express server serves the built frontend directly in production.
 
-export interface OwnerDto {
-    ownerId: string;
-    ownerType: "person" | "institution";
-    displayName: string;
-    phone?: string;
-    hasPassword: boolean;
-    hasPin: boolean;
-    createdAt: string;
+import { getToken } from "./session.js";
+
+/**
+ * Authenticated fetch — attaches the Bearer credential token when present.
+ * Use for all calls that require a logged-in user.
+ */
+function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
+    const token = getToken();
+    const headers = new Headers(init.headers as HeadersInit);
+    headers.set("Content-Type", "application/json");
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return fetch(input, { ...init, headers });
 }
 
 export interface AccountDto {
@@ -34,42 +38,41 @@ export interface TransactionDto {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-export async function loginWithPin(phone: string, pin: string): Promise<OwnerDto> {
-    const res = await fetch("/api/auth/pin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, pin }),
-    });
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Login failed");
-    }
-    return res.json() as Promise<OwnerDto>;
+export interface LoginResult {
+    token: string;
+    personId: string;
+    handle: string;
+    displayName: string;
+    accounts: AccountDto[];
 }
 
-export async function loginWithPassword(phone: string, password: string): Promise<OwnerDto> {
-    const res = await fetch("/api/auth/password", {
+/**
+ * Sign in via the community SSO. The bank backend proxies to community,
+ * verifies the credential, and returns the token + accounts in one call.
+ */
+export async function login(handle: string, password: string): Promise<LoginResult> {
+    const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, password }),
+        body: JSON.stringify({ handle, password }),
     });
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Login failed");
     }
-    return res.json() as Promise<OwnerDto>;
+    return res.json() as Promise<LoginResult>;
 }
 
 // ── Accounts ──────────────────────────────────────────────────────────────────
 
 export async function getAccountsByOwner(ownerId: string): Promise<AccountDto[]> {
-    const res = await fetch(`/api/accounts/${encodeURIComponent(ownerId)}`);
+    const res = await apiFetch(`/api/accounts/${encodeURIComponent(ownerId)}`);
     if (!res.ok) throw new Error("Failed to load accounts");
     return res.json() as Promise<AccountDto[]>;
 }
 
 export async function getAccountById(accountId: string): Promise<AccountDto> {
-    const res = await fetch(`/api/account/${encodeURIComponent(accountId)}`);
+    const res = await apiFetch(`/api/account/${encodeURIComponent(accountId)}`);
     if (!res.ok) throw new Error("Account not found");
     return res.json() as Promise<AccountDto>;
 }
@@ -80,7 +83,7 @@ export async function getTransactions(accountId: string, month?: string): Promis
     const url = month
         ? `/api/accounts/${encodeURIComponent(accountId)}/transactions?month=${encodeURIComponent(month)}`
         : `/api/accounts/${encodeURIComponent(accountId)}/transactions`;
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     if (!res.ok) throw new Error("Failed to load transactions");
     return res.json() as Promise<TransactionDto[]>;
 }
@@ -93,9 +96,8 @@ export async function sendTransfer(
     amount: number,
     memo: string,
 ): Promise<TransactionDto> {
-    const res = await fetch("/api/transfers", {
+    const res = await apiFetch("/api/transfers", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fromAccountId, toAccountId, amount, memo }),
     });
     if (!res.ok) {
@@ -103,30 +105,4 @@ export async function sendTransfer(
         throw new Error(body.error ?? "Transfer failed");
     }
     return res.json() as Promise<TransactionDto>;
-}
-
-// ── Settings ──────────────────────────────────────────────────────────────────
-
-export async function setPin(ownerId: string, pin: string): Promise<void> {
-    const res = await fetch(`/api/owners/${encodeURIComponent(ownerId)}/pin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin }),
-    });
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Failed to set PIN");
-    }
-}
-
-export async function setPassword(ownerId: string, password: string): Promise<void> {
-    const res = await fetch(`/api/owners/${encodeURIComponent(ownerId)}/password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-    });
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Failed to set password");
-    }
 }

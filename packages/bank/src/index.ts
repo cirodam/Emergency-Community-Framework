@@ -10,6 +10,7 @@ import { AccountOwnerLoader } from "./AccountOwnerLoader.js";
 import { AccountOwnerService } from "./AccountOwnerService.js";
 import bankRoutes from "./routes/bankRoutes.js";
 import ownerRoutes from "./routes/ownerRoutes.js";
+import { login as ssoLogin } from "./routes/AuthController.js";
 import { setCommunityIdentity } from "./communityIdentity.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -90,6 +91,7 @@ async function main(): Promise<void> {
     const charter = new BankCharterLoader(DATA_DIR).load(community.id, ownerType);
 
     // API routes
+    app.post("/api/auth/login", ssoLogin);   // SSO — proxies to community
     app.use("/api", bankRoutes);
     app.use("/api", ownerRoutes);
     app.use("/api/node", networkRouter);
