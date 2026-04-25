@@ -25,6 +25,40 @@ app.use(express.json({
     },
 }));
 
+/**
+ * Resolve the owning node's ID.
+ * If OWNER_NODE_ID is set explicitly, use it directly.
+ * Otherwise fetch it from COMMUNITY_URL/api/identity, retrying with backoff
+ * until the community node is reachable.
+ */
+async function resolveOwnerNodeId(): Promise<string> {
+    const explicit = process.env.OWNER_NODE_ID;
+    if (explicit) return explicit;
+
+    const communityUrl = process.env.COMMUNITY_URL;
+    if (!communityUrl) {
+        throw new Error(
+            "[bank] Either OWNER_NODE_ID or COMMUNITY_URL must be set"
+        );
+    }
+
+    const url = `${communityUrl}/api/identity`;
+    for (let attempt = 1; ; attempt++) {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const body = await res.json() as { id?: string };
+            if (!body.id) throw new Error("identity response missing id");
+            console.log(`[bank] resolved owner node ID from community: ${body.id}`);
+            return body.id;
+        } catch (err) {
+            const wait = Math.min(30_000, attempt * 5_000);
+            console.warn(`[bank] community not reachable (attempt ${attempt}), retrying in ${wait / 1000}s — ${err}`);
+            await new Promise(r => setTimeout(r, wait));
+        }
+    }
+}
+
 async function main(): Promise<void> {
     await NodeService.getInstance().init({
         type: "infrastructure",
@@ -45,11 +79,8 @@ async function main(): Promise<void> {
     Bank.getInstance().init(accountLoader, transactionLoader);
     AccountOwnerService.getInstance().init(ownerLoader);
 
-    const ownerNodeId = process.env.OWNER_NODE_ID;
-    const ownerType   = process.env.OWNER_TYPE as "community" | "federation" | undefined;
-    if (!ownerNodeId || !ownerType) {
-        throw new Error("[bank] OWNER_NODE_ID and OWNER_TYPE env vars are required");
-    }
+    const ownerNodeId = await resolveOwnerNodeId();
+    const ownerType   = process.env.OWNER_TYPE as "community" | "federation" | undefined ?? "community";
     if (ownerType !== "community" && ownerType !== "federation") {
         throw new Error(`[bank] OWNER_TYPE must be "community" or "federation", got "${ownerType}"`);
     }

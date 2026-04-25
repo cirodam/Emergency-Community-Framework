@@ -32,5 +32,5 @@ COPY --from=backend-builder /app/packages/community/dist ./packages/community/di
 COPY --from=backend-builder /app/packages/community/package.json ./packages/community/
 COPY --from=frontend-builder /app/frontend/dist ./packages/community/public
 
-EXPOSE 3000
-CMD ["node", "packages/community/dist/index.js"]
+EXPOSE 3002
+CMD ["node", "packages/community/dist/server.js"]

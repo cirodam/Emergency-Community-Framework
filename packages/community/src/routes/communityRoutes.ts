@@ -2,9 +2,13 @@ import { Router } from "express";
 import * as persons from "./PersonController.js";
 import * as auth from "./AuthController.js";
 import * as domains from "./DomainController.js";
+import * as setup from "./SetupController.js";
 
 const router = Router();
 
+// Setup (first-boot only)
+router.get( "/setup/status", setup.getSetupStatus);
+router.post("/setup",        setup.setup);
 // Persons
 router.get(   "/persons",                persons.listPersons);
 router.get(   "/persons/:id",            persons.getPerson);

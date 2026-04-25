@@ -1,0 +1,12 @@
+node_modules
+packages/*/node_modules
+packages/*/dist
+packages/*/frontend/node_modules
+packages/*/frontend/dist
+.git
+*.md
+architecture.md
+banking-layer.md
+governance-layer.md
+network-layer.md
+monorepo-bootstrap.md

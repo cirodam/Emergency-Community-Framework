@@ -38,6 +38,41 @@ export interface ConstitutionDocument {
     }[];
 }
 
+// ── Setup ─────────────────────────────────────────────────────────────────────
+
+export async function getSetupStatus(): Promise<{ needsSetup: boolean }> {
+    const res = await fetch("/api/setup/status");
+    if (!res.ok) throw new Error("Failed to check setup status");
+    return res.json() as Promise<{ needsSetup: boolean }>;
+}
+
+export interface SetupPayload {
+    communityName: string;
+    firstName: string;
+    lastName: string;
+    birthDate: string;   // ISO date string, e.g. "1990-04-25"
+    handle: string;
+    password: string;
+}
+
+export interface SetupResult {
+    communityName: string;
+    founder: { id: string; firstName: string; lastName: string; handle: string };
+}
+
+export async function runSetup(payload: SetupPayload): Promise<SetupResult> {
+    const res = await fetch("/api/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Setup failed");
+    }
+    return res.json() as Promise<SetupResult>;
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 export async function login(handle: string, password: string): Promise<PersonDto> {

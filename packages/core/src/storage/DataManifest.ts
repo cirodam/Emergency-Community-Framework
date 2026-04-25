@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { relative, resolve } from "path";
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from "fs";
+import { dirname, relative, resolve } from "path";
 import { NodeSigner } from "../network/NodeSigner.js";
 
 const MANIFEST_PATH = "data/.manifest.json";
@@ -109,6 +109,7 @@ export class DataManifest {
         if (!this.signerFn) return;
         const payload = canonical(this.entries);
         const signature = this.signerFn(payload);
+        mkdirSync(dirname(MANIFEST_PATH), { recursive: true });
         writeFileSync(
             MANIFEST_PATH,
             JSON.stringify({ entries: this.entries, signature }, null, 2),
