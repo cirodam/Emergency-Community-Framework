@@ -1,7 +1,6 @@
 import { randomUUID } from "crypto";
 import { IEconomicActor } from "@ecf/core";
 
-export { BankLike } from "./BankLike.js";
 
 /**
  * A FunctionalUnit is the operational body that does actual work within a domain.

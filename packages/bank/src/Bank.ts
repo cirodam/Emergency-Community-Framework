@@ -34,21 +34,21 @@ export class Bank {
         this.accountLoader = accountLoader;
         this.transactionLoader = transactionLoader;
         for (const account of accountLoader.loadAll()) {
-            this.accounts.set(account.id, account);
+            this.accounts.set(account.accountId, account);
             const list = this.ownerIndex.get(account.ownerId) ?? [];
-            list.push(account.id);
+            list.push(account.accountId);
             this.ownerIndex.set(account.ownerId, list);
         }
     }
 
     // ── Account management ────────────────────────────────────────────────────
 
-    openAccount(owner: IEconomicActor, label: string, overdraftLimit: number = 0, exemptFromDemurrage: boolean = false): BankAccount {
-        const account = new BankAccount(owner, label, overdraftLimit, exemptFromDemurrage);
-        this.accounts.set(account.id, account);
+    openAccount(owner: IEconomicActor, label: string, currency: Currency, overdraftLimit: number = 0): BankAccount {
+        const account = new BankAccount(owner, label, currency, overdraftLimit);
+        this.accounts.set(account.accountId, account);
 
         const ownerAccounts = this.ownerIndex.get(owner.getId()) ?? [];
-        ownerAccounts.push(account.id);
+        ownerAccounts.push(account.accountId);
         this.ownerIndex.set(owner.getId(), ownerAccounts);
         this.accountLoader?.save(account);
 
@@ -76,9 +76,9 @@ export class Bank {
         const ids = this.ownerIndex.get(ownerId) ?? [];
         for (const id of ids) {
             const account = this.accounts.get(id);
-            if (account && account.kin !== 0) {
+            if (account && account.amount !== 0) {
                 throw new Error(
-                    `Cannot close account ${id} (label: "${account.label}") for owner ${ownerId}: balance is ${account.kin}`
+                    `Cannot close account ${id} (label: "${account.label}") for owner ${ownerId}: balance is ${account.amount}`
                 );
             }
         }
@@ -94,7 +94,6 @@ export class Bank {
     transfer(
         fromAccountId: string,
         toAccountId: string,
-        currency: Currency,
         amount: number,
         memo: string = ""
     ): BankTransaction {
@@ -105,18 +104,25 @@ export class Bank {
         const from = this.accounts.get(fromAccountId);
         const to = this.accounts.get(toAccountId);
         if (!from) throw new Error(`Account ${fromAccountId} not found`);
-        if (!to) throw new Error(`Account ${toAccountId} not found`);
+        if (!to)   throw new Error(`Account ${toAccountId} not found`);
 
-        if (from.kin - amount < from.overdraftLimit) {
+        if (from.currency !== to.currency) {
             throw new Error(
-                `Insufficient funds: account ${fromAccountId} has ${from.kin}, limit ${from.overdraftLimit}, attempted ${amount}`
+                `Currency mismatch: account ${fromAccountId} is ${from.currency}, ` +
+                `account ${toAccountId} is ${to.currency}`
+            );
+        }
+
+        if (from.amount - amount < from.overdraftLimit) {
+            throw new Error(
+                `Insufficient funds: account ${from.accountId} has ${from.amount}, limit ${from.overdraftLimit}, attempted ${amount}`
             );
         }
 
         from.debit(amount);
         to.credit(amount);
 
-        const tx = new BankTransaction(fromAccountId, toAccountId, currency, amount, memo);
+        const tx = new BankTransaction(fromAccountId, toAccountId, from.currency, amount, memo);
         this.accountLoader?.save(from);
         this.accountLoader?.save(to);
         this.transactionLoader?.save(tx);

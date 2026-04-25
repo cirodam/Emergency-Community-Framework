@@ -1,9 +1,37 @@
 import { Request, Response } from "express";
 import { Bank } from "../Bank.js";
 import { Currency } from "../BankTransaction.js";
+import { IEconomicActor } from "@ecf/core";
 
 const CURRENCIES: Currency[] = ["kin", "kithe"];
 const bank = () => Bank.getInstance();
+
+// POST /api/accounts
+// Body: { ownerId, ownerName, currency, label?, overdraftLimit? }
+export function createAccount(req: Request, res: Response): void {
+    const { ownerId, ownerName, currency, label, overdraftLimit } = req.body ?? {};
+    if (typeof ownerId !== "string" || !ownerId) {
+        res.status(400).json({ error: "ownerId is required" }); return;
+    }
+    if (typeof ownerName !== "string" || !ownerName) {
+        res.status(400).json({ error: "ownerName is required" }); return;
+    }
+    if (!CURRENCIES.includes(currency)) {
+        res.status(400).json({ error: `currency must be one of: ${CURRENCIES.join(", ")}` }); return;
+    }
+    const owner: IEconomicActor = {
+        getId: () => ownerId,
+        getDisplayName: () => ownerName,
+        getHandle: () => ownerName.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+    };
+    const account = bank().openAccount(owner, label ?? "primary", currency as Currency, overdraftLimit ?? 0);
+    res.status(201).json(toAccountDto(account));
+}
+
+// GET /api/accounts (all accounts — admin use)
+export function getAllAccounts(_req: Request, res: Response): void {
+    res.json(bank().getAllAccounts().map(toAccountDto));
+}
 
 // GET /api/accounts/:ownerId
 export function getAccounts(req: Request, res: Response): void {
@@ -45,9 +73,9 @@ export function getTransactions(req: Request, res: Response): void {
 }
 
 // POST /api/transfers
-// Body: { fromAccountId, toAccountId, currency, amount, memo? }
+// Body: { fromAccountId, toAccountId, amount, memo? }
 export function createTransfer(req: Request, res: Response): void {
-    const { fromAccountId, toAccountId, currency, amount, memo } = req.body ?? {};
+    const { fromAccountId, toAccountId, amount, memo } = req.body ?? {};
 
     if (typeof fromAccountId !== "string" || !fromAccountId) {
         res.status(400).json({ error: "fromAccountId is required" });
@@ -55,10 +83,6 @@ export function createTransfer(req: Request, res: Response): void {
     }
     if (typeof toAccountId !== "string" || !toAccountId) {
         res.status(400).json({ error: "toAccountId is required" });
-        return;
-    }
-    if (!CURRENCIES.includes(currency)) {
-        res.status(400).json({ error: `currency must be one of: ${CURRENCIES.join(", ")}` });
         return;
     }
     if (typeof amount !== "number" || amount <= 0) {
@@ -71,22 +95,22 @@ export function createTransfer(req: Request, res: Response): void {
     }
 
     try {
-        const tx = bank().transfer(fromAccountId, toAccountId, currency as Currency, amount, memo ?? "");
+        const tx = bank().transfer(fromAccountId, toAccountId, amount, memo ?? "");
         res.status(201).json(toTxDto(tx));
     } catch (err) {
         res.status(422).json({ error: (err as Error).message });
     }
 }
 
-function toAccountDto(a: { id: string; ownerId: string; label: string; kin: number; overdraftLimit: number; exemptFromDemurrage: boolean; createdAt: Date }) {
+function toAccountDto(a: { accountId: string; ownerId: string; label: string; currency: string; amount: number; overdraftLimit: number; createdAt: Date }) {
     return {
-        id:                  a.id,
-        ownerId:             a.ownerId,
-        label:               a.label,
-        kin:                 a.kin,
-        overdraftLimit:      a.overdraftLimit,
-        exemptFromDemurrage: a.exemptFromDemurrage,
-        createdAt:           a.createdAt,
+        accountId:      a.accountId,
+        ownerId:        a.ownerId,
+        label:          a.label,
+        currency:       a.currency,
+        amount:         a.amount,
+        overdraftLimit: a.overdraftLimit,
+        createdAt:      a.createdAt,
     };
 }
 

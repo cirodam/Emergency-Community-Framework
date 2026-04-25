@@ -227,7 +227,7 @@ export class DomainService {
         const payerAccount = await bank.getPrimaryAccountAsync(payerId);
         if (!payerAccount) return;
 
-        let remaining = payerAccount.kin;
+        let remaining = payerAccount.amount;
         for (const roleId of roleIds) {
             const role = this.roles.get(roleId);
             if (!role || !role.isActive() || !role.memberId) continue;
@@ -242,7 +242,7 @@ export class DomainService {
                 console.warn(`[DomainService] no primary account for role holder ${role.memberId} ("${role.title}")`);
                 continue;
             }
-            await bank.transfer(payerAccount.id, recipientAccount.id, "kin", amount, `payroll: ${role.title}`);
+            await bank.transfer(payerAccount.accountId, recipientAccount.accountId, amount, `payroll: ${role.title}`);
             remaining -= amount;
         }
     }

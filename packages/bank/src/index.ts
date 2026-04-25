@@ -5,6 +5,7 @@ import { NodeService, DataManifest, networkRouter } from "@ecf/core";
 import { Bank } from "./Bank.js";
 import { AccountLoader } from "./AccountLoader.js";
 import { TransactionLoader } from "./TransactionLoader.js";
+import { BankCharterLoader } from "./BankCharterLoader.js";
 import bankRoutes from "./routes/bankRoutes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -39,9 +40,22 @@ async function main(): Promise<void> {
     const transactionLoader = new TransactionLoader(resolve(DATA_DIR, "transactions"));
     Bank.getInstance().init(accountLoader, transactionLoader);
 
+    const ownerNodeId = process.env.OWNER_NODE_ID;
+    const ownerType   = process.env.OWNER_TYPE as "community" | "federation" | undefined;
+    if (!ownerNodeId || !ownerType) {
+        throw new Error("[bank] OWNER_NODE_ID and OWNER_TYPE env vars are required");
+    }
+    if (ownerType !== "community" && ownerType !== "federation") {
+        throw new Error(`[bank] OWNER_TYPE must be "community" or "federation", got "${ownerType}"`);
+    }
+    const charter = new BankCharterLoader(DATA_DIR).load(ownerNodeId, ownerType);
+
     // API routes
     app.use("/api", bankRoutes);
     app.use("/api/node", networkRouter);
+
+    // Charter — who governs this bank
+    app.get("/api/charter", (_req, res) => { res.json(charter); });
 
     // Health check
     app.get("/health", (_req, res) => { res.json({ status: "ok" }); });
@@ -69,3 +83,5 @@ export { BankTransaction } from "./BankTransaction.js";
 export type { Currency } from "./BankTransaction.js";
 export { AccountLoader } from "./AccountLoader.js";
 export { TransactionLoader } from "./TransactionLoader.js";
+export { BankCharterLoader } from "./BankCharterLoader.js";
+export type { BankCharter, CharterOwnerType } from "./BankCharterLoader.js";

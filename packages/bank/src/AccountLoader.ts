@@ -1,18 +1,22 @@
 import { BankAccount } from "./BankAccount.js";
 import { FileStore } from "@ecf/core";
+import { Currency } from "./BankTransaction.js";
 
 interface PersistedRecord {
-    id: string;
+    accountId: string;
     ownerId: string;
     label: string;
-    kin: number;
+    currency: Currency;
+    amount: number;
     overdraftLimit: number;
-    exemptFromDemurrage: boolean;
     createdAt: string;
     // Backward-compat fields from older schema versions (read-only, never written)
+    id?: string;               // old field name for accountId
+    kin?: number;
     credits?: number;
     allowNegativeKin?: boolean;
     allowNegativeCredits?: boolean;
+    exemptFromDemurrage?: boolean; // removed — governance concern
 }
 
 export class AccountLoader {
@@ -23,14 +27,14 @@ export class AccountLoader {
     }
 
     save(account: BankAccount): void {
-        this.store.write(account.id, {
-            id:                  account.id,
-            ownerId:             account.ownerId,
-            label:               account.label,
-            kin:                 account.kin,
-            overdraftLimit:      account.overdraftLimit,
-            exemptFromDemurrage: account.exemptFromDemurrage,
-            createdAt:           account.createdAt.toISOString(),
+        this.store.write(account.accountId, {
+            accountId:      account.accountId,
+            ownerId:        account.ownerId,
+            label:          account.label,
+            currency:       account.currency,
+            amount:         account.amount,
+            overdraftLimit: account.overdraftLimit,
+            createdAt:      account.createdAt.toISOString(),
         });
     }
 
@@ -38,8 +42,8 @@ export class AccountLoader {
         return this.store.readAll<PersistedRecord>().map(r => this.fromRecord(r));
     }
 
-    delete(accountId: string): boolean {
-        return this.store.delete(accountId);
+    delete(id: string): boolean {
+        return this.store.delete(id);
     }
 
     private fromRecord(r: PersistedRecord): BankAccount {
@@ -53,17 +57,23 @@ export class AccountLoader {
             overdraftLimit = 0;
         }
 
-        // Backward compat: old schema used "credits" instead of "kin"
-        const kin = r.kin ?? r.credits ?? 0;
+        // Backward compat: old schema stored balance as "kin" or "credits"
+        const amount = r.amount ?? r.kin ?? r.credits ?? 0;
+
+        // Backward compat: old schema had no currency field — assume "kin"
+        const currency: Currency = r.currency ?? "kin";
+
+        // Backward compat: old records used "id" instead of "accountId"
+        const accountId = r.accountId ?? r.id ?? "";
 
         return BankAccount.restore({
-            id:                  r.id,
-            ownerId:             r.ownerId,
-            label:               r.label,
-            kin,
+            accountId,
+            ownerId:        r.ownerId,
+            label:          r.label,
+            currency,
+            amount,
             overdraftLimit,
-            exemptFromDemurrage: r.exemptFromDemurrage,
-            createdAt:           new Date(r.createdAt),
+            createdAt:      new Date(r.createdAt),
         });
     }
 }
