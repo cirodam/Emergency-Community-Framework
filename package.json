@@ -1,0 +1,10 @@
+{
+  "name": "emergency-community-framework",
+  "private": true,
+  "workspaces": [
+    "packages/core",
+    "packages/bank",
+    "packages/community",
+    "packages/federation"
+  ]
+}

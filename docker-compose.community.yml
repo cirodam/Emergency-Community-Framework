@@ -1,0 +1,31 @@
+services:
+  bank:
+    build:
+      context: .
+      dockerfile: packages/bank/Dockerfile
+    ports:
+      - "3001:3001"
+    volumes:
+      - bank-data:/data
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /data
+
+  community:
+    build:
+      context: .
+      dockerfile: packages/community/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /data
+      BANK_URL: http://bank:3001
+    depends_on:
+      - bank
+    volumes:
+      - community-data:/data
+
+volumes:
+  bank-data:
+  community-data:
