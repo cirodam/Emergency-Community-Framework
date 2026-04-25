@@ -8,7 +8,7 @@ RUN npm run build
 FROM node:22-alpine AS backend-builder
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/core/package.json ./packages/core/
 COPY packages/community/package.json ./packages/community/
 
