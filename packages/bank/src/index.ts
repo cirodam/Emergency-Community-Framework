@@ -6,7 +6,10 @@ import { Bank } from "./Bank.js";
 import { AccountLoader } from "./AccountLoader.js";
 import { TransactionLoader } from "./TransactionLoader.js";
 import { BankCharterLoader } from "./BankCharterLoader.js";
+import { AccountOwnerLoader } from "./AccountOwnerLoader.js";
+import { AccountOwnerService } from "./AccountOwnerService.js";
 import bankRoutes from "./routes/bankRoutes.js";
+import ownerRoutes from "./routes/ownerRoutes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -36,9 +39,11 @@ async function main(): Promise<void> {
         NodeService.getInstance().getSigner().publicKeyHex
     );
 
-    const accountLoader = new AccountLoader(resolve(DATA_DIR, "accounts"));
-    const transactionLoader = new TransactionLoader(resolve(DATA_DIR, "transactions"));
+    const accountLoader      = new AccountLoader(resolve(DATA_DIR, "accounts"));
+    const transactionLoader  = new TransactionLoader(resolve(DATA_DIR, "transactions"));
+    const ownerLoader        = new AccountOwnerLoader(resolve(DATA_DIR, "owners"));
     Bank.getInstance().init(accountLoader, transactionLoader);
+    AccountOwnerService.getInstance().init(ownerLoader);
 
     const ownerNodeId = process.env.OWNER_NODE_ID;
     const ownerType   = process.env.OWNER_TYPE as "community" | "federation" | undefined;
@@ -52,6 +57,7 @@ async function main(): Promise<void> {
 
     // API routes
     app.use("/api", bankRoutes);
+    app.use("/api", ownerRoutes);
     app.use("/api/node", networkRouter);
 
     // Charter — who governs this bank
@@ -85,3 +91,8 @@ export { AccountLoader } from "./AccountLoader.js";
 export { TransactionLoader } from "./TransactionLoader.js";
 export { BankCharterLoader } from "./BankCharterLoader.js";
 export type { BankCharter, CharterOwnerType } from "./BankCharterLoader.js";
+export { AccountOwner } from "./AccountOwner.js";
+export type { AccountOwnerRecord, OwnerType } from "./AccountOwner.js";
+export { AccountOwnerLoader } from "./AccountOwnerLoader.js";
+export { AccountOwnerService } from "./AccountOwnerService.js";
+export type { CreateOwnerOptions } from "./AccountOwnerService.js";

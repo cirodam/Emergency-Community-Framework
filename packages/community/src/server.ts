@@ -8,7 +8,14 @@ import { CommunityRoleLoader } from "./common/domain/CommunityRoleLoader.js";
 import { FunctionalUnitLoader } from "./common/domain/FunctionalUnitLoader.js";
 import { FunctionalDomainLoader } from "./common/domain/FunctionalDomainLoader.js";
 import { LeaderPoolLoader } from "./governance/LeaderPoolLoader.js";
+import { Constitution } from "./governance/Constitution.js";
+import { ConstitutionLoader } from "./governance/ConstitutionLoader.js";
 import { DomainService } from "./DomainService.js";
+import { BankClient } from "./BankClient.js";
+import { CentralBank } from "./domains/central_bank/CentralBank.js";
+import { CentralBankLoader } from "./domains/central_bank/CentralBankLoader.js";
+import { CurrencyBoard } from "./domains/currency_board/CurrencyBoard.js";
+import { CurrencyBoardLoader } from "./domains/currency_board/CurrencyBoardLoader.js";
 import communityRoutes from "./routes/communityRoutes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -40,6 +47,9 @@ async function main(): Promise<void> {
         NodeService.getInstance().getSigner().publicKeyHex,
     );
 
+    // ── Constitution ───────────────────────────────────────────────────────
+    new ConstitutionLoader(resolve(DATA_DIR, "governance")).load();
+
     // ── Persons ────────────────────────────────────────────────────────────
     const personLoader = new PersonLoader(resolve(DATA_DIR, "persons"));
     PersonService.getInstance().init(personLoader);
@@ -58,6 +68,11 @@ async function main(): Promise<void> {
     //   import { FoodDomain } from "./domains/FoodDomain.js";
     //   domainSvc.registerDomain(FoodDomain.getInstance());
 
+    // ── Monetary institutions ──────────────────────────────────────────────
+    const bank = new BankClient(BANK_URL);
+    await CentralBank.getInstance().init(bank, new CentralBankLoader(DATA_DIR));
+    await CurrencyBoard.getInstance().init(bank, new CurrencyBoardLoader(DATA_DIR));
+
     // ── Routes ─────────────────────────────────────────────────────────────
     app.use("/api",       communityRoutes);
     app.use("/api/node",  networkRouter);
@@ -68,6 +83,10 @@ async function main(): Promise<void> {
     app.get("/api/identity", (_req, res) => {
         const identity = NodeService.getInstance().getIdentity();
         res.json({ id: identity.id, publicKey: identity.publicKey, name: identity.name });
+    });
+
+    app.get("/api/constitution", (_req, res) => {
+        res.json(Constitution.getInstance().toDocument());
     });
 
     // Serve frontend

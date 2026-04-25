@@ -129,6 +129,47 @@ export class Bank {
         return tx;
     }
 
+    // ── Demurrage ─────────────────────────────────────────────────────────────
+
+    /**
+     * Charge a holding fee on every account in `currency` except the sink.
+     *
+     * `rate` is a fraction of the current balance, e.g. 0.02 = 2%.
+     * Accounts that cannot cover the full fee are charged only what is available
+     * above their overdraft limit. Zero-balance accounts are skipped entirely.
+     * Returns all generated transactions.
+     */
+    applyDemurrage(
+        currency: Currency,
+        rate: number,
+        sinkAccountId: string,
+        memo: string = "demurrage"
+    ): BankTransaction[] {
+        if (!Number.isFinite(rate) || rate <= 0 || rate >= 1) {
+            throw new Error(`Demurrage rate must be between 0 and 1 (exclusive), got ${rate}`);
+        }
+        const sink = this.accounts.get(sinkAccountId);
+        if (!sink) throw new Error(`Sink account ${sinkAccountId} not found`);
+        if (sink.currency !== currency) {
+            throw new Error(`Sink account currency ${sink.currency} does not match demurrage currency ${currency}`);
+        }
+
+        const txs: BankTransaction[] = [];
+        for (const account of this.accounts.values()) {
+            if (account.currency !== currency) continue;
+            if (account.accountId === sinkAccountId) continue;
+            if (account.amount <= 0) continue;
+
+            const fullFee    = Math.round(account.amount * rate * 100) / 100;
+            const headroom   = Math.round((account.amount - account.overdraftLimit) * 100) / 100;
+            const chargeable = Math.min(fullFee, headroom);
+            if (chargeable <= 0) continue;
+
+            txs.push(this.transfer(account.accountId, sinkAccountId, chargeable, memo));
+        }
+        return txs;
+    }
+
     // ── Transaction history ───────────────────────────────────────────────────
 
     getTransactions(accountId?: string, month?: string): BankTransaction[] {

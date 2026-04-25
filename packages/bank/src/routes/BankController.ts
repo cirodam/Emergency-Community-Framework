@@ -4,6 +4,7 @@ import { Currency } from "../BankTransaction.js";
 import { IEconomicActor } from "@ecf/core";
 
 const CURRENCIES: Currency[] = ["kin", "kithe"];
+
 const bank = () => Bank.getInstance();
 
 // POST /api/accounts
@@ -24,7 +25,9 @@ export function createAccount(req: Request, res: Response): void {
         getDisplayName: () => ownerName,
         getHandle: () => ownerName.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
     };
-    const account = bank().openAccount(owner, label ?? "primary", currency as Currency, overdraftLimit ?? 0);
+    // null overdraftLimit → -Infinity (issuance accounts for central bank / currency board)
+    const resolvedOverdraft = overdraftLimit === null ? -Infinity : (overdraftLimit ?? 0);
+    const account = bank().openAccount(owner, label ?? "primary", currency as Currency, resolvedOverdraft);
     res.status(201).json(toAccountDto(account));
 }
 
@@ -112,6 +115,30 @@ function toAccountDto(a: { accountId: string; ownerId: string; label: string; cu
         overdraftLimit: a.overdraftLimit,
         createdAt:      a.createdAt,
     };
+}
+
+// POST /api/demurrage
+// Body: { currency, rate, sinkAccountId, memo? }
+export function applyDemurrage(req: Request, res: Response): void {
+    const { currency, rate, sinkAccountId, memo } = req.body ?? {};
+    if (!CURRENCIES.includes(currency)) {
+        res.status(400).json({ error: `currency must be one of: ${CURRENCIES.join(", ")}` }); return;
+    }
+    if (typeof rate !== "number" || rate <= 0 || rate >= 1) {
+        res.status(400).json({ error: "rate must be a number between 0 and 1 (exclusive)" }); return;
+    }
+    if (typeof sinkAccountId !== "string" || !sinkAccountId) {
+        res.status(400).json({ error: "sinkAccountId is required" }); return;
+    }
+    if (memo !== undefined && typeof memo !== "string") {
+        res.status(400).json({ error: "memo must be a string" }); return;
+    }
+    try {
+        const txs = bank().applyDemurrage(currency as Currency, rate, sinkAccountId, memo ?? "demurrage");
+        res.status(201).json({ count: txs.length, transactions: txs.map(toTxDto) });
+    } catch (err) {
+        res.status(422).json({ error: (err as Error).message });
+    }
 }
 
 function toTxDto(t: { id: string; fromAccountId: string; toAccountId: string; currency: Currency; amount: number; memo: string; timestamp: Date }) {
