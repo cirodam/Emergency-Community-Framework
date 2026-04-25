@@ -17,3 +17,6 @@ export { FunctionalUnitLoader } from "./common/domain/FunctionalUnitLoader.js";
 export { FunctionalDomainLoader } from "./common/domain/FunctionalDomainLoader.js";
 export { UnitTemplateRegistry } from "./common/domain/UnitTemplateRegistry.js";
 
+export { LeaderPool } from "./governance/LeaderPool.js";
+export { LeaderPoolLoader } from "./governance/LeaderPoolLoader.js";
+

@@ -1,0 +1,214 @@
+import { Request, Response } from "express";
+import { DomainService } from "../DomainService.js";
+import { FunctionalDomain } from "../common/domain/FunctionalDomain.js";
+import { FunctionalUnit } from "../common/domain/FunctionalUnit.js";
+import { CommunityRole } from "../common/CommunityRole.js";
+import { LeaderPool } from "../governance/LeaderPool.js";
+
+const svc = () => DomainService.getInstance();
+
+// ── Domains ───────────────────────────────────────────────────────────────────
+
+// GET /api/domains
+export function listDomains(_req: Request, res: Response): void {
+    res.json(svc().getDomains().map(toDomainDto));
+}
+
+// GET /api/domains/:id
+export function getDomain(req: Request, res: Response): void {
+    const domain = svc().getDomain(req.params.id as string);
+    if (!domain) { res.status(404).json({ error: "Domain not found" }); return; }
+    res.json(toDomainDto(domain));
+}
+
+// PATCH /api/domains/:id
+// Body: { poolId? }
+export function updateDomain(req: Request, res: Response): void {
+    const domain = svc().getDomain(req.params.id as string);
+    if (!domain) { res.status(404).json({ error: "Domain not found" }); return; }
+    const { poolId } = req.body ?? {};
+    if (poolId !== undefined) {
+        if (poolId !== null && typeof poolId !== "string") {
+            res.status(400).json({ error: "poolId must be a string or null" }); return;
+        }
+        domain.poolId = poolId;
+        // Persist via DomainService (re-save domain state)
+        svc().registerDomain(domain); // no-op if already registered, updates map
+    }
+    res.json(toDomainDto(domain));
+}
+
+// ── Units ─────────────────────────────────────────────────────────────────────
+
+// GET /api/units
+export function listUnits(_req: Request, res: Response): void {
+    res.json(svc().getUnits().map(toUnitDto));
+}
+
+// GET /api/units/:id
+export function getUnit(req: Request, res: Response): void {
+    const unit = svc().getUnit(req.params.id as string);
+    if (!unit) { res.status(404).json({ error: "Unit not found" }); return; }
+    res.json(toUnitDto(unit));
+}
+
+// ── Roles ─────────────────────────────────────────────────────────────────────
+
+// GET /api/roles
+export function listRoles(_req: Request, res: Response): void {
+    res.json(svc().getRoles().map(toRoleDto));
+}
+
+// GET /api/roles/:id
+export function getRole(req: Request, res: Response): void {
+    const role = svc().getRole(req.params.id as string);
+    if (!role) { res.status(404).json({ error: "Role not found" }); return; }
+    res.json(toRoleDto(role));
+}
+
+// POST /api/roles
+// Body: { title, description?, kinPerMonth?, parentId, parentType: "domain"|"unit" }
+export function createRole(req: Request, res: Response): void {
+    const { title, description, kinPerMonth, parentId, parentType } = req.body ?? {};
+    if (typeof title !== "string" || !title.trim()) {
+        res.status(400).json({ error: "title is required" }); return;
+    }
+    if (typeof parentId !== "string" || !parentId) {
+        res.status(400).json({ error: "parentId is required" }); return;
+    }
+    if (parentType !== "domain" && parentType !== "unit") {
+        res.status(400).json({ error: "parentType must be 'domain' or 'unit'" }); return;
+    }
+    const role = new CommunityRole(title.trim(), description ?? "", kinPerMonth ?? 0);
+    svc().createRole(role, parentId, parentType);
+    res.status(201).json(toRoleDto(role));
+}
+
+// PATCH /api/roles/:id
+// Body: { memberId?, kinPerMonth?, funded?, termStartDate?, termEndDate?, title?, description? }
+export function updateRole(req: Request, res: Response): void {
+    const role = svc().getRole(req.params.id as string);
+    if (!role) { res.status(404).json({ error: "Role not found" }); return; }
+    const { memberId, kinPerMonth, funded, termStartDate, termEndDate, title, description } = req.body ?? {};
+    if (title        !== undefined) role.title        = title;
+    if (description  !== undefined) role.description  = description;
+    if (memberId     !== undefined) role.memberId     = memberId;
+    if (kinPerMonth  !== undefined) role.kinPerMonth  = kinPerMonth;
+    if (funded       !== undefined) role.funded       = funded;
+    if (termStartDate !== undefined) role.termStartDate = termStartDate ? new Date(termStartDate) : null;
+    if (termEndDate   !== undefined) role.termEndDate   = termEndDate   ? new Date(termEndDate)   : null;
+    svc().saveRole(role);
+    res.json(toRoleDto(role));
+}
+
+// DELETE /api/roles/:id
+export function deleteRole(req: Request, res: Response): void {
+    const deleted = svc().deleteRole(req.params.id as string);
+    if (!deleted) { res.status(404).json({ error: "Role not found" }); return; }
+    res.status(204).send();
+}
+
+// ── Pools ─────────────────────────────────────────────────────────────────────
+
+// GET /api/pools
+export function listPools(_req: Request, res: Response): void {
+    res.json(svc().getPools().map(toPoolDto));
+}
+
+// GET /api/pools/:id
+export function getPool(req: Request, res: Response): void {
+    const pool = svc().getPool(req.params.id as string);
+    if (!pool) { res.status(404).json({ error: "Pool not found" }); return; }
+    res.json(toPoolDto(pool));
+}
+
+// POST /api/pools
+// Body: { name, description? }
+export function createPool(req: Request, res: Response): void {
+    const { name, description } = req.body ?? {};
+    if (typeof name !== "string" || !name.trim()) {
+        res.status(400).json({ error: "name is required" }); return;
+    }
+    const pool = new LeaderPool(name.trim(), description ?? "");
+    svc().createPool(pool);
+    res.status(201).json(toPoolDto(pool));
+}
+
+// POST /api/pools/:id/members
+// Body: { personId }
+export function addPoolMember(req: Request, res: Response): void {
+    const pool = svc().getPool(req.params.id as string);
+    if (!pool) { res.status(404).json({ error: "Pool not found" }); return; }
+    const { personId } = req.body ?? {};
+    if (typeof personId !== "string" || !personId) {
+        res.status(400).json({ error: "personId is required" }); return;
+    }
+    pool.addPerson(personId);
+    svc().savePool(pool);
+    res.json(toPoolDto(pool));
+}
+
+// DELETE /api/pools/:id/members/:personId
+export function removePoolMember(req: Request, res: Response): void {
+    const pool = svc().getPool(req.params.id as string);
+    if (!pool) { res.status(404).json({ error: "Pool not found" }); return; }
+    pool.removePerson(req.params.personId as string);
+    svc().savePool(pool);
+    res.json(toPoolDto(pool));
+}
+
+// DELETE /api/pools/:id
+export function deletePool(req: Request, res: Response): void {
+    const deleted = svc().deletePool(req.params.id as string);
+    if (!deleted) { res.status(404).json({ error: "Pool not found" }); return; }
+    res.status(204).send();
+}
+
+// ── DTOs ──────────────────────────────────────────────────────────────────────
+
+function toDomainDto(d: FunctionalDomain) {
+    return {
+        id:      d.getId(),
+        name:    d.getDisplayName(),
+        handle:  d.getHandle(),
+        unitIds: d.unitIds,
+        roleIds: d.roleIds,
+        poolId:  d.poolId,
+    };
+}
+
+function toUnitDto(u: FunctionalUnit) {
+    return {
+        id:          u.id,
+        name:        u.name,
+        description: u.description,
+        type:        u.getType(),
+        personIds:   u.personIds,
+        roleIds:     u.roleIds,
+        createdAt:   u.createdAt,
+    };
+}
+
+function toRoleDto(r: CommunityRole) {
+    return {
+        id:            r.id,
+        title:         r.title,
+        description:   r.description,
+        memberId:      r.memberId,
+        kinPerMonth:   r.kinPerMonth,
+        funded:        r.funded,
+        termStartDate: r.termStartDate,
+        termEndDate:   r.termEndDate,
+        isActive:      r.isActive(),
+    };
+}
+
+function toPoolDto(p: LeaderPool) {
+    return {
+        id:          p.id,
+        name:        p.name,
+        description: p.description,
+        personIds:   p.personIds,
+        createdAt:   p.createdAt,
+    };
+}
