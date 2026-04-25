@@ -135,6 +135,12 @@ export class Bank {
      * Charge a holding fee on every account in `currency` except the sink.
      *
      * `rate` is a fraction of the current balance, e.g. 0.02 = 2%.
+     * `floor` (default 0) — the balance threshold below which no demurrage is
+     *   charged. Only the portion of a balance above the floor is taxed. This
+     *   protects small balances from erosion (see `demurrageFloor` in the
+     *   Constitution).
+     * `excludeAccountIds` — additional accounts to skip (e.g. the social
+     *   insurance pool, which holds deferred liabilities, not circulating kin).
      * Accounts that cannot cover the full fee are charged only what is available
      * above their overdraft limit. Zero-balance accounts are skipped entirely.
      * Returns all generated transactions.
@@ -143,7 +149,9 @@ export class Bank {
         currency: Currency,
         rate: number,
         sinkAccountId: string,
-        memo: string = "demurrage"
+        memo: string = "demurrage",
+        floor: number = 0,
+        excludeAccountIds: string[] = [],
     ): BankTransaction[] {
         if (!Number.isFinite(rate) || rate <= 0 || rate >= 1) {
             throw new Error(`Demurrage rate must be between 0 and 1 (exclusive), got ${rate}`);
@@ -154,13 +162,16 @@ export class Bank {
             throw new Error(`Sink account currency ${sink.currency} does not match demurrage currency ${currency}`);
         }
 
+        const excluded = new Set([sinkAccountId, ...excludeAccountIds]);
+
         const txs: BankTransaction[] = [];
         for (const account of this.accounts.values()) {
             if (account.currency !== currency) continue;
-            if (account.accountId === sinkAccountId) continue;
+            if (excluded.has(account.accountId)) continue;
             if (account.amount <= 0) continue;
 
-            const fullFee    = Math.round(account.amount * rate * 100) / 100;
+            const taxable    = Math.max(0, account.amount - floor);
+            const fullFee    = Math.round(taxable * rate * 100) / 100;
             const headroom   = Math.round((account.amount - account.overdraftLimit) * 100) / 100;
             const chargeable = Math.min(fullFee, headroom);
             if (chargeable <= 0) continue;

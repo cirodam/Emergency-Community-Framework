@@ -85,7 +85,12 @@ export class CurrencyBoard {
      * @param rate  Fraction of balance to collect, e.g. 0.02 = 2%
      * @param memo  Recorded on each generated transaction
      */
-    async applyDemurrage(rate: number, memo = "kithe demurrage"): Promise<{ count: number }> {
-        return this._bank.applyDemurrage("kithe", rate, this._issuanceAccountId, memo);
+    async applyDemurrage(
+        rate: number,
+        memo = "kithe demurrage",
+        excludeAccountIds: string[] = [],
+        floor = 0,
+    ): Promise<{ count: number }> {
+        return this._bank.applyDemurrage("kithe", rate, this._issuanceAccountId, memo, floor, excludeAccountIds);
     }
 }

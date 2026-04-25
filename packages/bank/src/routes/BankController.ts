@@ -118,9 +118,9 @@ function toAccountDto(a: { accountId: string; ownerId: string; label: string; cu
 }
 
 // POST /api/demurrage
-// Body: { currency, rate, sinkAccountId, memo? }
+// Body: { currency, rate, sinkAccountId, memo?, floor?, excludeAccountIds? }
 export function applyDemurrage(req: Request, res: Response): void {
-    const { currency, rate, sinkAccountId, memo } = req.body ?? {};
+    const { currency, rate, sinkAccountId, memo, floor, excludeAccountIds } = req.body ?? {};
     if (!CURRENCIES.includes(currency)) {
         res.status(400).json({ error: `currency must be one of: ${CURRENCIES.join(", ")}` }); return;
     }
@@ -133,8 +133,19 @@ export function applyDemurrage(req: Request, res: Response): void {
     if (memo !== undefined && typeof memo !== "string") {
         res.status(400).json({ error: "memo must be a string" }); return;
     }
+    if (floor !== undefined && typeof floor !== "number") {
+        res.status(400).json({ error: "floor must be a number" }); return;
+    }
+    if (excludeAccountIds !== undefined && !Array.isArray(excludeAccountIds)) {
+        res.status(400).json({ error: "excludeAccountIds must be an array" }); return;
+    }
     try {
-        const txs = bank().applyDemurrage(currency as Currency, rate, sinkAccountId, memo ?? "demurrage");
+        const txs = bank().applyDemurrage(
+            currency as Currency, rate, sinkAccountId,
+            memo ?? "demurrage",
+            floor ?? 0,
+            excludeAccountIds ?? [],
+        );
         res.status(201).json({ count: txs.length, transactions: txs.map(toTxDto) });
     } catch (err) {
         res.status(422).json({ error: (err as Error).message });

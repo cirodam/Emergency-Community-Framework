@@ -26,6 +26,13 @@ export class BankClient {
         return accounts.find(a => a.label === "primary") ?? accounts[0];
     }
 
+    async getAccountById(accountId: string): Promise<{ accountId: string; currency: string; amount: number } | undefined> {
+        const res = await fetch(`${this.baseUrl}/api/account/${encodeURIComponent(accountId)}`);
+        if (res.status === 404) return undefined;
+        if (!res.ok) throw new Error(`[BankClient] getAccountById(${accountId}) failed: ${res.status}`);
+        return res.json() as Promise<{ accountId: string; currency: string; amount: number }>;
+    }
+
     async openAccount(
         ownerId: string,
         ownerName: string,
@@ -60,11 +67,13 @@ export class BankClient {
         rate: number,
         sinkAccountId: string,
         memo = "demurrage",
+        floor = 0,
+        excludeAccountIds: string[] = [],
     ): Promise<{ count: number }> {
         const res = await fetch(`${this.baseUrl}/api/demurrage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ currency, rate, sinkAccountId, memo }),
+            body: JSON.stringify({ currency, rate, sinkAccountId, memo, floor, excludeAccountIds }),
         });
         if (!res.ok) {
             const body = await res.text();

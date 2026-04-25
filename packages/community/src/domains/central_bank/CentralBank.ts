@@ -84,7 +84,12 @@ export class CentralBank {
      * @param rate  Fraction of balance to collect, e.g. 0.02 = 2%
      * @param memo  Recorded on each generated transaction
      */
-    async applyDemurrage(rate: number, memo = "kin demurrage"): Promise<{ count: number }> {
-        return this._bank.applyDemurrage("kin", rate, this._issuanceAccountId, memo);
+    async applyDemurrage(
+        rate: number,
+        memo = "kin demurrage",
+        excludeAccountIds: string[] = [],
+        floor = 0,
+    ): Promise<{ count: number }> {
+        return this._bank.applyDemurrage("kin", rate, this._issuanceAccountId, memo, floor, excludeAccountIds);
     }
 }

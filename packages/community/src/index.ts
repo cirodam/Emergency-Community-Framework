@@ -29,3 +29,9 @@ export { CurrencyBoard } from "./domains/currency_board/CurrencyBoard.js";
 export { CurrencyBoardLoader } from "./domains/currency_board/CurrencyBoardLoader.js";
 export type { CurrencyBoardRecord } from "./domains/currency_board/CurrencyBoardLoader.js";
 
+export { SocialInsuranceMember } from "./domains/social_insurance/SocialInsuranceMember.js";
+export { SocialInsuranceMemberLoader } from "./domains/social_insurance/SocialInsuranceMemberLoader.js";
+export { SocialInsuranceBank } from "./domains/social_insurance/SocialInsuranceBank.js";
+export { SocialInsuranceBankLoader } from "./domains/social_insurance/SocialInsuranceBankLoader.js";
+export type { SocialInsuranceBankRecord } from "./domains/social_insurance/SocialInsuranceBankLoader.js";
+

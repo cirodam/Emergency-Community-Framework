@@ -16,6 +16,9 @@ import { CentralBank } from "./domains/central_bank/CentralBank.js";
 import { CentralBankLoader } from "./domains/central_bank/CentralBankLoader.js";
 import { CurrencyBoard } from "./domains/currency_board/CurrencyBoard.js";
 import { CurrencyBoardLoader } from "./domains/currency_board/CurrencyBoardLoader.js";
+import { SocialInsuranceBank } from "./domains/social_insurance/SocialInsuranceBank.js";
+import { SocialInsuranceBankLoader } from "./domains/social_insurance/SocialInsuranceBankLoader.js";
+import { SocialInsuranceMemberLoader } from "./domains/social_insurance/SocialInsuranceMemberLoader.js";
 import communityRoutes from "./routes/communityRoutes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -72,6 +75,11 @@ async function main(): Promise<void> {
     const bank = new BankClient(BANK_URL);
     await CentralBank.getInstance().init(bank, new CentralBankLoader(DATA_DIR));
     await CurrencyBoard.getInstance().init(bank, new CurrencyBoardLoader(DATA_DIR));
+    await SocialInsuranceBank.getInstance().init(
+        bank,
+        new SocialInsuranceBankLoader(DATA_DIR),
+        new SocialInsuranceMemberLoader(resolve(DATA_DIR, "si_members")),
+    );
 
     // ── Routes ─────────────────────────────────────────────────────────────
     app.use("/api",       communityRoutes);
