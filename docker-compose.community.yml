@@ -28,6 +28,24 @@ services:
     depends_on:
       - community
 
+  market:
+    build:
+      context: .
+      dockerfile: packages/market/Dockerfile
+    ports:
+      - "3003:3003"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      BANK_URL: http://bank:3001
+      COMMUNITY_URL: http://community:3002
+    volumes:
+      - market-data:/app/data
+    depends_on:
+      - bank
+      - community
+
 volumes:
   bank-data:
   community-data:
+  market-data:
