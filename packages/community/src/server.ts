@@ -26,6 +26,38 @@ import { CommunityTreasuryLoader } from "./domains/community_treasury/CommunityT
 import { FederationMembershipService } from "./FederationMembershipService.js";
 import { GsmModemProvider } from "./sms/GsmModemProvider.js";
 import { SmsService } from "./sms/SmsService.js";
+import { FoodDomain } from "./domains/food/FoodDomain.js";
+import { FoodUnitTemplates } from "./domains/food/FoodUnitTemplates.js";
+import { AgricultureDomain } from "./domains/agriculture/AgricultureDomain.js";
+import { AgricultureUnitTemplates } from "./domains/agriculture/AgricultureUnitTemplates.js";
+import { HealthcareDomain } from "./domains/healthcare/HealthcareDomain.js";
+import { HealthcareUnitTemplates } from "./domains/healthcare/HealthcareUnitTemplates.js";
+import { HousingDomain } from "./domains/housing/HousingDomain.js";
+import { HousingUnitTemplates } from "./domains/housing/HousingUnitTemplates.js";
+import { EnergyDomain } from "./domains/energy/EnergyDomain.js";
+import { EnergyUnitTemplates } from "./domains/energy/EnergyUnitTemplates.js";
+import { CommunicationsDomain } from "./domains/communications/CommunicationsDomain.js";
+import { CommunicationsUnitTemplates } from "./domains/communications/CommunicationsUnitTemplates.js";
+import { DeathcareDomain } from "./domains/deathcare/DeathcareDomain.js";
+import { DeathcareUnitTemplates } from "./domains/deathcare/DeathcareUnitTemplates.js";
+import { SanitationDomain } from "./domains/sanitation/SanitationDomain.js";
+import { SanitationUnitTemplates } from "./domains/sanitation/SanitationUnitTemplates.js";
+import { WaterDomain } from "./domains/water/WaterDomain.js";
+import { WaterUnitTemplates } from "./domains/water/WaterUnitTemplates.js";
+import { FireDomain } from "./domains/fire/FireDomain.js";
+import { FireUnitTemplates } from "./domains/fire/FireUnitTemplates.js";
+import { ChildcareDomain } from "./domains/childcare/ChildcareDomain.js";
+import { ChildcareUnitTemplates } from "./domains/childcare/ChildcareUnitTemplates.js";
+import { DependencyCareDomain } from "./domains/dependency_care/DependencyCareDomain.js";
+import { DependencyCareUnitTemplates } from "./domains/dependency_care/DependencyCareUnitTemplates.js";
+import { EducationDomain } from "./domains/education/EducationDomain.js";
+import { EducationUnitTemplates } from "./domains/education/EducationUnitTemplates.js";
+import { EnrichmentDomain } from "./domains/enrichment/EnrichmentDomain.js";
+import { EnrichmentUnitTemplates } from "./domains/enrichment/EnrichmentUnitTemplates.js";
+import { TransitDomain } from "./domains/transit/TransitDomain.js";
+import { TransitUnitTemplates } from "./domains/transit/TransitUnitTemplates.js";
+import { CourierDomain } from "./domains/courier/CourierDomain.js";
+import { CourierUnitTemplates } from "./domains/courier/CourierUnitTemplates.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -83,6 +115,40 @@ async function main(): Promise<void> {
     domainSvc.registerDomain(SocialInsuranceBank.getInstance());
     domainSvc.registerDomain(CommunityTreasury.getInstance());
     domainSvc.registerDomain(CommunityBankDomain.getInstance());
+    domainSvc.registerDomain(FoodDomain.getInstance());
+    domainSvc.registerDomain(AgricultureDomain.getInstance());
+    domainSvc.registerDomain(HealthcareDomain.getInstance());
+    domainSvc.registerDomain(HousingDomain.getInstance());
+    domainSvc.registerDomain(EnergyDomain.getInstance());
+    domainSvc.registerDomain(CommunicationsDomain.getInstance());
+    domainSvc.registerDomain(DeathcareDomain.getInstance());
+    domainSvc.registerDomain(SanitationDomain.getInstance());
+    domainSvc.registerDomain(WaterDomain.getInstance());
+    domainSvc.registerDomain(FireDomain.getInstance());
+    domainSvc.registerDomain(ChildcareDomain.getInstance());
+    domainSvc.registerDomain(DependencyCareDomain.getInstance());
+    domainSvc.registerDomain(EducationDomain.getInstance());
+    domainSvc.registerDomain(EnrichmentDomain.getInstance());
+    domainSvc.registerDomain(TransitDomain.getInstance());
+    domainSvc.registerDomain(CourierDomain.getInstance());
+
+    // Register all unit templates so POST /api/units can instantiate them by type.
+    FoodUnitTemplates.register();
+    AgricultureUnitTemplates.register();
+    HealthcareUnitTemplates.register();
+    HousingUnitTemplates.register();
+    EnergyUnitTemplates.register();
+    CommunicationsUnitTemplates.register();
+    DeathcareUnitTemplates.register();
+    SanitationUnitTemplates.register();
+    WaterUnitTemplates.register();
+    FireUnitTemplates.register();
+    ChildcareUnitTemplates.register();
+    DependencyCareUnitTemplates.register();
+    EducationUnitTemplates.register();
+    EnrichmentUnitTemplates.register();
+    TransitUnitTemplates.register();
+    CourierUnitTemplates.register();
 
     // ── Monetary institutions (non-fatal — bank may be unreachable) ────────
     const bank = new BankClient(BANK_URL, body => NodeService.getInstance().getSigner().signBody(body));

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { DomainService } from "../DomainService.js";
 import { FunctionalDomain } from "../common/domain/FunctionalDomain.js";
 import { FunctionalUnit } from "../common/domain/FunctionalUnit.js";
+import { UnitTemplateRegistry } from "../common/domain/UnitTemplateRegistry.js";
 import { CommunityRole } from "../common/CommunityRole.js";
 import { LeaderPool } from "../governance/LeaderPool.js";
 
@@ -50,6 +51,53 @@ export function getUnit(req: Request, res: Response): void {
     const unit = svc().getUnit(req.params.id as string);
     if (!unit) { res.status(404).json({ error: "Unit not found" }); return; }
     res.json(toUnitDto(unit));
+}
+
+// POST /api/units
+// Body: { type, domainId, name?, description? }
+// Creates a unit from a registered template and attaches it to the domain.
+// Optional name/description override the template defaults.
+export function createUnit(req: Request, res: Response): void {
+    const { type, domainId, name, description } = req.body ?? {};
+    if (typeof type !== "string" || !type.trim()) {
+        res.status(400).json({ error: "type is required" }); return;
+    }
+    if (typeof domainId !== "string" || !domainId) {
+        res.status(400).json({ error: "domainId is required" }); return;
+    }
+    const domain = svc().getDomain(domainId);
+    if (!domain) { res.status(404).json({ error: "Domain not found" }); return; }
+
+    const unit = UnitTemplateRegistry.create(type.trim());
+    if (!unit) { res.status(400).json({ error: `Unknown unit type "${type}"` }); return; }
+
+    if (typeof name === "string" && name.trim()) {
+        (unit as unknown as Record<string, unknown>)["name"] = name.trim();
+    }
+    if (typeof description === "string") {
+        (unit as unknown as Record<string, unknown>)["description"] = description;
+    }
+
+    svc().createUnit(unit, domainId);
+    res.status(201).json(toUnitDto(unit));
+}
+
+// DELETE /api/units/:id
+export function deleteUnit(req: Request, res: Response): void {
+    const deleted = svc().deleteUnit(req.params.id as string);
+    if (!deleted) { res.status(404).json({ error: "Unit not found" }); return; }
+    res.status(204).send();
+}
+
+// GET /api/templates
+// Returns all registered unit templates (type, label, description).
+export function listTemplates(_req: Request, res: Response): void {
+    const templates = UnitTemplateRegistry.getAll().map(t => ({
+        type:        t.type,
+        label:       t.label,
+        description: t.description,
+    }));
+    res.json(templates);
 }
 
 // ── Roles ─────────────────────────────────────────────────────────────────────

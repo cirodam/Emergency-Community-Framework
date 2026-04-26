@@ -41,8 +41,13 @@ router.get(  "/domains/:id", domains.getDomain);
 router.patch("/domains/:id", domains.updateDomain);
 
 // Units
-router.get("/units",     domains.listUnits);
-router.get("/units/:id", domains.getUnit);
+router.get(   "/units",     domains.listUnits);
+router.get(   "/units/:id", domains.getUnit);
+router.post(  "/units",     domains.createUnit);
+router.delete("/units/:id", domains.deleteUnit);
+
+// Unit templates
+router.get("/templates", domains.listTemplates);
 
 // Roles
 router.get(   "/roles",     domains.listRoles);
