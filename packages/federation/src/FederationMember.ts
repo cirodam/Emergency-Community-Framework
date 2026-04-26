@@ -19,6 +19,11 @@ export interface FederationMember {
     /** ISO 8601 join timestamp. */
     joinedAt: string;
     /**
+     * True for the community that founded the federation. Founders bypass
+     * the application process and are registered at first boot.
+     */
+    isFounder: boolean;
+    /**
      * The account ID at the federation bank where this community holds kithe.
      * Populated immediately after joining.
      */
@@ -29,6 +34,7 @@ export function createFederationMember(
     name: string,
     communityNodeId: string,
     communityPublicKey: string,
+    isFounder = false,
 ): FederationMember {
     return {
         id:                 randomUUID(),
@@ -36,6 +42,7 @@ export function createFederationMember(
         communityPublicKey,
         name,
         joinedAt:           new Date().toISOString(),
+        isFounder,
         bankAccountId:      null,
     };
 }

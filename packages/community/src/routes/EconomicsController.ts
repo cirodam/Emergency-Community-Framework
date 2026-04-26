@@ -3,6 +3,7 @@ import { CentralBank } from "../domains/central_bank/CentralBank.js";
 import { CurrencyBoard } from "../domains/currency_board/CurrencyBoard.js";
 import { SocialInsuranceBank } from "../domains/social_insurance/SocialInsuranceBank.js";
 import { BankClient } from "../BankClient.js";
+import { FederationMembershipService } from "../FederationMembershipService.js";
 
 const BANK_URL = process.env.BANK_URL ?? "http://localhost:3001";
 
@@ -48,12 +49,8 @@ export async function getEconomics(_req: Request, res: Response): Promise<void> 
 
 /** GET /api/federation — return current federation membership state */
 export async function getFederationStatus(_req: Request, res: Response): Promise<void> {
-    const cb = CurrencyBoard.getInstance();
-    if (!cb.isReady()) {
-        res.status(503).json({ error: "Currency Board not ready" });
-        return;
-    }
-    res.json(cb.federation ?? { status: "none" });
+    const svc = FederationMembershipService.getInstance();
+    res.json(svc.getStatus() ?? { status: "none" });
 }
 
 /** POST /api/federation/apply — submit an application to join a federation */
@@ -67,14 +64,8 @@ export async function applyToFederation(req: Request, res: Response): Promise<vo
         return;
     }
 
-    const cb = CurrencyBoard.getInstance();
-    if (!cb.isReady()) {
-        res.status(503).json({ error: "Currency Board not ready" });
-        return;
-    }
-
     try {
-        const membership = await cb.applyToFederation(federationUrl, communityName);
+        const membership = await FederationMembershipService.getInstance().apply(federationUrl, communityName);
         res.status(201).json(membership);
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -84,11 +75,6 @@ export async function applyToFederation(req: Request, res: Response): Promise<vo
 
 /** GET /api/federation/sync — poll the federation and refresh local state */
 export async function syncFederationStatus(_req: Request, res: Response): Promise<void> {
-    const cb = CurrencyBoard.getInstance();
-    if (!cb.isReady()) {
-        res.status(503).json({ error: "Currency Board not ready" });
-        return;
-    }
-    const membership = await cb.syncFederationStatus();
+    const membership = await FederationMembershipService.getInstance().sync();
     res.json(membership ?? { status: "none" });
 }

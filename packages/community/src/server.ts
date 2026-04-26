@@ -23,6 +23,7 @@ import communityRoutes from "./routes/communityRoutes.js";
 import { CommunityBankDomain } from "./domains/community_bank/CommunityBankDomain.js";
 import { CommunityTreasury } from "./domains/community_treasury/CommunityTreasury.js";
 import { CommunityTreasuryLoader } from "./domains/community_treasury/CommunityTreasuryLoader.js";
+import { FederationMembershipService } from "./FederationMembershipService.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -47,6 +48,9 @@ async function main(): Promise<void> {
         dataDir: resolve(DATA_DIR, "network"),
         seeds:   (process.env.BOOTSTRAP_PEERS ?? "").split(",").filter(Boolean),
     });
+
+    // ── Federation membership (community node owns the application process) ─
+    FederationMembershipService.getInstance(DATA_DIR);
 
     DataManifest.getInstance().init(
         body => NodeService.getInstance().getSigner().signBody(body),

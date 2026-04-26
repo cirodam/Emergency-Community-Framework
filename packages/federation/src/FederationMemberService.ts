@@ -42,11 +42,11 @@ export class FederationMemberService {
      * Register a new member community. Does NOT open a bank account — that is
      * done by the caller after registration so the account ID can be set.
      */
-    add(name: string, communityNodeId: string, communityPublicKey: string): FederationMember {
+    add(name: string, communityNodeId: string, communityPublicKey: string, isFounder = false): FederationMember {
         if (this.getByNodeId(communityNodeId)) {
             throw new Error(`Community node ${communityNodeId} is already a member`);
         }
-        const member = createFederationMember(name, communityNodeId, communityPublicKey);
+        const member = createFederationMember(name, communityNodeId, communityPublicKey, isFounder);
         this.members.set(member.id, member);
         this.loader.save(member);
         return member;
