@@ -1,31 +1,35 @@
 services:
-  bank:
-    build:
-      context: .
-      dockerfile: packages/bank/Dockerfile
-    ports:
-      - "3001:3001"
-    volumes:
-      - bank-data:/data
-    environment:
-      NODE_ENV: production
-      DATA_DIR: /data
-
   federation:
     build:
       context: .
       dockerfile: packages/federation/Dockerfile
     ports:
-      - "3002:3002"
+      - "3010:3010"
     environment:
       NODE_ENV: production
-      DATA_DIR: /data
-      BANK_URL: http://bank:3001
-    depends_on:
-      - bank
+      DATA_DIR: /app/data
+      BANK_URL: http://federation-bank:3011
     volumes:
-      - federation-data:/data
+      - federation-data:/app/data
+    depends_on:
+      - federation-bank
+
+  federation-bank:
+    build:
+      context: .
+      dockerfile: packages/bank/Dockerfile
+    ports:
+      - "3011:3011"
+    environment:
+      NODE_ENV:     production
+      DATA_DIR:     /app/data
+      PORT:         3011
+      COMMUNITY_URL: http://federation:3010
+      OWNER_TYPE:   federation
+    volumes:
+      - federation-bank-data:/app/data
 
 volumes:
-  bank-data:
   federation-data:
+  federation-bank-data:
+

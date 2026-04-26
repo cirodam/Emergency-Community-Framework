@@ -32,5 +32,5 @@ COPY --from=backend-builder /app/packages/federation/dist ./packages/federation/
 COPY --from=backend-builder /app/packages/federation/package.json ./packages/federation/
 COPY --from=frontend-builder /app/frontend/dist ./packages/federation/public
 
-EXPOSE 3002
+EXPOSE 3010
 CMD ["node", "packages/federation/dist/index.js"]

@@ -43,3 +43,52 @@ export async function getEconomics(_req: Request, res: Response): Promise<void> 
         } : null,
     });
 }
+
+// ── Federation membership ──────────────────────────────────────────────────
+
+/** GET /api/federation — return current federation membership state */
+export async function getFederationStatus(_req: Request, res: Response): Promise<void> {
+    const cb = CurrencyBoard.getInstance();
+    if (!cb.isReady()) {
+        res.status(503).json({ error: "Currency Board not ready" });
+        return;
+    }
+    res.json(cb.federation ?? { status: "none" });
+}
+
+/** POST /api/federation/apply — submit an application to join a federation */
+export async function applyToFederation(req: Request, res: Response): Promise<void> {
+    const { federationUrl, communityName } = req.body as {
+        federationUrl?: string;
+        communityName?: string;
+    };
+    if (!federationUrl || !communityName) {
+        res.status(400).json({ error: "federationUrl and communityName are required" });
+        return;
+    }
+
+    const cb = CurrencyBoard.getInstance();
+    if (!cb.isReady()) {
+        res.status(503).json({ error: "Currency Board not ready" });
+        return;
+    }
+
+    try {
+        const membership = await cb.applyToFederation(federationUrl, communityName);
+        res.status(201).json(membership);
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        res.status(400).json({ error: msg });
+    }
+}
+
+/** GET /api/federation/sync — poll the federation and refresh local state */
+export async function syncFederationStatus(_req: Request, res: Response): Promise<void> {
+    const cb = CurrencyBoard.getInstance();
+    if (!cb.isReady()) {
+        res.status(503).json({ error: "Currency Board not ready" });
+        return;
+    }
+    const membership = await cb.syncFederationStatus();
+    res.json(membership ?? { status: "none" });
+}

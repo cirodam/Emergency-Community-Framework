@@ -13,6 +13,11 @@ router.post("/setup",        setup.setup);
 
 // Economics (public transparency)
 router.get("/economics", economics.getEconomics);
+
+// Federation membership (Currency Board)
+router.get( "/federation",       economics.getFederationStatus);
+router.post("/federation/apply", economics.applyToFederation);
+router.get( "/federation/sync",  economics.syncFederationStatus);
 // Persons
 router.get(   "/persons",                persons.listPersons);
 router.get(   "/persons/:id",            persons.getPerson);
