@@ -2,13 +2,26 @@
  * HTTP client for all bank interactions.
  * The community node never imports @ecf/bank directly — all bank
  * interactions go through this client.
+ *
+ * Pass a `sign` function (from NodeSigner.signBody) to authenticate
+ * mutation requests as the community node. The bank verifies the
+ * x-node-signature header and accepts it in place of a PersonCredential.
  */
 export class BankClient {
     private readonly baseUrl: string;
+    private readonly sign: ((body: string) => string) | null;
 
-    constructor(bankUrl: string) {
+    constructor(bankUrl: string, sign: ((body: string) => string) | null = null) {
         // Trim trailing slash for consistent URL construction
         this.baseUrl = bankUrl.replace(/\/$/, "");
+        this.sign = sign;
+    }
+
+    /** Build headers for a signed POST request. */
+    private signedHeaders(body: string): Record<string, string> {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (this.sign) headers["x-node-signature"] = this.sign(body);
+        return headers;
     }
 
     getPrimaryAccount(ownerId: string): { id: string; kin: number } | undefined {
@@ -39,10 +52,11 @@ export class BankClient {
         currency: "kin" | "kithe" = "kin",
         overdraftLimit: number | null = 0,
     ): Promise<{ accountId: string; currency: string; amount: number }> {
+        const body = JSON.stringify({ ownerId, ownerName, currency, overdraftLimit });
         const res = await fetch(`${this.baseUrl}/api/accounts`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ownerId, ownerName, currency, overdraftLimit }),
+            headers: this.signedHeaders(body),
+            body,
         });
         if (!res.ok) throw new Error(`[BankClient] openAccount(${ownerId}) failed: ${res.status}`);
         return res.json() as Promise<{ accountId: string; currency: string; amount: number }>;
@@ -53,10 +67,11 @@ export class BankClient {
         displayName: string,
         options?: { phone?: string; publicKeyHex?: string; ownerId?: string },
     ): Promise<{ ownerId: string; ownerType: string; displayName: string }> {
+        const body = JSON.stringify({ ownerType, displayName, ...options });
         const res = await fetch(`${this.baseUrl}/api/owners`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ownerType, displayName, ...options }),
+            headers: this.signedHeaders(body),
+            body,
         });
         if (!res.ok) throw new Error(`[BankClient] createOwner(${displayName}) failed: ${res.status}`);
         return res.json() as Promise<{ ownerId: string; ownerType: string; displayName: string }>;
@@ -70,14 +85,15 @@ export class BankClient {
         floor = 0,
         excludeAccountIds: string[] = [],
     ): Promise<{ count: number }> {
+        const body = JSON.stringify({ currency, rate, sinkAccountId, memo, floor, excludeAccountIds });
         const res = await fetch(`${this.baseUrl}/api/demurrage`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ currency, rate, sinkAccountId, memo, floor, excludeAccountIds }),
+            headers: this.signedHeaders(body),
+            body,
         });
         if (!res.ok) {
-            const body = await res.text();
-            throw new Error(`[BankClient] applyDemurrage failed: ${res.status} ${body}`);
+            const text = await res.text();
+            throw new Error(`[BankClient] applyDemurrage failed: ${res.status} ${text}`);
         }
         return res.json() as Promise<{ count: number }>;
     }
@@ -88,14 +104,15 @@ export class BankClient {
         amount: number,
         memo: string,
     ): Promise<void> {
+        const body = JSON.stringify({ fromAccountId: fromId, toAccountId: toId, amount, memo });
         const res = await fetch(`${this.baseUrl}/api/transfers`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ fromAccountId: fromId, toAccountId: toId, amount, memo }),
+            headers: this.signedHeaders(body),
+            body,
         });
         if (!res.ok) {
-            const body = await res.text();
-            throw new Error(`[BankClient] transfer failed: ${res.status} ${body}`);
+            const text = await res.text();
+            throw new Error(`[BankClient] transfer failed: ${res.status} ${text}`);
         }
     }
 }

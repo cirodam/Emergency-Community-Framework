@@ -74,10 +74,6 @@
                     <span>Kin in circulation</span>
                     <strong class="metric-value">{fmt(data.centralBank.kinInCirculation)} <span class="currency">kin</span></strong>
                 </div>
-                <div class="metric-row secondary">
-                    <span>Issuance account</span>
-                    <code>{shortId(data.centralBank.issuanceAccountId)}</code>
-                </div>
                 <div class="note">
                     Negative balance on the issuance account represents kin actively circulating
                     in the economy. When it returns to zero all kin has been retired.
@@ -105,10 +101,6 @@
                 <div class="metric-row secondary">
                     <span>Reserve ratio</span>
                     <strong>1:1 kin backing</strong>
-                </div>
-                <div class="metric-row secondary">
-                    <span>Issuance account</span>
-                    <code>{shortId(data.currencyBoard.issuanceAccountId)}</code>
                 </div>
                 <div class="note">
                     Kithe is minted only when kin reserves are deposited and burned
@@ -151,10 +143,6 @@
                         <span>Net retained</span>
                         <strong>{fmt(data.socialInsurance.totalContributed - data.socialInsurance.totalPaidOut)}</strong>
                     </div>
-                </div>
-                <div class="metric-row secondary">
-                    <span>Pool account</span>
-                    <code>{shortId(data.socialInsurance.poolAccountId)}</code>
                 </div>
                 <div class="note">
                     The pool holds deferred liabilities and is excluded from demurrage.
@@ -279,7 +267,6 @@
     .metric-row:last-of-type { border-bottom: none; }
     .metric-row span  { color: #64748b; flex-shrink: 0; }
     .metric-row.secondary strong { font-weight: 600; color: #0f172a; }
-    .metric-row code  { font-size: 0.75rem; color: #475569; }
 
     .metric-row.primary {
         padding: 1rem 1.25rem;

@@ -58,18 +58,15 @@ export interface EconomicsDto {
     ready: boolean;
     centralBank: {
         kinInCirculation: number;
-        issuanceAccountId: string;
     } | null;
     currencyBoard: {
         kitheInCirculation: number;
-        issuanceAccountId: string;
     } | null;
     socialInsurance: {
         poolBalance: number;
         totalContributed: number;
         totalPaidOut: number;
         memberCount: number;
-        poolAccountId: string;
     } | null;
 }
 

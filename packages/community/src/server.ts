@@ -21,6 +21,8 @@ import { SocialInsuranceBankLoader } from "./domains/social_insurance/SocialInsu
 import { SocialInsuranceMemberLoader } from "./domains/social_insurance/SocialInsuranceMemberLoader.js";
 import communityRoutes from "./routes/communityRoutes.js";
 import { CommunityBankDomain } from "./domains/community_bank/CommunityBankDomain.js";
+import { CommunityTreasury } from "./domains/community_treasury/CommunityTreasury.js";
+import { CommunityTreasuryLoader } from "./domains/community_treasury/CommunityTreasuryLoader.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -73,31 +75,73 @@ async function main(): Promise<void> {
     domainSvc.registerDomain(CentralBank.getInstance());
     domainSvc.registerDomain(CurrencyBoard.getInstance());
     domainSvc.registerDomain(SocialInsuranceBank.getInstance());
+    domainSvc.registerDomain(CommunityTreasury.getInstance());
     domainSvc.registerDomain(CommunityBankDomain.getInstance());
 
     // ── Monetary institutions (non-fatal — bank may be unreachable) ────────
-    const bank = new BankClient(BANK_URL);
+    const bank = new BankClient(BANK_URL, body => NodeService.getInstance().getSigner().signBody(body));
 
-    // Automatically open a primary kin account whenever a new person joins.
-    // Non-fatal: if the bank is temporarily unreachable the join still succeeds.
+    // On join: open a primary kin account and issue the age-derived endowment.
+    // Non-fatal: if the bank is temporarily unreachable the person record still
+    // commits — the monetary operations are best-effort at join time.
     PersonService.getInstance().onPersonJoined(async (person) => {
         const displayName = `${person.firstName} ${person.lastName}`;
+        const centralBank = CentralBank.getInstance();
+        const siBank      = SocialInsuranceBank.getInstance();
+        const treasury    = CommunityTreasury.getInstance();
+        const constitution = Constitution.getInstance();
+
         try {
-            await bank.openAccount(person.id, displayName, "kin");
+            const memberAccount = await bank.openAccount(person.id, displayName, "kin");
             console.log(`[community] opened bank account for @${person.handle}`);
+
+            if (!centralBank.isReady() || !siBank.isReady() || !treasury.isReady()) {
+                console.warn(`[community] monetary institutions not ready — skipping endowment for @${person.handle}`);
+                return;
+            }
+
+            // Compute age-derived endowment: floor(age in years) × kinPerPersonYear
+            const MS_PER_YEAR  = 365.25 * 24 * 60 * 60 * 1000;
+            const ageInYears   = Math.floor((Date.now() - person.birthDate.getTime()) / MS_PER_YEAR);
+            const endowment    = ageInYears * constitution.kinPerPersonYear;
+
+            if (endowment <= 0) {
+                console.log(`[community] zero endowment for @${person.handle} (age ${ageInYears}) — skipping issuance`);
+                return;
+            }
+
+            // Split: poolFraction → retirement pool, seedBalance → member, remainder → treasury
+            const poolAmount     = Math.floor(endowment * constitution.endowmentPoolFraction);
+            const circulating    = endowment - poolAmount;
+            const seedAmount     = Math.min(constitution.endowmentSeedBalance, circulating);
+            const treasuryAmount = circulating - seedAmount;
+
+            await centralBank.issue(poolAmount,     siBank.poolAccountId,     "join endowment — retirement pool");
+            await centralBank.issue(seedAmount,     memberAccount.accountId,  "join endowment — seed balance");
+            await centralBank.issue(treasuryAmount, treasury.accountId,       "join endowment — community treasury");
+
+            siBank.recordContribution(person.id, poolAmount);
+
+            console.log(
+                `[community] issued join endowment for @${person.handle}: ` +
+                `${endowment} kin (pool: ${poolAmount}, seed: ${seedAmount}, treasury: ${treasuryAmount})`,
+            );
         } catch (err) {
-            console.warn(`[community] could not open bank account for @${person.handle}: ${(err as Error).message}`);
+            console.warn(`[community] join handler failed for @${person.handle}: ${(err as Error).message}`);
         }
     });
-    const centralBankLoader      = new CentralBankLoader(DATA_DIR);
-    const currencyBoardLoader    = new CurrencyBoardLoader(DATA_DIR);
-    const siBankLoader           = new SocialInsuranceBankLoader(DATA_DIR);
-    const siMemberLoader         = new SocialInsuranceMemberLoader(resolve(DATA_DIR, "si_members"));
+
+    const centralBankLoader   = new CentralBankLoader(DATA_DIR);
+    const currencyBoardLoader = new CurrencyBoardLoader(DATA_DIR);
+    const siBankLoader        = new SocialInsuranceBankLoader(DATA_DIR);
+    const siMemberLoader      = new SocialInsuranceMemberLoader(resolve(DATA_DIR, "si_members"));
+    const treasuryLoader      = new CommunityTreasuryLoader(DATA_DIR);
 
     async function initMonetaryInstitutions(): Promise<void> {
         await CentralBank.getInstance().init(bank, centralBankLoader);
         await CurrencyBoard.getInstance().init(bank, currencyBoardLoader);
         await SocialInsuranceBank.getInstance().init(bank, siBankLoader, siMemberLoader);
+        await CommunityTreasury.getInstance().init(bank, treasuryLoader);
         console.log("[community] monetary institutions ready");
     }
 
@@ -114,6 +158,90 @@ async function main(): Promise<void> {
             setTimeout(() => tryInitMonetary(attempt + 1), delay);
         }
     }
+
+    // Annual person-year issuance: on each member's birthday, issue one kinPerPersonYear
+    // split by birthdayCirculationFraction (member) and the remainder (retirement pool).
+    PersonService.getInstance().onPersonAnniversary(async (person) => {
+        const centralBank  = CentralBank.getInstance();
+        const siBank       = SocialInsuranceBank.getInstance();
+        const constitution = Constitution.getInstance();
+
+        if (!centralBank.isReady() || !siBank.isReady()) {
+            console.warn(`[community] monetary institutions not ready — skipping annual issuance for @${person.handle}`);
+            return;
+        }
+
+        try {
+            const memberAccount = await bank.getPrimaryAccountAsync(person.id);
+            if (!memberAccount) {
+                console.warn(`[community] no primary account for @${person.handle} — skipping annual issuance`);
+                return;
+            }
+
+            const annual          = constitution.kinPerPersonYear;
+            const memberAmount    = Math.floor(annual * constitution.birthdayCirculationFraction);
+            const poolAmount      = annual - memberAmount;
+
+            await centralBank.issue(poolAmount,   siBank.poolAccountId,    "annual issuance — retirement pool");
+            await centralBank.issue(memberAmount, memberAccount.accountId, "annual issuance — circulating");
+
+            siBank.recordContribution(person.id, poolAmount);
+
+            console.log(
+                `[community] annual issuance for @${person.handle}: ` +
+                `${annual} kin (pool: ${poolAmount}, member: ${memberAmount})`,
+            );
+        } catch (err) {
+            console.warn(`[community] annual issuance failed for @${person.handle}: ${(err as Error).message}`);
+        }
+    });
+
+    // Collect the community levy monthly — moves kin from member accounts
+    // to the treasury. Runs 30 days after startup, then every 30 days.
+    // Excludes institutional accounts (issuance, SI pool, treasury itself).
+    const runCommunityLevy = (): void => {
+        const centralBank  = CentralBank.getInstance();
+        const siBank       = SocialInsuranceBank.getInstance();
+        const treasury     = CommunityTreasury.getInstance();
+        const constitution = Constitution.getInstance();
+        if (!centralBank.isReady() || !siBank.isReady() || !treasury.isReady()) {
+            console.warn("[community] monetary institutions not ready — skipping community levy");
+            return;
+        }
+        treasury.collectLevy(
+            constitution.communityLevyRate,
+            constitution.demurrageFloor,
+            [centralBank.issuanceAccountId, siBank.poolAccountId],
+        ).then(({ count }) => {
+            console.log(`[community] community levy collected from ${count} accounts`);
+        }).catch(err => {
+            console.error("[community] community levy failed:", err);
+        });
+    };
+    // Run the levy check daily; collectLevy() fires only when a full 30-day
+    // cycle has elapsed. Using a daily tick avoids Node.js's 32-bit timer
+    // overflow (setTimeout > ~24.8 days fires immediately).
+    let lastLevyDate: Date | null = null;
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    setInterval(() => {
+        const now = new Date();
+        if (
+            lastLevyDate === null ||
+            now.getTime() - lastLevyDate.getTime() >= 30 * MS_PER_DAY
+        ) {
+            lastLevyDate = now;
+            runCommunityLevy();
+        }
+    }, MS_PER_DAY);
+
+    // Check birthdays once at startup, then every 24 hours.
+    const runAnniversaryCheck = (): void => {
+        PersonService.getInstance().checkAnniversaries().catch(err =>
+            console.error("[community] anniversary check failed:", err),
+        );
+    };
+    runAnniversaryCheck();
+    setInterval(runAnniversaryCheck, 24 * 60 * 60 * 1000);
 
     // Start without awaiting — governance routes come up immediately.
     void tryInitMonetary();

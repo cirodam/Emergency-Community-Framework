@@ -146,6 +146,15 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
             constraints: { min: 0, max: 5_000 },
         },
 
+        // ── Community levy ──────────────────────────────────────────────────
+        communityLevyRate: {
+            value: 0.01,
+            authority: "referendum",
+            description:
+                "Monthly rate collected from every member's primary account into the community treasury. Functions as community dues — kin is not retired, it moves from members to the shared budget. Applied after Central Bank demurrage.",
+            constraints: { min: 0, max: 0.10 },
+        },
+
         // ── Social insurance ─────────────────────────────────────────────────
         retirementAge: {
             value: 65,
@@ -162,25 +171,25 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
             constraints: { min: 0.001, max: 0.02 },
         },
         birthdayCirculationFraction: {
-            value: 0,
+            value: 0.20,
             authority: "referendum",
             description:
-                "Fraction of each birthday person-year issuance paid directly to the member's primary account as circulating kin. The remainder goes to the retirement pool.",
+                "Fraction of each annual person-year issuance (kinPerPersonYear) paid directly to the member's primary account as circulating kin. The remainder goes to the social insurance retirement pool.",
             constraints: { min: 0, max: 0.5 },
         },
-        communityBudget: {
-            value: 200,
+        endowmentPoolFraction: {
+            value: 0.80,
             authority: "referendum",
             description:
-                "Kin minted directly into the Commonwealth account each month as a community savings injection.",
-            constraints: { min: 0, max: 10_000 },
+                "Fraction of a new member's join endowment (age × kinPerPersonYear) directed into the social insurance retirement pool. The remaining fraction is split between the member's seed balance and the community treasury.",
+            constraints: { min: 0.50, max: 0.95 },
         },
-        communityEndowment: {
-            value: 50_000,
+        endowmentSeedBalance: {
+            value: 1_000,
             authority: "referendum",
             description:
-                "Kin minted per new member as a community liquidity endowment. 49,000 goes to the Commonwealth, 1,000 to the member's primary account. Burned when the member departs.",
-            constraints: { min: 0, max: 500_000 },
+                "Fixed kin issued directly to a new member's primary account on joining. Grounds the member's perception of scale. Taken from the circulating fraction of the join endowment; the remainder goes to the community treasury.",
+            constraints: { min: 0, max: 10_000 },
         },
     },
     amendments: [],
@@ -219,9 +228,17 @@ export class Constitution {
         return Constitution.instance;
     }
 
-    /** Load a persisted document, replacing the in-memory defaults. */
+    /**
+     * Load a persisted document. Parameters from the persisted document take
+     * precedence over defaults, but any parameters present in the defaults
+     * that are absent from the persisted document (i.e. added in a newer code
+     * version) are kept so the node doesn't crash on first boot after an upgrade.
+     */
     load(doc: ConstitutionDocument): void {
-        this.doc = doc;
+        this.doc = {
+            ...doc,
+            parameters: { ...this.doc.parameters, ...doc.parameters },
+        };
     }
 
     get version(): number       { return this.doc.version; }
@@ -302,8 +319,9 @@ export class Constitution {
     get retirementAge(): number                { return this.get<number>("retirementAge"); }
     get retirementPayoutRate(): number         { return this.get<number>("retirementPayoutRate"); }
     get birthdayCirculationFraction(): number  { return this.get<number>("birthdayCirculationFraction"); }
-    get communityBudget(): number              { return this.get<number>("communityBudget"); }
-    get communityEndowment(): number           { return this.get<number>("communityEndowment"); }
+    get communityLevyRate(): number             { return this.get<number>("communityLevyRate"); }
+    get endowmentPoolFraction(): number        { return this.get<number>("endowmentPoolFraction"); }
+    get endowmentSeedBalance(): number         { return this.get<number>("endowmentSeedBalance"); }
 
     /** Which governance body must authorize the given action. Returns null if not in the map. */
     getRequiredBody(action: string): GovernanceBody | null {

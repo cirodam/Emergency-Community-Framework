@@ -31,18 +31,15 @@ export async function getEconomics(_req: Request, res: Response): Promise<void> 
         ready: true,
         centralBank: {
             kinInCirculation:  cbAccount ? Math.max(0, -cbAccount.amount) : 0,
-            issuanceAccountId: cb.issuanceAccountId,
         },
         currencyBoard: curBoard.isReady() ? {
             kitheInCirculation: curBoardAccount ? Math.max(0, -curBoardAccount.amount) : 0,
-            issuanceAccountId:  curBoard.issuanceAccountId,
         } : null,
         socialInsurance: si.isReady() ? {
             poolBalance:       siAccount?.amount ?? 0,
             totalContributed:  si.getTotalPoolContributed(),
             totalPaidOut:      si.getTotalPaidOut(),
             memberCount:       si.getMemberCount(),
-            poolAccountId:     si.poolAccountId,
         } : null,
     });
 }
