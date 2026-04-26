@@ -11,6 +11,7 @@ interface PersonRecord {
     handle: string;
     disabled: boolean;
     retired: boolean;
+    bornInCommunity: boolean;
     guardianId: string | null;
     phone: string | null;
     pinHash: string | null;
@@ -40,6 +41,7 @@ export class PersonLoader {
             handle:       person.handle,
             disabled:     person.disabled,
             retired:      person.retired,
+            bornInCommunity: person.bornInCommunity,
             guardianId:   person.guardianId,
             phone:        person.phone,
             pinHash,
@@ -70,6 +72,7 @@ export class PersonLoader {
             handle:       r.handle,
             disabled:     r.disabled ?? false,
             retired:      r.retired ?? false,
+            bornInCommunity: r.bornInCommunity ?? false,
             guardianId:   r.guardianId,
             phone:        r.phone,
             pinHash:      r.pinHash ?? null,

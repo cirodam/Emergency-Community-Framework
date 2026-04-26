@@ -9,8 +9,15 @@ services:
       NODE_ENV: production
       DATA_DIR: /app/data
       BANK_URL: http://bank:3001
+      # SMS banking — set SMS_MODEM_PATH to enable (e.g. /dev/ttyUSB0).
+      # SMS_MODEM_PATH: /dev/ttyUSB0
+      # SMS_MODEM_BAUD: 9600
+      # SMS_WEBHOOK_SECRET: changeme   # for the optional inbound webhook
     volumes:
       - community-data:/app/data
+    # Uncomment to pass through the GSM modem device:
+    # devices:
+    #   - "/dev/ttyUSB0:/dev/ttyUSB0"
 
   bank:
     build:

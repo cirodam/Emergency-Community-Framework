@@ -17,9 +17,9 @@ export function getPerson(req: Request, res: Response): void {
 }
 
 // POST /api/persons
-// Body: { firstName, lastName, birthDate, phone?, languages? }
+// Body: { firstName, lastName, birthDate, bornInCommunity?, phone?, languages? }
 export async function addPerson(req: Request, res: Response): Promise<void> {
-    const { firstName, lastName, birthDate, phone, languages } = req.body ?? {};
+    const { firstName, lastName, birthDate, bornInCommunity, phone, languages } = req.body ?? {};
     if (typeof firstName !== "string" || !firstName.trim()) {
         res.status(400).json({ error: "firstName is required" }); return;
     }
@@ -33,7 +33,17 @@ export async function addPerson(req: Request, res: Response): Promise<void> {
     if (isNaN(parsedBirthDate.getTime())) {
         res.status(400).json({ error: "birthDate must be a valid date" }); return;
     }
-    const person = new Person(firstName.trim(), lastName.trim(), parsedBirthDate);
+    const person = new Person(
+        firstName.trim(),
+        lastName.trim(),
+        parsedBirthDate,
+        "",
+        false,
+        null,
+        null,
+        [],
+        bornInCommunity === true,
+    );
     if (phone)     person.phone     = phone;
     if (languages) person.languages = languages;
     await svc().add(person);
@@ -68,15 +78,16 @@ export function issueCredential(req: Request, res: Response): void {
 
 function toDto(p: Person) {
     return {
-        id:         p.id,
-        firstName:  p.firstName,
-        lastName:   p.lastName,
-        handle:     p.handle,
-        phone:      p.phone,
-        disabled:   p.disabled,
-        retired:    p.retired,
-        languages:  p.languages,
-        joinDate:   p.joinDate,
-        credential: p.credential,
+        id:              p.id,
+        firstName:       p.firstName,
+        lastName:        p.lastName,
+        handle:          p.handle,
+        phone:           p.phone,
+        disabled:        p.disabled,
+        retired:         p.retired,
+        bornInCommunity: p.bornInCommunity,
+        languages:       p.languages,
+        joinDate:        p.joinDate,
+        credential:      p.credential,
     };
 }

@@ -70,7 +70,7 @@ export class FederationMembershipService {
         const node = NodeService.getInstance();
         const body = JSON.stringify({
             communityName,
-            communityNodeId:    node.nodeId,
+            communityNodeId:    node.getIdentity().id,
             communityPublicKey: node.getSigner().publicKeyHex,
         });
         const signature = node.getSigner().signBody(body);

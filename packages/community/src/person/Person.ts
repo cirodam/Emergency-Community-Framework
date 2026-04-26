@@ -41,6 +41,13 @@ export class Person implements IEconomicActor {
     languages: LanguageProficiency[];
 
     /**
+     * True when this person was born into the community rather than joining as
+     * an existing person. Born members receive a birth grant instead of an
+     * age-derived back-endowment; their annual kin accrual begins at age one.
+     */
+    readonly bornInCommunity: boolean;
+
+    /**
      * The community-signed credential binding this person's public key to their identity.
      * Null until explicitly issued (see PersonService.issueCredential).
      */
@@ -63,6 +70,7 @@ export class Person implements IEconomicActor {
         guardianId: string | null = null,
         phone: string | null = null,
         languages: LanguageProficiency[] = [],
+        bornInCommunity: boolean = false,
     ) {
         this.id = randomUUID();
         this.firstName = firstName;
@@ -75,6 +83,7 @@ export class Person implements IEconomicActor {
         this.guardianId = guardianId;
         this.phone = phone;
         this.languages = languages;
+        this.bornInCommunity = bornInCommunity;
 
         const { privateKey, publicKey } = generateKeyPairSync("ed25519");
         this._privateKey = privateKey;
@@ -96,6 +105,7 @@ export class Person implements IEconomicActor {
         handle: string;
         disabled: boolean;
         retired: boolean;
+        bornInCommunity: boolean;
         guardianId: string | null;
         phone: string | null;
         pinHash: string | null;
@@ -114,6 +124,7 @@ export class Person implements IEconomicActor {
             record.guardianId,
             record.phone,
             record.languages,
+            record.bornInCommunity,
         );
         (p as unknown as Record<string, unknown>)["id"] = record.id;
         (p as unknown as Record<string, unknown>)["joinDate"] = record.joinDate;

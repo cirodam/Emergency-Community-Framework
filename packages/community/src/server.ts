@@ -24,6 +24,8 @@ import { CommunityBankDomain } from "./domains/community_bank/CommunityBankDomai
 import { CommunityTreasury } from "./domains/community_treasury/CommunityTreasury.js";
 import { CommunityTreasuryLoader } from "./domains/community_treasury/CommunityTreasuryLoader.js";
 import { FederationMembershipService } from "./FederationMembershipService.js";
+import { GsmModemProvider } from "./sms/GsmModemProvider.js";
+import { SmsService } from "./sms/SmsService.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -89,10 +91,10 @@ async function main(): Promise<void> {
     // Non-fatal: if the bank is temporarily unreachable the person record still
     // commits — the monetary operations are best-effort at join time.
     PersonService.getInstance().onPersonJoined(async (person) => {
-        const displayName = `${person.firstName} ${person.lastName}`;
-        const centralBank = CentralBank.getInstance();
-        const siBank      = SocialInsuranceBank.getInstance();
-        const treasury    = CommunityTreasury.getInstance();
+        const displayName  = `${person.firstName} ${person.lastName}`;
+        const centralBank  = CentralBank.getInstance();
+        const siBank       = SocialInsuranceBank.getInstance();
+        const treasury     = CommunityTreasury.getInstance();
         const constitution = Constitution.getInstance();
 
         try {
@@ -100,36 +102,56 @@ async function main(): Promise<void> {
             console.log(`[community] opened bank account for @${person.handle}`);
 
             if (!centralBank.isReady() || !siBank.isReady() || !treasury.isReady()) {
-                console.warn(`[community] monetary institutions not ready — skipping endowment for @${person.handle}`);
+                console.warn(`[community] monetary institutions not ready — skipping issuance for @${person.handle}`);
                 return;
             }
 
-            // Compute age-derived endowment: floor(age in years) × kinPerPersonYear
-            const MS_PER_YEAR  = 365.25 * 24 * 60 * 60 * 1000;
-            const ageInYears   = Math.floor((Date.now() - person.birthDate.getTime()) / MS_PER_YEAR);
-            const endowment    = ageInYears * constitution.kinPerPersonYear;
+            if (person.bornInCommunity) {
+                // ── Born into the community ───────────────────────────────────
+                // No back-endowment — this person has no prior years to credit.
+                // Issue a fixed birth grant into the community fund, which
+                // forwards it directly to the member. Their kin accrual begins
+                // on their first birthday via the anniversary handler.
+                const grantAmount = constitution.birthGrant;
+                if (grantAmount > 0) {
+                    await centralBank.issue(grantAmount, treasury.accountId,       "birth grant — community fund");
+                    await treasury.transfer(memberAccount.accountId, grantAmount,  "birth grant — to member");
+                    console.log(`[community] issued birth grant for @${person.handle}: ${grantAmount} kin`);
+                } else {
+                    console.log(`[community] birth grant is 0 — no issuance for @${person.handle}`);
+                }
+            } else {
+                // ── Joining from outside ──────────────────────────────────────
+                // Age-derived back-endowment: floor(age in years) × kinPerPersonYear.
+                // All kin is issued into the community fund first; the fund then
+                // distributes per policy: pool fraction → insurance fund,
+                // seed balance → member, remainder stays in the community fund.
+                const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
+                const ageInYears  = Math.floor((Date.now() - person.birthDate.getTime()) / MS_PER_YEAR);
+                const endowment   = ageInYears * constitution.kinPerPersonYear;
 
-            if (endowment <= 0) {
-                console.log(`[community] zero endowment for @${person.handle} (age ${ageInYears}) — skipping issuance`);
-                return;
+                if (endowment <= 0) {
+                    console.log(`[community] zero endowment for @${person.handle} (age ${ageInYears}) — skipping issuance`);
+                    return;
+                }
+
+                const poolAmount     = Math.floor(endowment * constitution.endowmentPoolFraction);
+                const circulating    = endowment - poolAmount;
+                const seedAmount     = Math.min(constitution.endowmentSeedBalance, circulating);
+                const treasuryAmount = circulating - seedAmount;
+
+                await centralBank.issue(endowment, treasury.accountId,              "join endowment — community fund");
+                await treasury.transfer(siBank.poolAccountId,    poolAmount,        "join endowment — insurance fund");
+                await treasury.transfer(memberAccount.accountId, seedAmount,        "join endowment — member seed balance");
+                // treasuryAmount remains in the community fund
+
+                siBank.recordContribution(person.id, poolAmount);
+
+                console.log(
+                    `[community] issued join endowment for @${person.handle}: ` +
+                    `${endowment} kin (community fund: ${treasuryAmount}, insurance: ${poolAmount}, member seed: ${seedAmount})`,
+                );
             }
-
-            // Split: poolFraction → retirement pool, seedBalance → member, remainder → treasury
-            const poolAmount     = Math.floor(endowment * constitution.endowmentPoolFraction);
-            const circulating    = endowment - poolAmount;
-            const seedAmount     = Math.min(constitution.endowmentSeedBalance, circulating);
-            const treasuryAmount = circulating - seedAmount;
-
-            await centralBank.issue(poolAmount,     siBank.poolAccountId,     "join endowment — retirement pool");
-            await centralBank.issue(seedAmount,     memberAccount.accountId,  "join endowment — seed balance");
-            await centralBank.issue(treasuryAmount, treasury.accountId,       "join endowment — community treasury");
-
-            siBank.recordContribution(person.id, poolAmount);
-
-            console.log(
-                `[community] issued join endowment for @${person.handle}: ` +
-                `${endowment} kin (pool: ${poolAmount}, seed: ${seedAmount}, treasury: ${treasuryAmount})`,
-            );
         } catch (err) {
             console.warn(`[community] join handler failed for @${person.handle}: ${(err as Error).message}`);
         }
@@ -168,9 +190,10 @@ async function main(): Promise<void> {
     PersonService.getInstance().onPersonAnniversary(async (person) => {
         const centralBank  = CentralBank.getInstance();
         const siBank       = SocialInsuranceBank.getInstance();
+        const treasury     = CommunityTreasury.getInstance();
         const constitution = Constitution.getInstance();
 
-        if (!centralBank.isReady() || !siBank.isReady()) {
+        if (!centralBank.isReady() || !siBank.isReady() || !treasury.isReady()) {
             console.warn(`[community] monetary institutions not ready — skipping annual issuance for @${person.handle}`);
             return;
         }
@@ -182,18 +205,21 @@ async function main(): Promise<void> {
                 return;
             }
 
-            const annual          = constitution.kinPerPersonYear;
-            const memberAmount    = Math.floor(annual * constitution.birthdayCirculationFraction);
-            const poolAmount      = annual - memberAmount;
+            // All kin is issued into the community fund first; the fund then
+            // distributes per policy: member fraction → member, remainder → insurance fund.
+            const annual       = constitution.kinPerPersonYear;
+            const memberAmount = Math.floor(annual * constitution.birthdayCirculationFraction);
+            const poolAmount   = annual - memberAmount;
 
-            await centralBank.issue(poolAmount,   siBank.poolAccountId,    "annual issuance — retirement pool");
-            await centralBank.issue(memberAmount, memberAccount.accountId, "annual issuance — circulating");
+            await centralBank.issue(annual, treasury.accountId, "annual issuance — community fund");
+            await treasury.transfer(siBank.poolAccountId,    poolAmount,   "annual issuance — insurance fund");
+            await treasury.transfer(memberAccount.accountId, memberAmount, "annual issuance — member share");
 
             siBank.recordContribution(person.id, poolAmount);
 
             console.log(
                 `[community] annual issuance for @${person.handle}: ` +
-                `${annual} kin (pool: ${poolAmount}, member: ${memberAmount})`,
+                `${annual} kin (insurance: ${poolAmount}, member: ${memberAmount})`,
             );
         } catch (err) {
             console.warn(`[community] annual issuance failed for @${person.handle}: ${(err as Error).message}`);
@@ -249,6 +275,28 @@ async function main(): Promise<void> {
 
     // Start without awaiting — governance routes come up immediately.
     void tryInitMonetary();
+
+    // ── SMS banking (non-fatal — modem may not be present) ────────────────
+    // Set SMS_MODEM_PATH to enable (e.g. /dev/ttyUSB0).
+    // In Docker, pass the device through:
+    //   devices:
+    //     - "/dev/ttyUSB0:/dev/ttyUSB0"
+    const modemPath = process.env.SMS_MODEM_PATH;
+    if (modemPath) {
+        const baudRate   = Number(process.env.SMS_MODEM_BAUD ?? 9600);
+        const modemProvider = new GsmModemProvider(modemPath, baudRate);
+        modemProvider.init()
+            .then(() => {
+                SmsService.getInstance().init(bank, modemProvider);
+                console.log(`[sms] modem active on ${modemPath}`);
+            })
+            .catch(err => {
+                console.warn(`[sms] modem unavailable on ${modemPath}: ${(err as Error).message}`);
+                console.warn("[sms] SMS banking disabled — fix the modem and restart");
+            });
+    } else {
+        console.log("[sms] SMS_MODEM_PATH not set — SMS banking disabled");
+    }
 
     // ── Routes ─────────────────────────────────────────────────────────────
     app.use("/api",       communityRoutes);

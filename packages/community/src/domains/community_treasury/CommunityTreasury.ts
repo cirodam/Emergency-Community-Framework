@@ -103,4 +103,14 @@ export class CommunityTreasury extends FunctionalDomain {
         });
         this._ready = true;
     }
+
+    /**
+     * Distribute kin from the treasury account to another account.
+     * Used to enact policy-driven allocations (e.g. routing annual issuance
+     * from the community fund to the insurance pool or a member's account).
+     */
+    async transfer(toAccountId: string, amount: number, memo: string): Promise<void> {
+        if (!this._ready) throw new Error("CommunityTreasury not ready");
+        await this._bank.transfer(this._accountId, toAccountId, amount, memo);
+    }
 }

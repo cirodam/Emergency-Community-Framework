@@ -4,6 +4,7 @@ import * as auth from "./AuthController.js";
 import * as domains from "./DomainController.js";
 import * as setup from "./SetupController.js";
 import * as economics from "./EconomicsController.js";
+import * as sms from "./SmsController.js";
 
 const router = Router();
 
@@ -30,6 +31,9 @@ router.post(  "/persons/:id/password",   auth.setPassword);
 // Auth
 router.post("/auth/login",  auth.login);
 router.post("/auth/verify", auth.verifyCredential);
+
+// SMS banking (inbound webhook — for testing or gammu-smsd RunOnReceive)
+router.post("/sms/inbound", sms.smsInbound);
 
 // Domains
 router.get(  "/domains",     domains.listDomains);

@@ -191,6 +191,13 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
                 "Fixed kin issued directly to a new member's primary account on joining. Grounds the member's perception of scale. Taken from the circulating fraction of the join endowment; the remainder goes to the community treasury.",
             constraints: { min: 0, max: 10_000 },
         },
+        birthGrant: {
+            value: 500,
+            authority: "referendum",
+            description:
+                "Fixed kin issued to the community fund when a person is born into the community, then forwarded to the newborn's account as a welcome grant. Unlike the join endowment (which compensates for prior years of life), the birth grant simply marks the start of a new member's kin journey. The community fund receives it first so the flow is transparent and consistent with policy.",
+            constraints: { min: 0, max: 5_000 },
+        },
     },
     amendments: [],
     authorityMap: [
@@ -322,6 +329,7 @@ export class Constitution {
     get communityLevyRate(): number             { return this.get<number>("communityLevyRate"); }
     get endowmentPoolFraction(): number        { return this.get<number>("endowmentPoolFraction"); }
     get endowmentSeedBalance(): number         { return this.get<number>("endowmentSeedBalance"); }
+    get birthGrant(): number                   { return this.get<number>("birthGrant"); }
 
     /** Which governance body must authorize the given action. Returns null if not in the map. */
     getRequiredBody(action: string): GovernanceBody | null {
