@@ -1,4 +1,4 @@
-import { Listing, ListingType, createListing } from "./Listing.js";
+import { Listing, ListingSide, ListingType, createListing } from "./Listing.js";
 import { ListingLoader } from "./ListingLoader.js";
 
 export interface ListingPatch {
@@ -41,29 +41,29 @@ export class ListingService {
         return this.getAll().filter(l => l.status === "open");
     }
 
-    getBySeller(sellerId: string): Listing[] {
-        return this.getAll().filter(l => l.sellerId === sellerId);
+    getByPoster(posterId: string): Listing[] {
+        return this.getAll().filter(l => l.posterId === posterId);
     }
 
     // ── Mutations ─────────────────────────────────────────────────────────────
 
     add(
-        sellerId: string,
-        sellerHandle: string,
+        side: ListingSide,
+        posterId: string,
+        posterHandle: string,
         type: ListingType,
         title: string,
         description: string,
         price: number,
     ): Listing {
-        const listing = createListing(sellerId, sellerHandle, type, title, description, price);
+        const listing = createListing(side, posterId, posterHandle, type, title, description, price);
         this.listings.set(listing.id, listing);
         this.loader.save(listing);
         return listing;
     }
 
     /**
-     * Update title, description, or price. Only the seller may do this.
-     * Throws if the listing does not exist, is not open, or caller is not the seller.
+     * Update title, description, or price. Only the poster may do this.
      */
     update(id: string, callerId: string, patch: ListingPatch): Listing {
         const listing = this.requireOpen(id, callerId);
@@ -76,8 +76,7 @@ export class ListingService {
     }
 
     /**
-     * Cancel a listing. Only the seller may do this.
-     * Throws if the listing does not exist, is not open, or caller is not the seller.
+     * Cancel a listing. Only the poster may do this.
      */
     cancel(id: string, callerId: string): Listing {
         const listing = this.requireOpen(id, callerId);
@@ -88,17 +87,31 @@ export class ListingService {
     }
 
     /**
-     * Mark a listing as sold. Called by the purchase handler after payment
-     * has been confirmed with the bank.
-     * Throws if the listing is not open.
+     * Mark a sell listing as sold (payment already confirmed with bank).
      */
     markSold(id: string, buyerId: string): Listing {
         const listing = this.listings.get(id);
-        if (!listing)                    throw new Error(`Listing ${id} not found`);
-        if (listing.status !== "open")   throw new Error(`Listing ${id} is not open`);
-        listing.status    = "sold";
-        listing.buyerId   = buyerId;
-        listing.updatedAt = new Date().toISOString();
+        if (!listing)                  throw new Error(`Listing ${id} not found`);
+        if (listing.status !== "open") throw new Error(`Listing ${id} is not open`);
+        if (listing.side !== "sell")   throw new Error(`Listing ${id} is not a sell listing`);
+        listing.status          = "sold";
+        listing.counterpartyId  = buyerId;
+        listing.updatedAt       = new Date().toISOString();
+        this.loader.save(listing);
+        return listing;
+    }
+
+    /**
+     * Mark a buy listing as filled (payment already confirmed with bank).
+     */
+    markFilled(id: string, fulfillerId: string): Listing {
+        const listing = this.listings.get(id);
+        if (!listing)                  throw new Error(`Listing ${id} not found`);
+        if (listing.status !== "open") throw new Error(`Listing ${id} is not open`);
+        if (listing.side !== "buy")    throw new Error(`Listing ${id} is not a buy listing`);
+        listing.status         = "filled";
+        listing.counterpartyId = fulfillerId;
+        listing.updatedAt      = new Date().toISOString();
         this.loader.save(listing);
         return listing;
     }
@@ -107,9 +120,9 @@ export class ListingService {
 
     private requireOpen(id: string, callerId: string): Listing {
         const listing = this.listings.get(id);
-        if (!listing)                    throw new Error(`Listing ${id} not found`);
-        if (listing.sellerId !== callerId) throw new Error("Not your listing");
-        if (listing.status !== "open")   throw new Error(`Listing ${id} is not open`);
+        if (!listing)                     throw new Error(`Listing ${id} not found`);
+        if (listing.posterId !== callerId) throw new Error("Not your listing");
+        if (listing.status !== "open")    throw new Error(`Listing ${id} is not open`);
         return listing;
     }
 }

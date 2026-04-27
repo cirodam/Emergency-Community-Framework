@@ -24,13 +24,15 @@
             if (returnUrl && (returnUrl.startsWith("http://") || returnUrl.startsWith("https://"))) {
                 // Hand the session payload back to the requesting service via
                 // the URL fragment (never sent to the server).
-                const payload = btoa(JSON.stringify({
+                // Encode as encodeURIComponent→btoa so non-ASCII names (accented
+                // characters etc.) survive the base64 round-trip safely.
+                const payload = btoa(encodeURIComponent(JSON.stringify({
                     token:     person.token,
                     id:        person.id,
                     firstName: person.firstName,
                     lastName:  person.lastName,
                     handle:    person.handle,
-                }));
+                })));
                 window.location.href = `${returnUrl}#session=${payload}`;
             } else {
                 session.login(person);

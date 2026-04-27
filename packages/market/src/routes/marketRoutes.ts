@@ -8,6 +8,7 @@ import {
     updateListing,
     cancelListing,
     purchaseListing,
+    fulfillListing,
 } from "./ListingController.js";
 
 const router = Router();
@@ -23,5 +24,6 @@ router.post(  "/listings",              requireAuth, createListing);
 router.patch( "/listings/:id",          requireAuth, updateListing);
 router.delete("/listings/:id",          requireAuth, cancelListing);
 router.post(  "/listings/:id/purchase", requireAuth, purchaseListing);
+router.post(  "/listings/:id/fulfill",  requireAuth, fulfillListing);
 
 export default router;

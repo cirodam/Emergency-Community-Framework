@@ -1,11 +1,15 @@
-import { getToken } from "./session.js";
+import { getToken, session } from "./session.js";
 
-function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
+async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
     const token = getToken();
     const headers = new Headers(init.headers);
     headers.set("Content-Type", "application/json");
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    return fetch(input, { ...init, headers });
+    const res = await fetch(input, { ...init, headers });
+    if (res.status === 401) {
+        session.logout();
+    }
+    return res;
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────

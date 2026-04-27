@@ -45,8 +45,14 @@ export function getMyAccounts(req: Request & { personId?: string }, res: Respons
 }
 
 // GET /api/accounts/:ownerId
-export function getAccounts(req: Request, res: Response): void {
-    const accounts = bank().getAccounts(req.params.ownerId as string);
+export function getAccounts(req: Request & { personId?: string }, res: Response): void {
+    const requestedOwner = req.params.ownerId as string;
+    // When called by a person credential, they may only fetch their own accounts
+    if (req.personId && req.personId !== requestedOwner) {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+    }
+    const accounts = bank().getAccounts(requestedOwner);
     if (accounts.length === 0) {
         res.status(404).json({ error: "No accounts found for owner" });
         return;
@@ -55,21 +61,31 @@ export function getAccounts(req: Request, res: Response): void {
 }
 
 // GET /api/account/:accountId
-export function getAccountById(req: Request, res: Response): void {
+export function getAccountById(req: Request & { personId?: string }, res: Response): void {
     const account = bank().getAccount(req.params.accountId as string);
     if (!account) {
         res.status(404).json({ error: "Account not found" });
+        return;
+    }
+    // When called by a person credential, enforce ownership
+    if (req.personId && account.ownerId !== req.personId) {
+        res.status(403).json({ error: "Forbidden" });
         return;
     }
     res.json(toAccountDto(account));
 }
 
 // GET /api/accounts/:accountId/transactions?month=YYYY-MM
-export function getTransactions(req: Request, res: Response): void {
+export function getTransactions(req: Request & { personId?: string }, res: Response): void {
     const accountId = req.params.accountId as string;
     const account = bank().getAccount(accountId);
     if (!account) {
         res.status(404).json({ error: "Account not found" });
+        return;
+    }
+    // When called by a person credential, enforce ownership
+    if (req.personId && account.ownerId !== req.personId) {
+        res.status(403).json({ error: "Forbidden" });
         return;
     }
 
@@ -85,7 +101,7 @@ export function getTransactions(req: Request, res: Response): void {
 
 // POST /api/transfers
 // Body: { fromAccountId, toAccountId, amount, memo? }
-export async function createTransfer(req: Request, res: Response): Promise<void> {
+export async function createTransfer(req: Request & { personId?: string }, res: Response): Promise<void> {
     const { fromAccountId, toAccountId, amount, memo } = req.body ?? {};
 
     if (typeof fromAccountId !== "string" || !fromAccountId) {
@@ -103,6 +119,15 @@ export async function createTransfer(req: Request, res: Response): Promise<void>
     if (memo !== undefined && typeof memo !== "string") {
         res.status(400).json({ error: "memo must be a string" });
         return;
+    }
+
+    // When called by a person credential, they may only transfer from their own account
+    if (req.personId) {
+        const fromAccount = bank().getAccount(fromAccountId);
+        if (!fromAccount || fromAccount.ownerId !== req.personId) {
+            res.status(403).json({ error: "Forbidden" });
+            return;
+        }
     }
 
     try {

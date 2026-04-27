@@ -2,7 +2,7 @@
     import AmountDisplay from "../components/AmountDisplay.svelte";
     import ErrorBanner from "../components/ErrorBanner.svelte";
     import { session, currentPage } from "../lib/session.js";
-    import { getAccountById } from "../lib/api.js";
+    import { getAccountById, getMyAccounts } from "../lib/api.js";
     import type { AccountDto } from "../lib/api.js";
 
     let account: AccountDto | null = $state(null);
@@ -11,11 +11,31 @@
 
     const s = $derived($session!);
 
+    async function loadByOwner() {
+        const accounts = await getMyAccounts();
+        const primary = accounts.find(a => a.label === "primary") ?? accounts[0];
+        if (primary) {
+            session.refresh({ primaryAccountId: primary.accountId });
+            account = await getAccountById(primary.accountId);
+        } else {
+            error = "No bank account found. Your account may still be setting up — try refreshing.";
+        }
+    }
+
     async function load() {
         loading = true;
         error = "";
         try {
-            account = await getAccountById(s.primaryAccountId);
+            if (!s.primaryAccountId) {
+                await loadByOwner();
+                return;
+            }
+            try {
+                account = await getAccountById(s.primaryAccountId);
+            } catch {
+                // Stored accountId may be stale (e.g. after data wipe) — look up fresh
+                await loadByOwner();
+            }
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to load account";
         } finally {

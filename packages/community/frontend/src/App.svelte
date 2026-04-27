@@ -20,6 +20,7 @@
     import BudgetPage          from "./pages/BudgetPage.svelte";
     import AssociationsPage    from "./pages/AssociationsPage.svelte";
     import AssociationPage     from "./pages/AssociationPage.svelte";
+    import AddPersonPage       from "./pages/AddPersonPage.svelte";
     import BottomNav           from "./components/BottomNav.svelte";
 
     type AppState = "loading" | "setup" | "login" | "app";
@@ -89,6 +90,8 @@
             <AssociationsPage />
         {:else if $currentPage === "association"}
             <AssociationPage />
+        {:else if $currentPage === "add-person"}
+            <AddPersonPage />
         {/if}
     </main>
     <BottomNav />

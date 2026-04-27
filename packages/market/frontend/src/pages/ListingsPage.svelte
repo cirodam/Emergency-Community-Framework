@@ -1,10 +1,11 @@
 <script lang="ts">
-    import type { Listing, ListingType } from "../lib/api.js";
+    import type { Listing, ListingType, ListingSide } from "../lib/api.js";
     import {
         getListings,
         createListing,
         cancelListing,
         purchaseListing,
+        fulfillListing,
     } from "../lib/api.js";
     import { session } from "../lib/session.js";
     import ListingCard from "../components/ListingCard.svelte";
@@ -12,11 +13,16 @@
 
     let listings     = $state<Listing[]>([]);
     let filterType   = $state<ListingType | "all">("all");
+    let filterSide   = $state<ListingSide | "all">("all");
     let loading      = $state(true);
     let error        = $state("");
     let showForm     = $state(false);
 
+    const sideOptions  = ["all", "sell", "buy"]    as const;
+    const typeOptions  = ["all", "item", "service"] as const;
+
     // New listing form fields
+    let newSide        = $state<ListingSide>("sell");
     let newType        = $state<ListingType>("item");
     let newTitle       = $state("");
     let newDescription = $state("");
@@ -28,7 +34,10 @@
         loading = true;
         error   = "";
         try {
-            listings = await getListings(filterType === "all" ? undefined : filterType);
+            listings = await getListings(
+                filterSide === "all" ? undefined : filterSide,
+                filterType === "all" ? undefined : filterType,
+            );
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to load listings";
         } finally {
@@ -40,12 +49,13 @@
 
     async function submitListing() {
         formError = "";
-        if (!newTitle.trim())       { formError = "Title is required"; return; }
-        if (newPrice < 0)           { formError = "Price cannot be negative"; return; }
+        if (!newTitle.trim()) { formError = "Title is required"; return; }
+        if (newPrice < 0)     { formError = "Price cannot be negative"; return; }
 
         submitting = true;
         try {
             await createListing(
+                newSide,
                 newType,
                 newTitle.trim(),
                 newDescription,
@@ -78,6 +88,15 @@
             alert(e instanceof Error ? e.message : "Purchase failed");
         }
     }
+
+    async function onFulfill(id: string) {
+        try {
+            await fulfillListing(id);
+            await loadListings();
+        } catch (e) {
+            alert(e instanceof Error ? e.message : "Fulfill failed");
+        }
+    }
 </script>
 
 <div class="listings-page">
@@ -96,15 +115,28 @@
         </div>
 
         <div class="filters">
-            {#each (["all", "item", "service"] as const) as t}
-                <button
-                    class="filter-btn"
-                    class:active={filterType === t}
-                    onclick={() => { filterType = t; }}
-                >
-                    {t === "all" ? "All" : t === "item" ? "Items" : "Services"}
-                </button>
-            {/each}
+            <div class="filter-group">
+                {#each sideOptions as s}
+                    <button
+                        class="filter-btn"
+                        class:active={filterSide === s}
+                        onclick={() => { filterSide = s; }}
+                    >
+                        {s === "all" ? "All" : s === "sell" ? "Selling" : "Wanted"}
+                    </button>
+                {/each}
+            </div>
+            <div class="filter-group">
+                {#each typeOptions as t}
+                    <button
+                        class="filter-btn secondary"
+                        class:active={filterType === t}
+                        onclick={() => { filterType = t; }}
+                    >
+                        {t === "all" ? "Any type" : t === "item" ? "Items" : "Services"}
+                    </button>
+                {/each}
+            </div>
         </div>
     </header>
 
@@ -115,6 +147,20 @@
                 <div class="error-banner">{formError}</div>
             {/if}
             <form onsubmit={(e) => { e.preventDefault(); submitListing(); }}>
+                <div class="side-toggle">
+                    <button
+                        type="button"
+                        class="side-btn"
+                        class:active={newSide === "sell"}
+                        onclick={() => { newSide = "sell"; }}
+                    >I'm selling</button>
+                    <button
+                        type="button"
+                        class="side-btn"
+                        class:active={newSide === "buy"}
+                        onclick={() => { newSide = "buy"; }}
+                    >I want to buy</button>
+                </div>
                 <div class="form-row">
                     <label>
                         Type
@@ -124,20 +170,25 @@
                         </select>
                     </label>
                     <label>
-                        Price (kin)
-                        <input type="number" min="0" step="1" bind:value={newPrice} />
+                        {newSide === "sell" ? "Price (kin)" : "Willing to pay (kin)"}
+                        <input type="number" min="0" step="0.01" bind:value={newPrice} />
                     </label>
                 </div>
                 <label>
                     Title
-                    <input type="text" bind:value={newTitle} placeholder="What are you offering?" maxlength={100} />
+                    <input
+                        type="text"
+                        bind:value={newTitle}
+                        placeholder={newSide === "sell" ? "What are you offering?" : "What are you looking for?"}
+                        maxlength={100}
+                    />
                 </label>
                 <label>
                     Description
                     <textarea bind:value={newDescription} rows="3" placeholder="More details…" maxlength={1000}></textarea>
                 </label>
                 <button type="submit" class="btn-primary" disabled={submitting}>
-                    {submitting ? "Posting…" : "Post Listing"}
+                    {submitting ? "Posting…" : newSide === "sell" ? "Post for Sale" : "Post Wanted"}
                 </button>
             </form>
         </div>
@@ -156,6 +207,7 @@
                     {listing}
                     onCancel={onCancel}
                     onPurchase={onPurchase}
+                    onFulfill={onFulfill}
                 />
             {/each}
         </div>
@@ -203,7 +255,14 @@
 
     .filters {
         display: flex;
-        gap: 0.5rem;
+        gap: 1rem;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .filter-group {
+        display: flex;
+        gap: 0.375rem;
     }
 
     .filter-btn {
@@ -222,6 +281,11 @@
         border-color: #16a34a;
     }
 
+    .filter-btn.secondary.active {
+        background: #6b7280;
+        border-color: #6b7280;
+    }
+
     .new-listing-form {
         background: white;
         border: 1px solid #d1d5db;
@@ -235,6 +299,33 @@
         font-weight: 600;
         margin: 0 0 1rem;
         color: #111827;
+    }
+
+    .side-toggle {
+        display: flex;
+        border: 1px solid #d1d5db;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        width: fit-content;
+    }
+
+    .side-btn {
+        padding: 0.5rem 1.25rem;
+        border: none;
+        background: white;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        color: #6b7280;
+    }
+
+    .side-btn + .side-btn {
+        border-left: 1px solid #d1d5db;
+    }
+
+    .side-btn.active {
+        background: #16a34a;
+        color: white;
     }
 
     .error-banner {

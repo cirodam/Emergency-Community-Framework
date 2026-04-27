@@ -1,6 +1,7 @@
 <script lang="ts">
     import { listPersons } from "../lib/api.js";
     import type { PersonDto } from "../lib/api.js";
+    import { currentPage } from "../lib/session.js";
 
     let members: PersonDto[] = $state([]);
     let loading = $state(true);
@@ -34,7 +35,10 @@
 </script>
 
 <div class="directory-page">
-    <h2 class="page-title">Directory</h2>
+    <div class="page-header">
+        <h2 class="page-title">Directory</h2>
+        <button class="btn-add" onclick={() => currentPage.go("add-person")}>+ Add</button>
+    </div>
 
     <div class="search-row">
         <input
@@ -91,6 +95,26 @@
     }
 
     .page-title { font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0 0 1rem; }
+
+    .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+    }
+
+    .page-header .page-title { margin: 0; }
+
+    .btn-add {
+        background: #16a34a;
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        padding: 0.5rem 1rem;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
 
     .search-row { margin-bottom: 1.25rem; }
 

@@ -20,15 +20,18 @@ function toDto(l: ReturnType<ListingService["get"]>) {
     return l;
 }
 
-// GET /api/listings?type=item|service&status=open
+// GET /api/listings?type=item|service&side=sell|buy&status=open
 export function listListings(req: Request, res: Response): void {
-    const { type, status } = req.query;
+    const { type, side, status } = req.query;
     let results = status === "open" || status === undefined
         ? svc().getOpen()
         : svc().getAll();
 
     if (type === "item" || type === "service") {
         results = results.filter(l => l.type === type);
+    }
+    if (side === "sell" || side === "buy") {
+        results = results.filter(l => l.side === side);
     }
     res.json(results.map(toDto));
 }
@@ -41,12 +44,15 @@ export function getListing(req: Request, res: Response): void {
 }
 
 // POST /api/listings
-// Body: { type, title, description, price, sellerHandle? }
+// Body: { side, type, title, description, price, posterHandle? }
 export function createListing(req: Request & { personId?: string }, res: Response): void {
-    const { type, title, description, price, sellerHandle } = req.body ?? {};
-    const sellerId = req.personId;
+    const { side, type, title, description, price, posterHandle } = req.body ?? {};
+    const posterId = req.personId;
 
-    if (!sellerId) { res.status(401).json({ error: "Not authenticated" }); return; }
+    if (!posterId) { res.status(401).json({ error: "Not authenticated" }); return; }
+    if (side !== "sell" && side !== "buy") {
+        res.status(400).json({ error: "side must be 'sell' or 'buy'" }); return;
+    }
     if (type !== "item" && type !== "service") {
         res.status(400).json({ error: "type must be 'item' or 'service'" }); return;
     }
@@ -61,8 +67,9 @@ export function createListing(req: Request & { personId?: string }, res: Respons
     }
 
     const listing = svc().add(
-        sellerId,
-        typeof sellerHandle === "string" ? sellerHandle : "",
+        side,
+        posterId,
+        typeof posterHandle === "string" ? posterHandle : "",
         type,
         title.trim(),
         description,
@@ -118,15 +125,16 @@ export async function purchaseListing(
     if (!buyerId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
     const listing = svc().get(req.params.id as string);
-    if (!listing)                   { res.status(404).json({ error: "Listing not found" }); return; }
-    if (listing.status !== "open")  { res.status(422).json({ error: "Listing is not open" }); return; }
-    if (listing.sellerId === buyerId) { res.status(422).json({ error: "Cannot purchase your own listing" }); return; }
+    if (!listing)                    { res.status(404).json({ error: "Listing not found" }); return; }
+    if (listing.side !== "sell")     { res.status(422).json({ error: "Use /fulfill for buy listings" }); return; }
+    if (listing.status !== "open")   { res.status(422).json({ error: "Listing is not open" }); return; }
+    if (listing.posterId === buyerId) { res.status(422).json({ error: "Cannot purchase your own listing" }); return; }
 
     const b = bank();
 
     const [buyerAccount, sellerAccount] = await Promise.all([
         b.getPrimaryAccountAsync(buyerId),
-        b.getPrimaryAccountAsync(listing.sellerId),
+        b.getPrimaryAccountAsync(listing.posterId),
     ]);
 
     if (!buyerAccount)  { res.status(422).json({ error: "Buyer has no bank account" }); return; }
@@ -148,4 +156,47 @@ export async function purchaseListing(
 
     const sold = svc().markSold(listing.id, buyerId);
     res.json(toDto(sold));
+}
+
+// POST /api/listings/:id/fulfill
+// Someone fulfills a buy listing: payment flows from poster (buyer) to fulfiller.
+export async function fulfillListing(
+    req: Request & { personId?: string },
+    res: Response,
+): Promise<void> {
+    const fulfillerId = req.personId;
+    if (!fulfillerId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+    const listing = svc().get(req.params.id as string);
+    if (!listing)                      { res.status(404).json({ error: "Listing not found" }); return; }
+    if (listing.side !== "buy")        { res.status(422).json({ error: "Use /purchase for sell listings" }); return; }
+    if (listing.status !== "open")     { res.status(422).json({ error: "Listing is not open" }); return; }
+    if (listing.posterId === fulfillerId) { res.status(422).json({ error: "Cannot fulfill your own listing" }); return; }
+
+    const b = bank();
+
+    const [posterAccount, fulfillerAccount] = await Promise.all([
+        b.getPrimaryAccountAsync(listing.posterId),
+        b.getPrimaryAccountAsync(fulfillerId),
+    ]);
+
+    if (!posterAccount)   { res.status(422).json({ error: "Poster has no bank account" }); return; }
+    if (!fulfillerAccount) { res.status(422).json({ error: "You have no bank account" }); return; }
+
+    if (listing.price > 0) {
+        try {
+            await b.transfer(
+                posterAccount.accountId,
+                fulfillerAccount.accountId,
+                listing.price,
+                `fulfill: ${listing.title}`,
+            );
+        } catch (err) {
+            res.status(422).json({ error: `Payment failed: ${(err as Error).message}` });
+            return;
+        }
+    }
+
+    const filled = svc().markFilled(listing.id, fulfillerId);
+    res.json(toDto(filled));
 }

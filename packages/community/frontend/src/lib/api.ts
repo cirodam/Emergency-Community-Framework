@@ -1,18 +1,22 @@
 // Typed API wrappers for the community backend.
 // All calls use relative URLs — Vite proxies /api → http://localhost:3002 in dev.
 
-import { getToken } from "./session.js";
+import { getToken, session } from "./session.js";
 
 /**
  * Authenticated fetch — attaches the Bearer credential token when present.
- * Use for all calls that require a logged-in user.
+ * On 401, clears the session so the app re-routes to login.
  */
-function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
+async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
     const token = getToken();
     const headers = new Headers(init.headers);
     headers.set("Content-Type", "application/json");
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    return fetch(input, { ...init, headers });
+    const res = await fetch(input, { ...init, headers });
+    if (res.status === 401) {
+        session.logout();
+    }
+    return res;
 }
 
 export interface PersonDto {
@@ -194,6 +198,22 @@ export async function getPerson(id: string): Promise<PersonDto> {
     const res = await apiFetch(`/api/persons/${encodeURIComponent(id)}`);
     if (!res.ok) throw new Error("Member not found");
     return res.json() as Promise<PersonDto>;
+}
+
+export async function addPerson(data: {
+    firstName: string;
+    lastName: string;
+    birthDate: string;
+    bornInCommunity?: boolean;
+    phone?: string | null;
+}): Promise<PersonDto> {
+    const res = await apiFetch("/api/persons", {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+    const body = await res.json().catch(() => ({})) as { error?: string } & PersonDto;
+    if (!res.ok) throw new Error(body.error ?? "Failed to add person");
+    return body as PersonDto;
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────

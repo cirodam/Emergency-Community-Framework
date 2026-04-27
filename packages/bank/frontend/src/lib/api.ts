@@ -2,18 +2,22 @@
 // All calls use relative URLs — Vite proxies /api → http://localhost:3001 in dev,
 // and the Express server serves the built frontend directly in production.
 
-import { getToken } from "./session.js";
+import { getToken, session } from "./session.js";
 
 /**
  * Authenticated fetch — attaches the Bearer credential token when present.
- * Use for all calls that require a logged-in user.
+ * On 401, clears the local session so the app re-routes to login.
  */
-function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
+async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
     const token = getToken();
     const headers = new Headers(init.headers as HeadersInit);
     headers.set("Content-Type", "application/json");
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    return fetch(input, { ...init, headers });
+    const res = await fetch(input, { ...init, headers });
+    if (res.status === 401) {
+        session.logout();
+    }
+    return res;
 }
 
 export interface AccountDto {

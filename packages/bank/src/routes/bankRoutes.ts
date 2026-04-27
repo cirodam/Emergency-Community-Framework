@@ -25,7 +25,7 @@ function requireAuthOrNodeSignature(req: Request, res: Response, next: NextFunct
 // Admin / infrastructure routes — node signature required
 router.get( "/accounts",                         requireNodeAuth, getAllAccounts);
 router.post("/accounts",                         requireNodeAuth, createAccount);
-router.get( "/account/:accountId",               requireNodeAuth, getAccountById);
+router.get( "/account/:accountId",               requireAuthOrNodeSignature, getAccountById);
 router.post("/demurrage",                        requireAuthOrNodeSignature, applyDemurrage);
 
 // Member routes — require a valid community-issued credential or node signature

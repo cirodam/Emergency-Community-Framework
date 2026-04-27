@@ -8,6 +8,13 @@
     import SettingsPage from "./pages/SettingsPage.svelte";
     import BottomNav    from "./components/BottomNav.svelte";
 
+    // If the URL contains a fresh #session= fragment, any existing sessionStorage
+    // data is stale. Clear it immediately so the $effect below does not treat the
+    // old session as valid and set ready=true before onMount can process the fragment.
+    if (window.location.hash.startsWith("#session=")) {
+        session.logout();
+    }
+
     let ready = $state(false);
 
     onMount(async () => {
@@ -15,15 +22,25 @@
         const hash = window.location.hash;
         if (hash.startsWith("#session=")) {
             try {
-                const raw  = atob(hash.slice("#session=".length));
+                const raw  = decodeURIComponent(atob(hash.slice("#session=".length)));
                 const payload = JSON.parse(raw) as { token: string; id: string; firstName: string; lastName: string; handle: string };
-                // Fetch bank accounts using the new credential
-                const accountsRes = await fetch("/api/me/accounts", {
-                    headers: { Authorization: `Bearer ${payload.token}` },
-                });
-                const accounts = accountsRes.ok
-                    ? await accountsRes.json() as { accountId: string; label: string }[]
-                    : [];
+                // Fetch bank accounts using the new credential.
+                // Retry up to 5 times with 1 s delay — the community's
+                // onPersonJoined hook opens the account asynchronously so
+                // it may not exist yet by the time we get here.
+                let accounts: { accountId: string; label: string }[] = [];
+                for (let attempt = 0; attempt < 5; attempt++) {
+                    const r = await fetch("/api/me/accounts", {
+                        headers: { Authorization: `Bearer ${payload.token}` },
+                    });
+                    if (r.ok) {
+                        const fetched = await r.json() as { accountId: string; label: string }[];
+                        if (fetched.length > 0) { accounts = fetched; break; }
+                    } else if (r.status === 401 || r.status === 403) {
+                        break; // stale token — no point retrying
+                    }
+                    if (attempt < 4) await new Promise(res => setTimeout(res, 1000));
+                }
                 const primary = accounts.find(a => a.label === "primary") ?? accounts[0];
                 const data: SessionData = {
                     personId:         payload.id,
@@ -54,7 +71,17 @@
 
     // Keep ready in sync if session is already loaded from sessionStorage
     $effect(() => {
-        if ($session) ready = true;
+        if ($session) {
+            ready = true;
+        } else if (ready) {
+            // Session was cleared (e.g. 401 on an API call) — redirect to login
+            ready = false;
+            fetch("/api/config").then(r => r.json()).catch(() => ({ communityUrl: "" })).then((cfg: { communityUrl?: string }) => {
+                const communityUrl = cfg.communityUrl || "http://localhost:3002";
+                const returnUrl    = encodeURIComponent(window.location.origin);
+                window.location.href = `${communityUrl}/login?return=${returnUrl}`;
+            });
+        }
     });
 </script>
 

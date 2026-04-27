@@ -17,7 +17,14 @@
         try {
             person = await getPerson(s.personId);
         } catch (e) {
-            error = e instanceof Error ? e.message : "Failed to load profile";
+            const msg = e instanceof Error ? e.message : "";
+            // Person not found means the session is pointing at a deleted/wiped record.
+            // Log out so the user is sent back to the login page.
+            if (msg.includes("not found") || msg.includes("404")) {
+                session.logout();
+                return;
+            }
+            error = msg || "Failed to load profile";
         } finally {
             loading = false;
         }

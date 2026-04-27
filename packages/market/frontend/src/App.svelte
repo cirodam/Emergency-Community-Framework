@@ -6,11 +6,16 @@
 
     let ready = $state(false);
 
+    // Clear any stale sessionStorage before processing a fresh login redirect.
+    if (window.location.hash.startsWith("#session=")) {
+        session.logout();
+    }
+
     onMount(async () => {
         const hash = window.location.hash;
         if (hash.startsWith("#session=")) {
             try {
-                const raw     = atob(hash.slice("#session=".length));
+                const raw     = decodeURIComponent(atob(hash.slice("#session=".length)));
                 const payload = JSON.parse(raw) as { token: string; id: string; firstName: string; lastName: string; handle: string };
                 const data: SessionData = {
                     personId:  payload.id,
@@ -38,7 +43,16 @@
     });
 
     $effect(() => {
-        if ($session) ready = true;
+        if ($session) {
+            ready = true;
+        } else if (ready) {
+            ready = false;
+            fetch("/api/config").then(r => r.json()).catch(() => ({ communityUrl: "" })).then((cfg: { communityUrl?: string }) => {
+                const communityUrl = cfg.communityUrl || "http://localhost:3002";
+                const returnUrl    = encodeURIComponent(window.location.origin);
+                window.location.href = `${communityUrl}/login?return=${returnUrl}`;
+            });
+        }
     });
 </script>
 
