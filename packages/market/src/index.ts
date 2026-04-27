@@ -2,8 +2,14 @@ import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
 import { initServiceNode, resolveCommunityIdentity, networkRouter } from "@ecf/core";
-import { ListingLoader } from "./ListingLoader.js";
-import { ListingService } from "./ListingService.js";
+import { ClassifiedLoader } from "./ClassifiedLoader.js";
+import { ClassifiedService } from "./ClassifiedService.js";
+import { StallLoader } from "./StallLoader.js";
+import { StallService } from "./StallService.js";
+import { ServiceProfileLoader } from "./ServiceProfileLoader.js";
+import { ServiceProfileService } from "./ServiceProfileService.js";
+import { MarketplaceLoader } from "./MarketplaceLoader.js";
+import { MarketplaceService } from "./MarketplaceService.js";
 import { setCommunityIdentity } from "./communityIdentity.js";
 import marketRoutes from "./routes/marketRoutes.js";
 
@@ -31,9 +37,21 @@ async function main(): Promise<void> {
         seeds:        process.env.BOOTSTRAP_PEERS,
     });
 
-    // Listings
-    const listingLoader = new ListingLoader(resolve(DATA_DIR, "listings"));
-    ListingService.getInstance().init(listingLoader);
+    // Classifieds
+    const classifiedLoader = new ClassifiedLoader(resolve(DATA_DIR, "classifieds"));
+    ClassifiedService.getInstance().init(classifiedLoader);
+
+    // Stalls
+    const stallLoader = new StallLoader(resolve(DATA_DIR, "stalls"));
+    StallService.getInstance().init(stallLoader);
+
+    // Services
+    const serviceProfileLoader = new ServiceProfileLoader(resolve(DATA_DIR, "services"));
+    ServiceProfileService.getInstance().init(serviceProfileLoader);
+
+    // Marketplaces
+    const marketplaceLoader = new MarketplaceLoader(resolve(DATA_DIR, "marketplaces"));
+    MarketplaceService.getInstance().init(marketplaceLoader);
 
     // Resolve community identity non-blocking — public endpoints work immediately
     resolveCommunityIdentity(COMMUNITY_URL, "[market]")
@@ -45,9 +63,12 @@ async function main(): Promise<void> {
 
     app.get("/health", (_req, res) => {
         res.json({
-            status:   "ok",
-            bankUrl:  BANK_URL,
-            listings: ListingService.getInstance().getAll().length,
+            status:      "ok",
+            bankUrl:     BANK_URL,
+            classifieds: ClassifiedService.getInstance().getAll().length,
+            stalls:      StallService.getInstance().getAll().length,
+            services:    ServiceProfileService.getInstance().getAll().length,
+            marketplaces: MarketplaceService.getInstance().getAll().length,
         });
     });
 

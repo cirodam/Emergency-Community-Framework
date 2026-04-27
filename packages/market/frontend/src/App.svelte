@@ -2,7 +2,13 @@
     import { onMount } from "svelte";
     import { session } from "./lib/session.js";
     import type { SessionData } from "./lib/session.js";
-    import ListingsPage from "./pages/ListingsPage.svelte";
+    import { currentPage } from "./lib/nav.js";
+    import ClassifiedsPage  from "./pages/ClassifiedsPage.svelte";
+    import StallsPage        from "./pages/StallsPage.svelte";
+    import StallPage         from "./pages/StallPage.svelte";
+    import ServicesPage      from "./pages/ServicesPage.svelte";
+    import MarketplacesPage  from "./pages/MarketplacesPage.svelte";
+    import MarketplacePage   from "./pages/MarketplacePage.svelte";
 
     let ready = $state(false);
 
@@ -57,7 +63,36 @@
 </script>
 
 {#if ready && $session}
-    <ListingsPage />
+    <nav class="tab-bar">
+        <button class="tab" class:active={$currentPage === "classifieds"} onclick={() => currentPage.set("classifieds")}>
+            Classifieds
+        </button>
+        <button class="tab" class:active={$currentPage === "stalls" || $currentPage === "stall"} onclick={() => currentPage.set("stalls")}>
+            Stalls
+        </button>
+        <button class="tab" class:active={$currentPage === "services"} onclick={() => currentPage.set("services")}>
+            Services
+        </button>
+        <button class="tab" class:active={$currentPage === "marketplaces" || $currentPage === "marketplace"} onclick={() => currentPage.set("marketplaces")}>
+            Markets
+        </button>
+    </nav>
+
+    <main>
+        {#if $currentPage === "classifieds"}
+            <ClassifiedsPage />
+        {:else if $currentPage === "stall"}
+            <StallPage />
+        {:else if $currentPage === "stalls"}
+            <StallsPage />
+        {:else if $currentPage === "services"}
+            <ServicesPage />
+        {:else if $currentPage === "marketplace"}
+            <MarketplacePage />
+        {:else}
+            <MarketplacesPage />
+        {/if}
+    </main>
 {/if}
 
 <style>
@@ -71,4 +106,31 @@
         background: #f0fdf4;
         color: #111827;
     }
+
+    .tab-bar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        display: flex;
+        background: #fff;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 0 1rem;
+    }
+
+    .tab {
+        padding: 0.75rem 1.25rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #64748b;
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        transition: color 0.15s, border-color 0.15s;
+        margin-bottom: -1px;
+    }
+    .tab:hover   { color: #0f172a; }
+    .tab.active  { color: #16a34a; border-bottom-color: #16a34a; }
+
+    main { min-height: calc(100dvh - 45px); }
 </style>
