@@ -68,7 +68,7 @@ function createSessionStore() {
 
 export const session = createSessionStore();
 
-export type Page = "profile" | "directory" | "constitution" | "economy" | "settings" | "domains" | "domain" | "governance" | "central-bank" | "currency-board" | "social-insurance" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person";
+export type Page = "profile" | "directory" | "constitution" | "economy" | "settings" | "domains" | "domain" | "governance" | "central-bank" | "currency-board" | "social-insurance" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations";
 
 function createPageStore() {
     const { subscribe, set } = writable<Page>("profile");

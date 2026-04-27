@@ -553,3 +553,70 @@ export async function withdrawApplication(applicationId: string): Promise<Applic
     return res.json() as Promise<ApplicationDto>;
 }
 
+// ── Locations ─────────────────────────────────────────────────────────────────
+
+export interface LocationDto {
+    id:          string;
+    name:        string;
+    address:     string;
+    lat:         number | null;
+    lng:         number | null;
+    description: string;
+    createdAt:   string;
+}
+
+export async function listLocations(): Promise<LocationDto[]> {
+    const res = await fetch("/api/locations");
+    if (!res.ok) throw new Error("Failed to load locations");
+    return res.json() as Promise<LocationDto[]>;
+}
+
+export async function getLocation(id: string): Promise<LocationDto> {
+    const res = await fetch(`/api/locations/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error("Location not found");
+    return res.json() as Promise<LocationDto>;
+}
+
+export async function createLocation(data: {
+    name: string;
+    address: string;
+    lat?: number | null;
+    lng?: number | null;
+    description?: string;
+}): Promise<LocationDto> {
+    const res = await apiFetch("/api/locations", {
+        method: "POST",
+        body:   JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to create location");
+    }
+    return res.json() as Promise<LocationDto>;
+}
+
+export async function updateLocation(id: string, patch: {
+    name?: string;
+    address?: string;
+    lat?: number | null;
+    lng?: number | null;
+    description?: string;
+}): Promise<LocationDto> {
+    const res = await apiFetch(`/api/locations/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body:   JSON.stringify(patch),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to update location");
+    }
+    return res.json() as Promise<LocationDto>;
+}
+
+export async function deleteLocation(id: string): Promise<void> {
+    const res = await apiFetch(`/api/locations/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to delete location");
+    }
+}

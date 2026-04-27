@@ -1,6 +1,7 @@
 <script lang="ts">
     import { getConstitution } from "../lib/api.js";
     import type { ConstitutionDocument } from "../lib/api.js";
+    import { currentPage } from "../lib/session.js";
 
     let doc: ConstitutionDocument | null = $state(null);
     let loading = $state(true);
@@ -32,6 +33,9 @@
 </script>
 
 <div class="constitution-page">
+    <div class="page-header">
+        <button class="back-btn" onclick={() => currentPage.go("governance")}>‹ Governance</button>
+    </div>
     <h2 class="page-title">Constitution</h2>
 
     {#if loading}
@@ -54,13 +58,18 @@
         <h3 class="section-title">Parameters</h3>
         <div class="param-list">
             {#each Object.entries(doc.parameters) as [key, param]}
-                <div class="param-row">
+                <div class="param-row" class:param-immutable={param.authority === "immutable"}>
                     <div class="param-header">
                         <span class="param-key">{key}</span>
-                        <span class="authority-badge {authorityColor(param.authority)}">{param.authority}</span>
+                        <span class="authority-badge {authorityColor(param.authority)}">
+                            {#if param.authority === "immutable"}🔒{/if}
+                            {param.authority}
+                        </span>
                     </div>
                     <div class="param-desc">{param.description}</div>
-                    <div class="param-value">{formatValue(param.value)}</div>
+                    <div class="param-value" class:param-value-immutable={param.authority === "immutable"}>
+                        {formatValue(param.value)}
+                    </div>
                 </div>
             {/each}
         </div>
@@ -87,6 +96,17 @@
         padding: 1.5rem 1.5rem 6rem;
         max-width: 480px;
         margin: 0 auto;
+    }
+
+    .page-header { margin-bottom: 0.25rem; }
+
+    .back-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+        color: #3b82f6;
+        padding: 0;
     }
 
     @media (min-width: 768px) {
@@ -147,6 +167,12 @@
         gap: 0.35rem;
     }
 
+    .param-immutable {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+        opacity: 0.8;
+    }
+
     .param-header {
         display: flex;
         justify-content: space-between;
@@ -163,6 +189,10 @@
         font-weight: 700;
         color: #15803d;
         font-variant-numeric: tabular-nums;
+    }
+
+    .param-value-immutable {
+        color: #94a3b8;
     }
 
     .authority-badge {

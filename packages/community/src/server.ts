@@ -14,6 +14,8 @@ import { OrgLoader } from "./organization/OrgLoader.js";
 import { OrgService } from "./organization/OrgService.js";
 import { CalendarEventLoader } from "./calendar/CalendarEventLoader.js";
 import { CalendarService } from "./calendar/CalendarService.js";
+import { LocationLoader } from "./location/LocationLoader.js";
+import { LocationService } from "./location/LocationService.js";
 import { RoleTypeLoader } from "./common/RoleTypeLoader.js";
 import { RoleType, DEFAULT_ROLE_TYPES } from "./common/RoleType.js";
 import { CommunityRoleLoader } from "./common/domain/CommunityRoleLoader.js";
@@ -125,6 +127,10 @@ async function main(): Promise<void> {
     // ── Calendar ─────────────────────────────────────────────────────────────
     const calendarLoader = new CalendarEventLoader(resolve(DATA_DIR, "calendar"));
     CalendarService.getInstance().init(calendarLoader);
+
+    // ── Locations ─────────────────────────────────────────────────────────────
+    const locationLoader = new LocationLoader(resolve(DATA_DIR, "locations"));
+    LocationService.getInstance().init(locationLoader);
 
     // When an application collects enough vouches, admit the applicant as a full Person.
     MemberApplicationService.getInstance().onAdmitted(async (app) => {

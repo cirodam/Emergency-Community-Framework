@@ -4,6 +4,25 @@ import { Person } from "../person/Person.js";
 
 const svc = () => PersonService.getInstance();
 
+// ── Login rate limiting ───────────────────────────────────────────────────────
+// Keyed by client IP. 10 attempts per 15-minute window.
+const LOGIN_ATTEMPTS = new Map<string, { count: number; resetAt: number }>();
+const MAX_LOGIN_ATTEMPTS = 10;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
+function checkLoginRateLimit(ip: string): boolean {
+    const now = Date.now();
+    const entry = LOGIN_ATTEMPTS.get(ip);
+    if (!entry || now >= entry.resetAt) {
+        LOGIN_ATTEMPTS.set(ip, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+        return true;
+    }
+    if (entry.count >= MAX_LOGIN_ATTEMPTS) return false;
+    entry.count++;
+    return true;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function toPersonDto(p: Person) {
     return {
         id:        p.id,
@@ -22,6 +41,10 @@ function toPersonDto(p: Person) {
 // Body: { handle, password }
 // Returns person DTO + a base64url-encoded PersonCredential token.
 export async function login(req: Request, res: Response): Promise<void> {
+    const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
+    if (!checkLoginRateLimit(ip)) {
+        res.status(429).json({ error: "Too many login attempts. Please try again later." }); return;
+    }
     const { handle, password } = req.body ?? {};
     if (typeof handle !== "string" || typeof password !== "string") {
         res.status(400).json({ error: "handle and password are required" }); return;

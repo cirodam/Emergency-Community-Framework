@@ -12,6 +12,7 @@
         { id: "domains",       label: "Domains",       icon: "⊛" },
         { id: "governance",    label: "Governance",    icon: "⚖" },
         { id: "economy",       label: "Economy",       icon: "⊕" },
+        { id: "locations",     label: "Locations",     icon: "⊕" },
         { id: "how-it-works",  label: "How It Works",  icon: "⊙" },
         { id: "settings",      label: "Settings",      icon: "⚙" },
     ];

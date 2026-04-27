@@ -11,6 +11,7 @@ import * as applications from "./ApplicationController.js";
 import * as associations from "./AssociationController.js";
 import * as orgs from "./OrgController.js";
 import * as calendar from "./CalendarController.js";
+import * as locations from "./LocationController.js";
 
 const requireAuth = requirePersonCredential(getCommunityIdentity);
 
@@ -28,14 +29,14 @@ router.get("/budget",    economics.getCommunityBudget);
 router.get( "/federation",       economics.getFederationStatus);
 router.post("/federation/apply", economics.applyToFederation);
 router.get( "/federation/sync",  economics.syncFederationStatus);
-// Persons
-router.get(   "/persons",                persons.listPersons);
-router.get(   "/persons/:id",            persons.getPerson);
-router.post(  "/persons",                persons.addPerson);
-router.patch( "/persons/:id",            persons.updatePerson);
-router.delete("/persons/:id",            persons.dischargePerson);
-router.post(  "/persons/:id/credential", persons.issueCredential);
-router.post(  "/persons/:id/password",   auth.setPassword);
+// Persons (all require auth — member data is not public)
+router.get(   "/persons",                requireAuth, persons.listPersons);
+router.get(   "/persons/:id",            requireAuth, persons.getPerson);
+router.post(  "/persons",                requireAuth, persons.addPerson);
+router.patch( "/persons/:id",            requireAuth, persons.updatePerson);
+router.delete("/persons/:id",            requireAuth, persons.dischargePerson);
+router.post(  "/persons/:id/credential", requireAuth, persons.issueCredential);
+router.post(  "/persons/:id/password",   requireAuth, auth.setPassword);
 
 // Auth
 router.post("/auth/login",  auth.login);
@@ -44,30 +45,30 @@ router.post("/auth/verify", auth.verifyCredential);
 // SMS banking (inbound webhook — for testing or gammu-smsd RunOnReceive)
 router.post("/sms/inbound", sms.smsInbound);
 
-// Member applications
-router.get(   "/applications",              applications.listApplications);
+// Member applications (require auth — applicant data is sensitive)
+router.get(   "/applications",              requireAuth, applications.listApplications);
 router.post(  "/applications",              requireAuth, applications.submitApplication);
-router.get(   "/applications/:id",          applications.getApplication);
+router.get(   "/applications/:id",          requireAuth, applications.getApplication);
 router.post(  "/applications/:id/vouch",    requireAuth, applications.vouchForApplication);
 router.delete("/applications/:id/vouch",    requireAuth, applications.removeVouch);
 router.post(  "/applications/:id/withdraw", requireAuth, applications.withdrawApplication);
 
-// Domains
+// Domains (reads are public; writes require auth)
 router.get(  "/domains",     domains.listDomains);
 router.get(  "/domains/:id", domains.getDomain);
-router.patch("/domains/:id", domains.updateDomain);
+router.patch("/domains/:id", requireAuth, domains.updateDomain);
 
 // Domain budgets
 router.get(   "/domains/:id/budget",                domains.getDomainBudget);
-router.post(  "/domains/:id/budget/items",          domains.addBudgetItem);
-router.patch( "/domains/:id/budget/items/:itemId",  domains.updateBudgetItem);
-router.delete("/domains/:id/budget/items/:itemId",  domains.removeBudgetItem);
+router.post(  "/domains/:id/budget/items",          requireAuth, domains.addBudgetItem);
+router.patch( "/domains/:id/budget/items/:itemId",  requireAuth, domains.updateBudgetItem);
+router.delete("/domains/:id/budget/items/:itemId",  requireAuth, domains.removeBudgetItem);
 
 // Units
 router.get(   "/units",     domains.listUnits);
 router.get(   "/units/:id", domains.getUnit);
-router.post(  "/units",     domains.createUnit);
-router.delete("/units/:id", domains.deleteUnit);
+router.post(  "/units",     requireAuth, domains.createUnit);
+router.delete("/units/:id", requireAuth, domains.deleteUnit);
 
 // Unit templates
 router.get("/templates", domains.listTemplates);
@@ -75,24 +76,24 @@ router.get("/templates", domains.listTemplates);
 // Roles
 router.get(   "/roles",     domains.listRoles);
 router.get(   "/roles/:id", domains.getRole);
-router.post(  "/roles",     domains.createRole);
-router.patch( "/roles/:id", domains.updateRole);
-router.delete("/roles/:id", domains.deleteRole);
+router.post(  "/roles",     requireAuth, domains.createRole);
+router.patch( "/roles/:id", requireAuth, domains.updateRole);
+router.delete("/roles/:id", requireAuth, domains.deleteRole);
 
 // Role types (the bank)
 router.get(   "/role-types",     domains.listRoleTypes);
 router.get(   "/role-types/:id", domains.getRoleType);
-router.post(  "/role-types",     domains.createRoleType);
-router.patch( "/role-types/:id", domains.updateRoleType);
-router.delete("/role-types/:id", domains.deleteRoleType);
+router.post(  "/role-types",     requireAuth, domains.createRoleType);
+router.patch( "/role-types/:id", requireAuth, domains.updateRoleType);
+router.delete("/role-types/:id", requireAuth, domains.deleteRoleType);
 
 // Pools
 router.get(   "/pools",                        domains.listPools);
 router.get(   "/pools/:id",                    domains.getPool);
-router.post(  "/pools",                        domains.createPool);
-router.post(  "/pools/:id/members",            domains.addPoolMember);
-router.delete("/pools/:id/members/:personId",  domains.removePoolMember);
-router.delete("/pools/:id",                    domains.deletePool);
+router.post(  "/pools",                        requireAuth, domains.createPool);
+router.post(  "/pools/:id/members",            requireAuth, domains.addPoolMember);
+router.delete("/pools/:id/members/:personId",  requireAuth, domains.removePoolMember);
+router.delete("/pools/:id",                    requireAuth, domains.deletePool);
 
 // Associations
 router.get(   "/associations",                            associations.listAssociations);
@@ -120,5 +121,12 @@ router.patch( "/calendar/:id",                   requireAuth, calendar.updateEve
 router.delete("/calendar/:id",                   requireAuth, calendar.cancelEvent);
 router.post(  "/calendar/:id/rsvp",              requireAuth, calendar.rsvpToEvent);
 router.delete("/calendar/:id/rsvp/:personId",    requireAuth, calendar.removeRsvp);
+
+// Locations
+router.get(   "/locations",     locations.listLocations);
+router.get(   "/locations/:id", locations.getLocation);
+router.post(  "/locations",     requireAuth, locations.createLocation);
+router.patch( "/locations/:id", requireAuth, locations.updateLocation);
+router.delete("/locations/:id", requireAuth, locations.deleteLocation);
 
 export default router;

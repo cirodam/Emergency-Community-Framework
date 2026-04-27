@@ -6,7 +6,7 @@ const svc = () => PersonService.getInstance();
 
 // GET /api/persons
 export function listPersons(req: Request, res: Response): void {
-    res.json(svc().getAll().map(toDto));
+    res.json(svc().getAll().map(toListDto));
 }
 
 // GET /api/persons/:id
@@ -76,6 +76,7 @@ export function issueCredential(req: Request, res: Response): void {
     res.json(credential);
 }
 
+/** Full DTO — includes phone; only used for the individual GET. */
 function toDto(p: Person) {
     return {
         id:              p.id,
@@ -89,5 +90,20 @@ function toDto(p: Person) {
         languages:       p.languages,
         joinDate:        p.joinDate,
         credential:      p.credential,
+    };
+}
+
+/** Stripped DTO for list responses — omits phone. */
+function toListDto(p: Person) {
+    return {
+        id:              p.id,
+        firstName:       p.firstName,
+        lastName:        p.lastName,
+        handle:          p.handle,
+        disabled:        p.disabled,
+        retired:         p.retired,
+        bornInCommunity: p.bornInCommunity,
+        languages:       p.languages,
+        joinDate:        p.joinDate,
     };
 }
