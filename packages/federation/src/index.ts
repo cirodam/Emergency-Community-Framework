@@ -14,6 +14,8 @@ import { FederationConstitution } from "./governance/FederationConstitution.js";
 import { FederationDomainService } from "./common/FederationDomainService.js";
 import { InsuranceDomain } from "./domains/insurance/InsuranceDomain.js";
 import { BankClient } from "./BankClient.js";
+import { CensusRecordLoader } from "./census/CensusRecordLoader.js";
+import { FederationCensusService } from "./census/FederationCensusService.js";
 import federationRoutes from "./routes/federationRoutes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -105,6 +107,10 @@ async function main(): Promise<void> {
 
     // ── Federation constitution ────────────────────────────────────────────
     FederationConstitution.getInstance().load(resolve(DATA_DIR, "governance"));
+
+    // ── Member census ──────────────────────────────────────────────────────
+    const censusLoader = new CensusRecordLoader(resolve(DATA_DIR, "census"));
+    FederationCensusService.getInstance().init(censusLoader);
 
     // ── Federation functional domains ─────────────────────────────────────
     const domainSvc = FederationDomainService.getInstance();

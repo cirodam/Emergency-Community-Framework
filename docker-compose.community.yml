@@ -32,6 +32,10 @@ services:
       DATA_DIR: /app/data
       COMMUNITY_URL: http://community:3002
       OWNER_TYPE: community
+      PUBLIC_COMMUNITY_URL: http://localhost:3002
+      PUBLIC_BANK_URL: http://localhost:3001
+      PUBLIC_MARKET_URL: http://localhost:3003
+      PUBLIC_MAIL_URL: http://localhost:3020
     depends_on:
       - community
 
@@ -46,6 +50,10 @@ services:
       DATA_DIR: /app/data
       BANK_URL: http://bank:3001
       COMMUNITY_URL: http://community:3002
+      PUBLIC_COMMUNITY_URL: http://localhost:3002
+      PUBLIC_BANK_URL: http://localhost:3001
+      PUBLIC_MARKET_URL: http://localhost:3003
+      PUBLIC_MAIL_URL: http://localhost:3020
     volumes:
       - market-data:/app/data
     depends_on:
@@ -62,6 +70,10 @@ services:
       NODE_ENV: production
       DATA_DIR: /app/data
       COMMUNITY_URL: http://community:3002
+      PUBLIC_COMMUNITY_URL: http://localhost:3002
+      PUBLIC_BANK_URL: http://localhost:3001
+      PUBLIC_MARKET_URL: http://localhost:3003
+      PUBLIC_MAIL_URL: http://localhost:3020
     volumes:
       - mail-data:/app/data
     depends_on:

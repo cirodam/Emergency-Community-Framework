@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { requirePersonCredential } from "@ecf/core";
 import { getCommunityIdentity } from "../communityIdentity.js";
-import { login } from "./AuthController.js";
 import {
     listListings,
     getListing,
@@ -14,9 +13,6 @@ import {
 const router = Router();
 
 const requireAuth = requirePersonCredential(getCommunityIdentity);
-
-// Auth (SSO proxy to community)
-router.post("/auth/login", login);
 
 // Public
 router.get("/listings",     listListings);

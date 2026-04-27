@@ -1,10 +1,10 @@
 import { FileStore } from "@ecf/core";
-import { FunctionalDomain } from "./FunctionalDomain.js";
+import { FunctionalDomain, type BudgetItem } from "./FunctionalDomain.js";
 
 interface DomainStateRecord {
     id: string;
     unitIds: string[];
-    roleIds: string[];
+    budgetItems: BudgetItem[];
     poolId: string | null;
 }
 
@@ -22,10 +22,10 @@ export class FunctionalDomainLoader {
 
     save(domain: FunctionalDomain): void {
         const record: DomainStateRecord = {
-            id:      domain.id,
-            unitIds: domain.unitIds,
-            roleIds: domain.roleIds,
-            poolId:  domain.poolId,
+            id:          domain.id,
+            unitIds:     domain.unitIds,
+            budgetItems: domain.budgetItems,
+            poolId:      domain.poolId,
         };
         this.store.write(domain.id, record);
     }
@@ -37,9 +37,9 @@ export class FunctionalDomainLoader {
     restore(domain: FunctionalDomain): void {
         const record = this.store.read<DomainStateRecord>(domain.id);
         if (!record) return;
-        domain.unitIds = record.unitIds ?? [];
-        domain.roleIds = record.roleIds ?? [];
-        domain.poolId  = record.poolId  ?? null;
+        domain.unitIds     = record.unitIds     ?? [];
+        domain.budgetItems = record.budgetItems ?? [];
+        domain.poolId      = record.poolId      ?? null;
     }
 
     delete(domainId: string): boolean {

@@ -4,6 +4,14 @@ import { dirname, join, resolve } from "path";
 import { NodeService, DataManifest, networkRouter } from "@ecf/core";
 import { PersonLoader } from "./person/PersonLoader.js";
 import { PersonService } from "./person/PersonService.js";
+import { Person } from "./person/Person.js";
+import { MemberApplicationLoader } from "./applications/MemberApplicationLoader.js";
+import { MemberApplicationService } from "./applications/MemberApplicationService.js";
+import { pushCensus } from "./census/CensusService.js";
+import { AssociationLoader } from "./association/AssociationLoader.js";
+import { AssociationService } from "./association/AssociationService.js";
+import { RoleTypeLoader } from "./common/RoleTypeLoader.js";
+import { RoleType, DEFAULT_ROLE_TYPES } from "./common/RoleType.js";
 import { CommunityRoleLoader } from "./common/domain/CommunityRoleLoader.js";
 import { FunctionalUnitLoader } from "./common/domain/FunctionalUnitLoader.js";
 import { FunctionalDomainLoader } from "./common/domain/FunctionalDomainLoader.js";
@@ -98,6 +106,34 @@ async function main(): Promise<void> {
     const personLoader = new PersonLoader(resolve(DATA_DIR, "persons"));
     PersonService.getInstance().init(personLoader);
 
+    // ── Member applications ────────────────────────────────────────────────
+    const appLoader = new MemberApplicationLoader(resolve(DATA_DIR, "applications"));
+    MemberApplicationService.getInstance().init(appLoader);
+
+    // ── Associations ───────────────────────────────────────────────────────
+    const associationLoader = new AssociationLoader(resolve(DATA_DIR, "associations"));
+    AssociationService.getInstance().init(associationLoader);
+
+    // When an application collects enough vouches, admit the applicant as a full Person.
+    MemberApplicationService.getInstance().onAdmitted(async (app) => {
+        const person = new Person(
+            app.firstName,
+            app.lastName,
+            new Date(app.birthDate),
+        );
+        await PersonService.getInstance().add(person);
+        console.log(`[community] admitted ${app.firstName} ${app.lastName} via application ${app.id}`);
+
+        // Push updated census to federation (no-op if not a federation member).
+        pushCensus().then(result => {
+            if (result?.duplicates.length) {
+                console.warn(`[census] duplicate nullifiers detected across communities: ${result.duplicates.join(", ")}`);
+            }
+        }).catch(err => {
+            console.warn(`[census] failed to push census after admission: ${(err as Error).message}`);
+        });
+    });
+
     // ── Domain registries ──────────────────────────────────────────────────
     const domainSvc = DomainService.getInstance();
     domainSvc.init(
@@ -106,6 +142,18 @@ async function main(): Promise<void> {
         new CommunityRoleLoader(resolve(DATA_DIR, "roles")),
         new LeaderPoolLoader(resolve(DATA_DIR, "pools")),
     );
+
+    // ── Role type bank ─────────────────────────────────────────────────────
+    const roleTypeLoader = new RoleTypeLoader(resolve(DATA_DIR, "role-types"));
+    domainSvc.initRoleTypes(roleTypeLoader);
+
+    // Seed defaults on first boot (once any custom types exist we leave them alone)
+    if (domainSvc.getRoleTypes().length === 0) {
+        for (const def of DEFAULT_ROLE_TYPES) {
+            domainSvc.createRoleType(new RoleType(def.title, def.description, def.defaultKinPerMonth));
+        }
+        console.log(`[community] seeded ${DEFAULT_ROLE_TYPES.length} default role types`);
+    }
 
     // Register the four monetary/financial domains so they participate in
     // governance — they get leader pools, roles, and appear in the domain API.
@@ -373,6 +421,16 @@ async function main(): Promise<void> {
         res.status(bankReady ? 200 : 206).json({
             status: bankReady ? "ok" : "degraded",
             bank: bankReady ? "connected" : "unreachable",
+        });
+    });
+
+    app.get("/api/config", (_req, res) => {
+        const PORT_NUM = Number(process.env.PORT ?? 3002);
+        res.json({
+            communityUrl: process.env.PUBLIC_COMMUNITY_URL ?? `http://localhost:${PORT_NUM}`,
+            bankUrl:      process.env.PUBLIC_BANK_URL      ?? "http://localhost:3001",
+            marketUrl:    process.env.PUBLIC_MARKET_URL    ?? "http://localhost:3003",
+            mailUrl:      process.env.PUBLIC_MAIL_URL      ?? "http://localhost:3020",
         });
     });
 

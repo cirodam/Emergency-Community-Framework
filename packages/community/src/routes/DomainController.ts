@@ -4,7 +4,9 @@ import { FunctionalDomain } from "../common/domain/FunctionalDomain.js";
 import { FunctionalUnit } from "../common/domain/FunctionalUnit.js";
 import { UnitTemplateRegistry } from "../common/domain/UnitTemplateRegistry.js";
 import { CommunityRole } from "../common/CommunityRole.js";
+import { RoleType } from "../common/RoleType.js";
 import { LeaderPool } from "../governance/LeaderPool.js";
+import type { BudgetCategory } from "../common/domain/FunctionalDomain.js";
 
 const svc = () => DomainService.getInstance();
 
@@ -115,20 +117,35 @@ export function getRole(req: Request, res: Response): void {
 }
 
 // POST /api/roles
-// Body: { title, description?, kinPerMonth?, parentId, parentType: "domain"|"unit" }
+// Body: { unitId, roleTypeId?, title?, description?, kinPerMonth? }
+// Creates a role slot in a unit. Either roleTypeId (from the bank) or title must be supplied.
 export function createRole(req: Request, res: Response): void {
-    const { title, description, kinPerMonth, parentId, parentType } = req.body ?? {};
-    if (typeof title !== "string" || !title.trim()) {
-        res.status(400).json({ error: "title is required" }); return;
+    const { unitId, roleTypeId, title, description, kinPerMonth } = req.body ?? {};
+    if (typeof unitId !== "string" || !unitId) {
+        res.status(400).json({ error: "unitId is required" }); return;
     }
-    if (typeof parentId !== "string" || !parentId) {
-        res.status(400).json({ error: "parentId is required" }); return;
+    const unit = svc().getUnit(unitId);
+    if (!unit) { res.status(404).json({ error: "Unit not found" }); return; }
+
+    let resolvedTitle: string;
+    let resolvedDescription: string;
+    let resolvedRoleTypeId: string | null = null;
+
+    if (typeof roleTypeId === "string" && roleTypeId) {
+        const rt = svc().getRoleType(roleTypeId);
+        if (!rt) { res.status(404).json({ error: "Role type not found" }); return; }
+        resolvedTitle       = rt.title;
+        resolvedDescription = rt.description;
+        resolvedRoleTypeId  = rt.id;
+    } else if (typeof title === "string" && title.trim()) {
+        resolvedTitle       = title.trim();
+        resolvedDescription = description ?? "";
+    } else {
+        res.status(400).json({ error: "Either roleTypeId or title is required" }); return;
     }
-    if (parentType !== "domain" && parentType !== "unit") {
-        res.status(400).json({ error: "parentType must be 'domain' or 'unit'" }); return;
-    }
-    const role = new CommunityRole(title.trim(), description ?? "", kinPerMonth ?? 0);
-    svc().createRole(role, parentId, parentType);
+
+    const role = new CommunityRole(resolvedTitle, resolvedDescription, kinPerMonth ?? 0, resolvedRoleTypeId);
+    svc().createRole(role, unitId);
     res.status(201).json(toRoleDto(role));
 }
 
@@ -153,6 +170,55 @@ export function updateRole(req: Request, res: Response): void {
 export function deleteRole(req: Request, res: Response): void {
     const deleted = svc().deleteRole(req.params.id as string);
     if (!deleted) { res.status(404).json({ error: "Role not found" }); return; }
+    res.status(204).send();
+}
+
+// ── Role Types (the bank) ─────────────────────────────────────────────────────
+
+// GET /api/role-types
+export function listRoleTypes(_req: Request, res: Response): void {
+    res.json(svc().getRoleTypes().map(toRoleTypeDto));
+}
+
+// GET /api/role-types/:id
+export function getRoleType(req: Request, res: Response): void {
+    const rt = svc().getRoleType(req.params.id as string);
+    if (!rt) { res.status(404).json({ error: "Role type not found" }); return; }
+    res.json(toRoleTypeDto(rt));
+}
+
+// POST /api/role-types
+// Body: { title, description?, defaultKinPerMonth? }
+export function createRoleType(req: Request, res: Response): void {
+    const { title, description, defaultKinPerMonth } = req.body ?? {};
+    if (typeof title !== "string" || !title.trim()) {
+        res.status(400).json({ error: "title is required" }); return;
+    }
+    if (svc().hasRoleTypeWithTitle(title.trim())) {
+        res.status(409).json({ error: `A role type named "${title.trim()}" already exists` }); return;
+    }
+    const rt = new RoleType(title.trim(), description ?? "", defaultKinPerMonth ?? 0);
+    svc().createRoleType(rt);
+    res.status(201).json(toRoleTypeDto(rt));
+}
+
+// PATCH /api/role-types/:id
+// Body: { title?, description?, defaultKinPerMonth? }
+export function updateRoleType(req: Request, res: Response): void {
+    const rt = svc().getRoleType(req.params.id as string);
+    if (!rt) { res.status(404).json({ error: "Role type not found" }); return; }
+    const { title, description, defaultKinPerMonth } = req.body ?? {};
+    if (title              !== undefined) rt.title              = title;
+    if (description        !== undefined) rt.description        = description;
+    if (defaultKinPerMonth !== undefined) rt.defaultKinPerMonth = defaultKinPerMonth;
+    svc().saveRoleType(rt);
+    res.json(toRoleTypeDto(rt));
+}
+
+// DELETE /api/role-types/:id
+export function deleteRoleType(req: Request, res: Response): void {
+    const deleted = svc().deleteRoleType(req.params.id as string);
+    if (!deleted) { res.status(404).json({ error: "Role type not found" }); return; }
     res.status(204).send();
 }
 
@@ -221,7 +287,6 @@ function toDomainDto(d: FunctionalDomain) {
         handle:      d.getHandle(),
         description: d.description,
         unitIds:     d.unitIds,
-        roleIds:     d.roleIds,
         poolId:      d.poolId,
     };
 }
@@ -241,6 +306,7 @@ function toUnitDto(u: FunctionalUnit) {
 function toRoleDto(r: CommunityRole) {
     return {
         id:            r.id,
+        roleTypeId:    r.roleTypeId,
         title:         r.title,
         description:   r.description,
         memberId:      r.memberId,
@@ -252,6 +318,15 @@ function toRoleDto(r: CommunityRole) {
     };
 }
 
+function toRoleTypeDto(rt: RoleType) {
+    return {
+        id:                 rt.id,
+        title:              rt.title,
+        description:        rt.description,
+        defaultKinPerMonth: rt.defaultKinPerMonth,
+    };
+}
+
 function toPoolDto(p: LeaderPool) {
     return {
         id:          p.id,
@@ -260,4 +335,57 @@ function toPoolDto(p: LeaderPool) {
         personIds:   p.personIds,
         createdAt:   p.createdAt,
     };
+}
+
+// ── Budget ────────────────────────────────────────────────────────────────────
+
+const VALID_CATEGORIES = new Set<string>(["supplies", "equipment", "services", "other"]);
+
+// GET /api/domains/:id/budget
+export function getDomainBudget(req: Request, res: Response): void {
+    const budget = svc().getDomainBudget(req.params.id as string);
+    if (!budget) { res.status(404).json({ error: "Domain not found" }); return; }
+    res.json(budget);
+}
+
+// POST /api/domains/:id/budget/items
+// Body: { label, amount, category?, note? }
+export function addBudgetItem(req: Request, res: Response): void {
+    const { label, amount, category, note } = req.body ?? {};
+    if (typeof label !== "string" || !label.trim()) {
+        res.status(400).json({ error: "label is required" }); return;
+    }
+    if (typeof amount !== "number" || amount < 0) {
+        res.status(400).json({ error: "amount must be a non-negative number" }); return;
+    }
+    const cat: BudgetCategory = VALID_CATEGORIES.has(category) ? category : "other";
+    const item = svc().addBudgetItem(req.params.id as string, {
+        label: label.trim(),
+        amount,
+        category: cat,
+        note: typeof note === "string" ? note : "",
+    });
+    if (!item) { res.status(404).json({ error: "Domain not found" }); return; }
+    res.status(201).json(item);
+}
+
+// PATCH /api/domains/:id/budget/items/:itemId
+// Body: { label?, amount?, category?, note? }
+export function updateBudgetItem(req: Request, res: Response): void {
+    const { label, amount, category, note } = req.body ?? {};
+    const patch: Record<string, unknown> = {};
+    if (label    !== undefined) patch["label"]    = typeof label === "string" ? label.trim() : label;
+    if (amount   !== undefined) patch["amount"]   = amount;
+    if (category !== undefined) patch["category"] = VALID_CATEGORIES.has(category) ? category : "other";
+    if (note     !== undefined) patch["note"]     = note;
+    const item = svc().updateBudgetItem(req.params.id as string, req.params.itemId as string, patch);
+    if (!item) { res.status(404).json({ error: "Domain or item not found" }); return; }
+    res.json(item);
+}
+
+// DELETE /api/domains/:id/budget/items/:itemId
+export function removeBudgetItem(req: Request, res: Response): void {
+    const removed = svc().removeBudgetItem(req.params.id as string, req.params.itemId as string);
+    if (!removed) { res.status(404).json({ error: "Domain or item not found" }); return; }
+    res.status(204).send();
 }

@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
-import { NodeService, DataManifest, networkRouter } from "@ecf/core";
+import { initServiceNode, resolveCommunityIdentity, networkRouter } from "@ecf/core";
 import { ListingLoader } from "./ListingLoader.js";
 import { ListingService } from "./ListingService.js";
 import { setCommunityIdentity } from "./communityIdentity.js";
@@ -9,10 +9,10 @@ import marketRoutes from "./routes/marketRoutes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const PORT         = Number(process.env.PORT         ?? 3003);
-const DATA_DIR     = process.env.DATA_DIR             ?? join(__dirname, "../../data");
-const BANK_URL     = process.env.BANK_URL             ?? "http://localhost:3001";
-const COMMUNITY_URL = process.env.COMMUNITY_URL       ?? "http://localhost:3002";
+const PORT          = Number(process.env.PORT          ?? 3003);
+const DATA_DIR      = process.env.DATA_DIR              ?? join(__dirname, "../../data");
+const BANK_URL      = process.env.BANK_URL              ?? "http://localhost:3001";
+const COMMUNITY_URL = process.env.COMMUNITY_URL         ?? "http://localhost:3002";
 
 const app = express();
 
@@ -22,55 +22,23 @@ app.use(express.json({
     },
 }));
 
-/**
- * Resolve the governing community's node ID and public key for credential
- * verification. Retries with backoff until the community node is reachable.
- */
-async function resolveCommunityIdentity(): Promise<void> {
-    const url = `${COMMUNITY_URL}/api/identity`;
-    for (let attempt = 1; ; attempt++) {
-        try {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const body = await res.json() as { id?: string; publicKey?: string };
-            if (!body.id || !body.publicKey) throw new Error("Identity response missing fields");
-            setCommunityIdentity(body.id, body.publicKey);
-            console.log(`[market] resolved community identity: ${body.id}`);
-            return;
-        } catch (err) {
-            const wait = Math.min(30_000, attempt * 5_000);
-            console.warn(
-                `[market] community not reachable (attempt ${attempt}), ` +
-                `retrying in ${wait / 1000}s — ${(err as Error).message}`,
-            );
-            await new Promise(r => setTimeout(r, wait));
-        }
-    }
-}
-
 async function main(): Promise<void> {
-    await NodeService.getInstance().init({
-        type:    "infrastructure",
-        name:    process.env.NODE_NAME    ?? "market",
-        address: process.env.NODE_ADDRESS ?? `http://localhost:${PORT}`,
-        dataDir: resolve(DATA_DIR, "network"),
-        seeds:   (process.env.BOOTSTRAP_PEERS ?? "").split(",").filter(Boolean),
+    await initServiceNode({
+        name:         "market",
+        port:         PORT,
+        dataDir:      resolve(DATA_DIR),
+        communityUrl: COMMUNITY_URL,
+        seeds:        process.env.BOOTSTRAP_PEERS,
     });
-
-    DataManifest.getInstance().init(
-        body => NodeService.getInstance().getSigner().signBody(body),
-        NodeService.getInstance().getSigner().publicKeyHex,
-    );
 
     // Listings
     const listingLoader = new ListingLoader(resolve(DATA_DIR, "listings"));
     ListingService.getInstance().init(listingLoader);
 
-    // Resolve community identity so credentials can be verified (non-blocking —
-    // public listing endpoints work immediately; auth endpoints degrade until resolved).
-    resolveCommunityIdentity().catch(err =>
-        console.error("[market] community identity resolution failed:", err),
-    );
+    // Resolve community identity non-blocking — public endpoints work immediately
+    resolveCommunityIdentity(COMMUNITY_URL, "[market]")
+        .then(id => setCommunityIdentity(id.nodeId, id.publicKey))
+        .catch(err => console.error("[market] community identity resolution failed:", err));
 
     app.use("/api",      marketRoutes);
     app.use("/api/node", networkRouter);
@@ -80,6 +48,15 @@ async function main(): Promise<void> {
             status:   "ok",
             bankUrl:  BANK_URL,
             listings: ListingService.getInstance().getAll().length,
+        });
+    });
+
+    app.get("/api/config", (_req, res) => {
+        res.json({
+            communityUrl: process.env.PUBLIC_COMMUNITY_URL ?? COMMUNITY_URL,
+            bankUrl:      process.env.PUBLIC_BANK_URL      ?? "http://localhost:3001",
+            marketUrl:    process.env.PUBLIC_MARKET_URL    ?? `http://localhost:${PORT}`,
+            mailUrl:      process.env.PUBLIC_MAIL_URL      ?? "http://localhost:3020",
         });
     });
 

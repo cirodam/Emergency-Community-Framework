@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
-import { NodeService, DataManifest, networkRouter } from "@ecf/core";
+import { initServiceNode, resolveCommunityIdentity, networkRouter } from "@ecf/core";
 import { Bank } from "./Bank.js";
 import { AccountLoader } from "./AccountLoader.js";
 import { TransactionLoader } from "./TransactionLoader.js";
@@ -10,71 +10,30 @@ import { AccountOwnerLoader } from "./AccountOwnerLoader.js";
 import { AccountOwnerService } from "./AccountOwnerService.js";
 import bankRoutes from "./routes/bankRoutes.js";
 import ownerRoutes from "./routes/ownerRoutes.js";
-import { login as ssoLogin } from "./routes/AuthController.js";
 import { setCommunityIdentity } from "./communityIdentity.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const PORT = Number(process.env.PORT ?? 3001);
-const DATA_DIR = process.env.DATA_DIR ?? join(__dirname, "../../data");
+const PORT      = Number(process.env.PORT     ?? 3001);
+const DATA_DIR  = process.env.DATA_DIR         ?? join(__dirname, "../../data");
+const COMMUNITY_URL = process.env.COMMUNITY_URL ?? "http://localhost:3002";
 
 const app = express();
 
-// Capture raw body for node signature verification
 app.use(express.json({
     verify: (req, _res, buf) => {
         (req as typeof req & { rawBody: string }).rawBody = buf.toString("utf-8");
     },
 }));
 
-/**
- * Resolve the owning community node's ID and public key.
- * If OWNER_NODE_ID + COMMUNITY_PUBLIC_KEY are set explicitly, use them.
- * Otherwise fetch from COMMUNITY_URL/api/identity with backoff.
- */
-async function resolveCommunityIdentity(): Promise<{ id: string; publicKey: string }> {
-    const explicitId  = process.env.OWNER_NODE_ID;
-    const explicitKey = process.env.COMMUNITY_PUBLIC_KEY;
-    if (explicitId && explicitKey) return { id: explicitId, publicKey: explicitKey };
-
-    const communityUrl = process.env.COMMUNITY_URL;
-    if (!communityUrl) {
-        throw new Error(
-            "[bank] Either OWNER_NODE_ID+COMMUNITY_PUBLIC_KEY or COMMUNITY_URL must be set"
-        );
-    }
-
-    const url = `${communityUrl}/api/identity`;
-    for (let attempt = 1; ; attempt++) {
-        try {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const body = await res.json() as { id?: string; publicKey?: string };
-            if (!body.id)        throw new Error("identity response missing id");
-            if (!body.publicKey) throw new Error("identity response missing publicKey");
-            console.log(`[bank] resolved community identity: ${body.id}`);
-            return { id: body.id, publicKey: body.publicKey };
-        } catch (err) {
-            const wait = Math.min(30_000, attempt * 5_000);
-            console.warn(`[bank] community not reachable (attempt ${attempt}), retrying in ${wait / 1000}s — ${err}`);
-            await new Promise(r => setTimeout(r, wait));
-        }
-    }
-}
-
 async function main(): Promise<void> {
-    await NodeService.getInstance().init({
-        type: "infrastructure",
-        name: process.env.NODE_NAME ?? "bank",
-        address: process.env.NODE_ADDRESS ?? `http://localhost:${PORT}`,
-        dataDir: resolve(DATA_DIR, "network"),
-        seeds: (process.env.BOOTSTRAP_PEERS ?? "").split(",").filter(Boolean),
+    await initServiceNode({
+        name:         "bank",
+        port:         PORT,
+        dataDir:      resolve(DATA_DIR),
+        communityUrl: COMMUNITY_URL,
+        seeds:        process.env.BOOTSTRAP_PEERS,
     });
-
-    DataManifest.getInstance().init(
-        body => NodeService.getInstance().getSigner().signBody(body),
-        NodeService.getInstance().getSigner().publicKeyHex
-    );
 
     const accountLoader      = new AccountLoader(resolve(DATA_DIR, "accounts"));
     const transactionLoader  = new TransactionLoader(resolve(DATA_DIR, "transactions"));
@@ -82,22 +41,37 @@ async function main(): Promise<void> {
     Bank.getInstance().init(accountLoader, transactionLoader);
     AccountOwnerService.getInstance().init(ownerLoader);
 
-    const community  = await resolveCommunityIdentity();
-    const ownerType  = process.env.OWNER_TYPE as "community" | "federation" | undefined ?? "community";
+    // Bank supports explicit override via env vars (for federation-owned banks)
+    const explicitId  = process.env.OWNER_NODE_ID;
+    const explicitKey = process.env.COMMUNITY_PUBLIC_KEY;
+    const community = explicitId && explicitKey
+        ? { nodeId: explicitId, publicKey: explicitKey }
+        : await resolveCommunityIdentity(COMMUNITY_URL, "[bank]");
+
+    const ownerType = process.env.OWNER_TYPE as "community" | "federation" | undefined ?? "community";
     if (ownerType !== "community" && ownerType !== "federation") {
         throw new Error(`[bank] OWNER_TYPE must be "community" or "federation", got "${ownerType}"`);
     }
-    setCommunityIdentity(community.id, community.publicKey);
-    const charter = new BankCharterLoader(DATA_DIR).load(community.id, ownerType);
+    setCommunityIdentity(community.nodeId, community.publicKey);
+    const charter = new BankCharterLoader(DATA_DIR).load(community.nodeId, ownerType);
 
     // API routes
-    app.post("/api/auth/login", ssoLogin);   // SSO — proxies to community
     app.use("/api", bankRoutes);
     app.use("/api", ownerRoutes);
     app.use("/api/node", networkRouter);
 
     // Charter — who governs this bank
     app.get("/api/charter", (_req, res) => { res.json(charter); });
+
+    // Public config — tells the frontend the browser-accessible service URLs
+    app.get("/api/config", (_req, res) => {
+        res.json({
+            communityUrl: process.env.PUBLIC_COMMUNITY_URL ?? COMMUNITY_URL,
+            bankUrl:      process.env.PUBLIC_BANK_URL      ?? `http://localhost:${PORT}`,
+            marketUrl:    process.env.PUBLIC_MARKET_URL    ?? "http://localhost:3003",
+            mailUrl:      process.env.PUBLIC_MAIL_URL      ?? "http://localhost:3020",
+        });
+    });
 
     // Health check
     app.get("/health", (_req, res) => { res.json({ status: "ok" }); });

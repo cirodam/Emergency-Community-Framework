@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
-import { NodeService, DataManifest, networkRouter } from "@ecf/core";
+import { initServiceNode, resolveCommunityIdentity, networkRouter } from "@ecf/core";
 import { MessageLoader } from "./MessageLoader.js";
 import { MessageService } from "./MessageService.js";
 import { setCommunityIdentity } from "./communityIdentity.js";
@@ -21,54 +21,36 @@ app.use(express.json({
     },
 }));
 
-async function resolveCommunityIdentity(): Promise<void> {
-    const url = `${COMMUNITY_URL}/api/identity`;
-    for (let attempt = 1; ; attempt++) {
-        try {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const body = await res.json() as { id?: string; publicKey?: string };
-            if (!body.id || !body.publicKey) throw new Error("Identity response missing fields");
-            setCommunityIdentity(body.id, body.publicKey);
-            console.log(`[mail] resolved community identity: ${body.id}`);
-            return;
-        } catch (err) {
-            const wait = Math.min(30_000, attempt * 5_000);
-            console.warn(
-                `[mail] community not reachable (attempt ${attempt}), ` +
-                `retrying in ${wait / 1000}s — ${(err as Error).message}`,
-            );
-            await new Promise(r => setTimeout(r, wait));
-        }
-    }
-}
-
 async function main(): Promise<void> {
-    await NodeService.getInstance().init({
-        type:    "infrastructure",
-        name:    process.env.NODE_NAME    ?? "mail",
-        address: process.env.NODE_ADDRESS ?? `http://localhost:${PORT}`,
-        dataDir: resolve(DATA_DIR, "network"),
-        seeds:   (process.env.BOOTSTRAP_PEERS ?? "").split(",").filter(Boolean),
+    await initServiceNode({
+        name:         "mail",
+        port:         PORT,
+        dataDir:      resolve(DATA_DIR),
+        communityUrl: COMMUNITY_URL,
+        seeds:        process.env.BOOTSTRAP_PEERS,
     });
-
-    DataManifest.getInstance().init(
-        body => NodeService.getInstance().getSigner().signBody(body),
-        NodeService.getInstance().getSigner().publicKeyHex,
-    );
 
     const loader = new MessageLoader(resolve(DATA_DIR, "mail"));
     MessageService.getInstance().init(loader);
 
-    resolveCommunityIdentity().catch(err =>
-        console.error("[mail] community identity resolution failed:", err),
-    );
+    resolveCommunityIdentity(COMMUNITY_URL, "[mail]")
+        .then(id => setCommunityIdentity(id.nodeId, id.publicKey))
+        .catch(err => console.error("[mail] community identity resolution failed:", err));
 
     app.use("/api",      mailRoutes);
     app.use("/api/node", networkRouter);
 
     app.get("/health", (_req, res) => {
         res.json({ status: "ok", communityUrl: COMMUNITY_URL });
+    });
+
+    app.get("/api/config", (_req, res) => {
+        res.json({
+            communityUrl: process.env.PUBLIC_COMMUNITY_URL ?? COMMUNITY_URL,
+            bankUrl:      process.env.PUBLIC_BANK_URL      ?? "http://localhost:3001",
+            marketUrl:    process.env.PUBLIC_MARKET_URL    ?? "http://localhost:3003",
+            mailUrl:      process.env.PUBLIC_MAIL_URL      ?? `http://localhost:${PORT}`,
+        });
     });
 
     // Serve frontend

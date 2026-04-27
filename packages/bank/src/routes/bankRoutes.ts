@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { requirePersonCredential, verifyNodeSignature } from "@ecf/core";
 import { getCommunityIdentity } from "../communityIdentity.js";
-import { createAccount, getAllAccounts, getAccounts, getAccountById, getTransactions, createTransfer, applyDemurrage } from "./BankController.js";
+import { createAccount, getAllAccounts, getAccounts, getAccountById, getTransactions, createTransfer, applyDemurrage, getMyAccounts } from "./BankController.js";
 
 const router = Router();
 
@@ -29,6 +29,7 @@ router.get( "/account/:accountId",               getAccountById);
 router.post("/demurrage",                        requireAuthOrNodeSignature, applyDemurrage);
 
 // Member routes — require a valid community-issued credential or node signature
+router.get( "/me/accounts",                      requireAuth, getMyAccounts);
 router.get( "/accounts/:ownerId",                requireAuth, getAccounts);
 router.get( "/accounts/:accountId/transactions", requireAuth, getTransactions);
 router.post("/transfers",                        requireAuthOrNodeSignature, createTransfer);

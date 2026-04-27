@@ -92,6 +92,15 @@ export class Person implements IEconomicActor {
         this._nullifier = createHash("sha256").update(this._privateKeyDer).digest("hex");
     }
 
+    /** Returns the person's age in whole years as of today. */
+    getAgeYears(now: Date = new Date()): number {
+        const years = now.getFullYear() - this.birthDate.getFullYear();
+        const hadBirthday =
+            now.getMonth() > this.birthDate.getMonth() ||
+            (now.getMonth() === this.birthDate.getMonth() && now.getDate() >= this.birthDate.getDate());
+        return hadBirthday ? years : years - 1;
+    }
+
     /**
      * Reconstruct a Person from a persisted record.
      * Only for use by PersonLoader.

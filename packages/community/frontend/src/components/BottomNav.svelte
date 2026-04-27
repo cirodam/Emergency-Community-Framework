@@ -1,15 +1,19 @@
 <script lang="ts">
     import { currentPage, type Page } from "../lib/session.js";
+    import AppSwitcher from "./AppSwitcher.svelte";
 
     interface NavItem { id: Page; label: string; icon: string; }
 
     const items: NavItem[] = [
-        { id: "profile",      label: "Profile",      icon: "◉" },
-        { id: "directory",    label: "Directory",    icon: "⊞" },
-        { id: "domains",      label: "Domains",      icon: "⊛" },
-        { id: "governance",   label: "Governance",   icon: "⚖" },
-        { id: "economy",      label: "Economy",      icon: "⊕" },
-        { id: "settings",     label: "Settings",     icon: "⚙" },
+        { id: "profile",       label: "Profile",       icon: "◉" },
+        { id: "directory",     label: "Directory",     icon: "⊞" },
+        { id: "associations",  label: "Associations",  icon: "⊟" },
+        { id: "applications",  label: "Applications",  icon: "◎" },
+        { id: "domains",       label: "Domains",       icon: "⊛" },
+        { id: "governance",    label: "Governance",    icon: "⚖" },
+        { id: "economy",       label: "Economy",       icon: "⊕" },
+        { id: "how-it-works",  label: "How It Works",  icon: "⊙" },
+        { id: "settings",      label: "Settings",      icon: "⚙" },
     ];
 </script>
 
@@ -17,11 +21,12 @@
     <div class="nav-brand">
         <span class="brand-icon">⊚</span>
         <span class="brand-name">Community</span>
+        <div class="brand-switcher"><AppSwitcher /></div>
     </div>
     {#each items as item}
         <button
             class="nav-item"
-            class:active={$currentPage === item.id || (item.id === "domains" && $currentPage === "domain")}
+            class:active={$currentPage === item.id || (item.id === "domains" && $currentPage === "domain") || (item.id === "associations" && $currentPage === "association")}
             onclick={() => currentPage.go(item.id)}
             aria-current={$currentPage === item.id ? "page" : undefined}
         >
@@ -89,6 +94,10 @@
             padding: 0.25rem 1.25rem 1.25rem;
             border-bottom: 1px solid #f1f5f9;
             margin-bottom: 0.5rem;
+        }
+
+        .brand-switcher {
+            margin-left: auto;
         }
 
         .brand-icon { font-size: 1.4rem; color: #16a34a; }

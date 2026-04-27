@@ -1,15 +1,21 @@
 import { randomUUID } from "crypto";
 import { IEconomicActor } from "@ecf/core";
 
-export interface BudgetLineItem {
+export type BudgetCategory = "supplies" | "equipment" | "services" | "other";
+
+export interface BudgetItem {
+    id: string;
     label: string;
+    /** Monthly amount in kin. */
     amount: number;
+    category: BudgetCategory;
+    note: string;
 }
 
-export interface DomainBudget {
-    lineItems: BudgetLineItem[];
-    total: number;
-}
+/** @deprecated Use BudgetItem. Kept for index.ts re-exports. */
+export interface BudgetLineItem { label: string; amount: number; }
+/** @deprecated Use domain.budgetItems + DomainService.getDomainBudget. */
+export interface DomainBudget { lineItems: BudgetLineItem[]; total: number; }
 
 /**
  * Base class for all functional domains (Food, Healthcare, Childcare, etc.).
@@ -27,7 +33,7 @@ export abstract class FunctionalDomain implements IEconomicActor {
     readonly description: string;
 
     unitIds: string[] = [];
-    roleIds: string[] = [];
+    budgetItems: BudgetItem[] = [];
 
     /** The leader pool that governs this domain (if any). */
     poolId: string | null = null;

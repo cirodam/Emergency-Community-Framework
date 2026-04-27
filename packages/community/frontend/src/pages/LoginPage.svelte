@@ -8,6 +8,10 @@
     let error    = $state("");
     let loading  = $state(false);
 
+    // Other ECF services redirect here with ?return=<origin> after which we
+    // hand the credential back via a hash fragment so it never hits a server.
+    const returnUrl = new URLSearchParams(window.location.search).get("return");
+
     async function submit() {
         error = "";
         if (!handle.trim())   { error = "Enter your handle"; return; }
@@ -16,8 +20,22 @@
         loading = true;
         try {
             const person = await login(handle.trim().toLowerCase(), password);
-            session.login(person);
-            currentPage.go("profile");
+
+            if (returnUrl && (returnUrl.startsWith("http://") || returnUrl.startsWith("https://"))) {
+                // Hand the session payload back to the requesting service via
+                // the URL fragment (never sent to the server).
+                const payload = btoa(JSON.stringify({
+                    token:     person.token,
+                    id:        person.id,
+                    firstName: person.firstName,
+                    lastName:  person.lastName,
+                    handle:    person.handle,
+                }));
+                window.location.href = `${returnUrl}#session=${payload}`;
+            } else {
+                session.login(person);
+                currentPage.go("profile");
+            }
         } catch (e) {
             error = e instanceof Error ? e.message : "Login failed";
         } finally {

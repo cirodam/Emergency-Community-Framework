@@ -156,6 +156,13 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
         },
 
         // ── Social insurance ─────────────────────────────────────────────────
+        workingAgeMin: {
+            value: 16,
+            authority: "referendum",
+            description:
+                "Minimum age at which a community member is considered part of the working-age population. Used for demographic reporting and role eligibility.",
+            constraints: { min: 14, max: 21 },
+        },
         retirementAge: {
             value: 65,
             authority: "referendum",
@@ -197,6 +204,15 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
             description:
                 "Fixed kin issued to the community fund when a person is born into the community, then forwarded to the newborn's account as a welcome grant. Unlike the join endowment (which compensates for prior years of life), the birth grant simply marks the start of a new member's kin journey. The community fund receives it first so the flow is transparent and consistent with policy.",
             constraints: { min: 0, max: 5_000 },
+        },
+
+        // ── Membership admission ─────────────────────────────────────────────
+        memberAdmissionVouchesRequired: {
+            value: 3,
+            authority: "assembly",
+            description:
+                "Number of existing member vouches required to automatically admit a membership applicant. Once this many distinct members vouch for an application it is admitted without further action.",
+            constraints: { min: 1, max: 10 },
         },
     },
     amendments: [],
@@ -323,6 +339,7 @@ export class Constitution {
     get bankDemurrageRate(): number            { return this.get<number>("bankDemurrageRate"); }
     get demurrageFloor(): number               { return this.get<number>("demurrageFloor"); }
     get kinPerPersonYear(): number             { return this.get<number>("kinPerPersonYear"); }
+    get workingAgeMin(): number                { return this.get<number>("workingAgeMin"); }
     get retirementAge(): number                { return this.get<number>("retirementAge"); }
     get retirementPayoutRate(): number         { return this.get<number>("retirementPayoutRate"); }
     get birthdayCirculationFraction(): number  { return this.get<number>("birthdayCirculationFraction"); }
@@ -330,6 +347,7 @@ export class Constitution {
     get endowmentPoolFraction(): number        { return this.get<number>("endowmentPoolFraction"); }
     get endowmentSeedBalance(): number         { return this.get<number>("endowmentSeedBalance"); }
     get birthGrant(): number                   { return this.get<number>("birthGrant"); }
+    get memberAdmissionVouchesRequired(): number { return this.get<number>("memberAdmissionVouchesRequired"); }
 
     /** Which governance body must authorize the given action. Returns null if not in the map. */
     getRequiredBody(action: string): GovernanceBody | null {

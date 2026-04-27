@@ -8,6 +8,7 @@ import { FederationConstitution } from "../governance/FederationConstitution.js"
 import { FederationDomainService } from "../common/FederationDomainService.js";
 import { BankClient } from "../BankClient.js";
 import { NodeService } from "@ecf/core";
+import { FederationCensusService } from "../census/FederationCensusService.js";
 
 const BANK_URL = process.env.BANK_URL ?? "http://localhost:3011";
 
@@ -327,4 +328,39 @@ export function listDomains(_req: Request, res: Response): void {
         description: d.description,
     }));
     res.json(domains);
+}
+
+// ── Census ────────────────────────────────────────────────────────────────────
+
+type AuthedRequest = Request & { communityId: string; communityNodeId: string };
+
+/**
+ * POST /api/census
+ * Auth: requireMemberCommunity (x-node-id + x-node-signature)
+ * Body: { memberCount: number, nullifiers: string[] }
+ *
+ * The community submits a pseudonymous census. The federation stores it and
+ * returns any nullifiers that appear in other communities' censuses.
+ */
+export function submitCensus(req: Request, res: Response): void {
+    const { communityId } = req as AuthedRequest;
+    const { memberCount, nullifiers } = req.body ?? {};
+
+    if (typeof memberCount !== "number" || memberCount < 0) {
+        res.status(400).json({ error: "memberCount must be a non-negative number" }); return;
+    }
+    if (!Array.isArray(nullifiers) || nullifiers.some(n => typeof n !== "string")) {
+        res.status(400).json({ error: "nullifiers must be an array of strings" }); return;
+    }
+    if (nullifiers.length !== memberCount) {
+        res.status(400).json({ error: "nullifiers.length must equal memberCount" }); return;
+    }
+
+    const result = FederationCensusService.getInstance().submit(communityId, memberCount, nullifiers);
+    res.json(result);
+}
+
+/** GET /api/census — public summary of unique members across all communities. */
+export function getCensusSummary(_req: Request, res: Response): void {
+    res.json(FederationCensusService.getInstance().getSummary());
 }

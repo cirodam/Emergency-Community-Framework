@@ -8,6 +8,7 @@
     } from "../lib/api.js";
     import { session } from "../lib/session.js";
     import ListingCard from "../components/ListingCard.svelte";
+    import AppSwitcher from "../components/AppSwitcher.svelte";
 
     let listings     = $state<Listing[]>([]);
     let filterType   = $state<ListingType | "all">("all");
@@ -82,7 +83,10 @@
 <div class="listings-page">
     <header class="page-header">
         <div class="header-row">
-            <h1>Market</h1>
+            <div class="header-left">
+                <AppSwitcher />
+                <h1>Market</h1>
+            </div>
             <div class="header-actions">
                 <button class="btn-outline" onclick={() => { showForm = !showForm; formError = ""; }}>
                     {showForm ? "Cancel" : "+ New Listing"}
@@ -176,6 +180,12 @@
         justify-content: space-between;
         align-items: center;
         margin-bottom: 1rem;
+    }
+
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
     }
 
     h1 {

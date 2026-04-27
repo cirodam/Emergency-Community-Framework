@@ -3,6 +3,7 @@
     import { getUnreadCount } from "../lib/api.js";
     import type { Page } from "../lib/session.js";
     import { onMount } from "svelte";
+    import AppSwitcher from "./AppSwitcher.svelte";
 
     const s = $derived($session!);
 
@@ -27,6 +28,8 @@
 </script>
 
 <header class="navbar">
+    <AppSwitcher />
+
     <div class="brand">
         <span class="brand-icon">✉</span>
         <span class="brand-name">Mail</span>

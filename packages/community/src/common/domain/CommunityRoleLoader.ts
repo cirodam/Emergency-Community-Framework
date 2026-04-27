@@ -5,6 +5,7 @@ interface RoleRecord {
     id: string;
     title: string;
     description: string;
+    roleTypeId: string | null;
     memberId: string | null;
     kinPerMonth: number;
     funded: boolean;
@@ -24,6 +25,7 @@ export class CommunityRoleLoader {
             id:            role.id,
             title:         role.title,
             description:   role.description,
+            roleTypeId:    role.roleTypeId,
             memberId:      role.memberId,
             kinPerMonth:   role.kinPerMonth,
             funded:        role.funded,
@@ -42,7 +44,7 @@ export class CommunityRoleLoader {
     }
 
     private fromRecord(r: RoleRecord): CommunityRole {
-        const role = new CommunityRole(r.title, r.description, r.kinPerMonth);
+        const role = new CommunityRole(r.title, r.description, r.kinPerMonth, r.roleTypeId ?? null);
         (role as unknown as Record<string, unknown>)["id"] = r.id;
         role.memberId      = r.memberId;
         role.funded        = r.funded;

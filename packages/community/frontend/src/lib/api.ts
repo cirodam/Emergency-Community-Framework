@@ -68,12 +68,68 @@ export interface EconomicsDto {
         totalPaidOut: number;
         memberCount: number;
     } | null;
+    demographics: {
+        total:          number;
+        workingAge:     number;
+        children:       number;
+        retired:        number;
+        disabled:       number;
+        workingAgeMin:  number;
+        retirementAge:  number;
+    } | null;
 }
 
 export async function getEconomics(): Promise<EconomicsDto> {
     const res = await fetch("/api/economics");
     if (!res.ok) throw new Error("Failed to load economics data");
     return res.json() as Promise<EconomicsDto>;
+}
+
+// ── Community Budget ───────────────────────────────────────────────────────────
+
+export interface BudgetPayrollRow {
+    roleId:      string;
+    title:       string;
+    memberId:    string | null;
+    kinPerMonth: number;
+}
+
+export interface BudgetItem {
+    id:       string;
+    label:    string;
+    amount:   number;
+    category: "supplies" | "equipment" | "services" | "other";
+    note:     string;
+}
+
+export interface BudgetDomainRow {
+    domainId:   string;
+    domainName: string;
+    payroll:    BudgetPayrollRow[];
+    items:      BudgetItem[];
+    totals:     { payroll: number; items: number; total: number };
+}
+
+export interface CommunityBudgetDto {
+    ready: boolean;
+    inflow: {
+        treasuryBalance:      number;
+        levyRate:             number;
+        estimatedMonthlyLevy: number;
+        kinInCirculation:     number;
+    };
+    outflow: {
+        monthlyTotal: number;
+        domains:      BudgetDomainRow[];
+        totals:       { payroll: number; items: number; total: number };
+    };
+    solvent: boolean;
+}
+
+export async function getCommunityBudget(): Promise<CommunityBudgetDto> {
+    const res = await fetch("/api/budget");
+    if (!res.ok) throw new Error("Failed to load budget");
+    return res.json() as Promise<CommunityBudgetDto>;
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
@@ -159,6 +215,102 @@ export async function getConstitution(): Promise<ConstitutionDocument> {
     const res = await fetch("/api/constitution");
     if (!res.ok) throw new Error("Failed to load constitution");
     return res.json() as Promise<ConstitutionDocument>;
+}
+
+// ── Associations ──────────────────────────────────────────────────────────────
+
+export interface AssociationDto {
+    id:           string;
+    name:         string;
+    handle:       string;
+    description:  string;
+    active:       boolean;
+    memberIds:    string[];
+    adminIds:     string[];
+    memberCount:  number;
+    registeredAt: string;
+}
+
+export async function listAssociations(): Promise<AssociationDto[]> {
+    const res = await fetch("/api/associations");
+    if (!res.ok) throw new Error("Failed to load associations");
+    return res.json() as Promise<AssociationDto[]>;
+}
+
+export async function getAssociation(id: string): Promise<AssociationDto> {
+    const res = await fetch(`/api/associations/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error("Association not found");
+    return res.json() as Promise<AssociationDto>;
+}
+
+export async function createAssociation(payload: { name: string; handle: string; description?: string }): Promise<AssociationDto> {
+    const res = await apiFetch("/api/associations", {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to create association");
+    }
+    return res.json() as Promise<AssociationDto>;
+}
+
+export async function updateAssociation(id: string, patch: { name?: string; description?: string }): Promise<AssociationDto> {
+    const res = await apiFetch(`/api/associations/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to update association");
+    }
+    return res.json() as Promise<AssociationDto>;
+}
+
+export async function addAssociationMember(id: string, personId: string): Promise<AssociationDto> {
+    const res = await apiFetch(`/api/associations/${encodeURIComponent(id)}/members`, {
+        method: "POST",
+        body: JSON.stringify({ personId }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to add member");
+    }
+    return res.json() as Promise<AssociationDto>;
+}
+
+export async function removeAssociationMember(id: string, personId: string): Promise<AssociationDto> {
+    const res = await apiFetch(`/api/associations/${encodeURIComponent(id)}/members/${encodeURIComponent(personId)}`, {
+        method: "DELETE",
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to remove member");
+    }
+    return res.json() as Promise<AssociationDto>;
+}
+
+export async function addAssociationAdmin(id: string, personId: string): Promise<AssociationDto> {
+    const res = await apiFetch(`/api/associations/${encodeURIComponent(id)}/admins`, {
+        method: "POST",
+        body: JSON.stringify({ personId }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to promote admin");
+    }
+    return res.json() as Promise<AssociationDto>;
+}
+
+export async function removeAssociationAdmin(id: string, personId: string): Promise<AssociationDto> {
+    const res = await apiFetch(`/api/associations/${encodeURIComponent(id)}/admins/${encodeURIComponent(personId)}`, {
+        method: "DELETE",
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to remove admin");
+    }
+    return res.json() as Promise<AssociationDto>;
 }
 
 // ── Domains ───────────────────────────────────────────────────────────────────
@@ -265,3 +417,83 @@ export async function deletePool(poolId: string): Promise<void> {
         throw new Error(body.error ?? "Failed to delete pool");
     }
 }
+
+// ── Member applications ───────────────────────────────────────────────────────
+
+export interface ApplicationVoucher {
+    id: string;
+    name: string;
+}
+
+export interface ApplicationDto {
+    id: string;
+    firstName: string;
+    lastName: string;
+    birthDate: string;
+    message: string;
+    status: "pending" | "admitted" | "withdrawn";
+    voucherIds: string[];
+    vouchers: ApplicationVoucher[];
+    vouchesRequired: number;
+    submittedBy: string;
+    submittedByName: string;
+    submittedAt: string;
+    admittedAt: string | null;
+}
+
+export async function listApplications(): Promise<ApplicationDto[]> {
+    const res = await apiFetch("/api/applications");
+    if (!res.ok) throw new Error("Failed to load applications");
+    return res.json() as Promise<ApplicationDto[]>;
+}
+
+export async function submitApplication(payload: {
+    firstName: string;
+    lastName: string;
+    birthDate: string;
+    message: string;
+}): Promise<ApplicationDto> {
+    const res = await apiFetch("/api/applications", {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to submit application");
+    }
+    return res.json() as Promise<ApplicationDto>;
+}
+
+export async function vouchForApplication(applicationId: string): Promise<ApplicationDto> {
+    const res = await apiFetch(`/api/applications/${encodeURIComponent(applicationId)}/vouch`, {
+        method: "POST",
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to vouch");
+    }
+    return res.json() as Promise<ApplicationDto>;
+}
+
+export async function removeApplicationVouch(applicationId: string): Promise<ApplicationDto> {
+    const res = await apiFetch(`/api/applications/${encodeURIComponent(applicationId)}/vouch`, {
+        method: "DELETE",
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to remove vouch");
+    }
+    return res.json() as Promise<ApplicationDto>;
+}
+
+export async function withdrawApplication(applicationId: string): Promise<ApplicationDto> {
+    const res = await apiFetch(`/api/applications/${encodeURIComponent(applicationId)}/withdraw`, {
+        method: "POST",
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to withdraw application");
+    }
+    return res.json() as Promise<ApplicationDto>;
+}
+

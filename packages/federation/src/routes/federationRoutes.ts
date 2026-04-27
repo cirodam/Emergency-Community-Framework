@@ -14,6 +14,8 @@ import {
     getConstitution,
     getBudget,
     listDomains,
+    submitCensus,
+    getCensusSummary,
 } from "./FederationController.js";
 
 const router = Router();
@@ -39,5 +41,9 @@ router.get("/domains",       listDomains);
 const requireMember = requireMemberCommunity();
 router.post("/transfers",   requireMember, transferKithe);
 router.post("/kithe/issue", requireMember, issueKithe);
+
+// Census — authenticated submit, public summary
+router.post("/census", requireMember, submitCensus);
+router.get( "/census", getCensusSummary);
 
 export default router;

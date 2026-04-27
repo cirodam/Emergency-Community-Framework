@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { requirePersonCredential } from "@ecf/core";
 import { getCommunityIdentity } from "../communityIdentity.js";
-import { login } from "./AuthController.js";
 import {
     listThreads,
     getThread,
@@ -16,9 +15,6 @@ import {
 const router = Router();
 
 const requireAuth = requirePersonCredential(getCommunityIdentity);
-
-// Auth (SSO proxy to community)
-router.post("/auth/login", login);
 
 // All mail routes require authentication
 router.get(   "/threads",                requireAuth, listThreads);

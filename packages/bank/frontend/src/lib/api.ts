@@ -36,34 +36,13 @@ export interface TransactionDto {
     timestamp: string;
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
-export interface LoginResult {
-    token: string;
-    personId: string;
-    handle: string;
-    displayName: string;
-    accounts: AccountDto[];
-}
-
-/**
- * Sign in via the community SSO. The bank backend proxies to community,
- * verifies the credential, and returns the token + accounts in one call.
- */
-export async function login(handle: string, password: string): Promise<LoginResult> {
-    const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handle, password }),
-    });
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Login failed");
-    }
-    return res.json() as Promise<LoginResult>;
-}
-
 // ── Accounts ──────────────────────────────────────────────────────────────────
+
+export async function getMyAccounts(): Promise<AccountDto[]> {
+    const res = await apiFetch("/api/me/accounts");
+    if (!res.ok) throw new Error("Failed to load accounts");
+    return res.json() as Promise<AccountDto[]>;
+}
 
 export async function getAccountsByOwner(ownerId: string): Promise<AccountDto[]> {
     const res = await apiFetch(`/api/accounts/${encodeURIComponent(ownerId)}`);

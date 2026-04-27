@@ -7,12 +7,20 @@
     import ProfilePage     from "./pages/ProfilePage.svelte";
     import DirectoryPage   from "./pages/DirectoryPage.svelte";
     import ConstitutionPage from "./pages/ConstitutionPage.svelte";
-    import EconomicsPage   from "./pages/EconomicsPage.svelte";
-    import SettingsPage    from "./pages/SettingsPage.svelte";
+    import EconomicsPage       from "./pages/EconomicsPage.svelte";
+    import CentralBankPage     from "./pages/CentralBankPage.svelte";
+    import CurrencyBoardPage   from "./pages/CurrencyBoardPage.svelte";
+    import SocialInsurancePage from "./pages/SocialInsurancePage.svelte";
+    import SettingsPage        from "./pages/SettingsPage.svelte";
     import DomainsPage      from "./pages/DomainsPage.svelte";
     import DomainPage      from "./pages/DomainPage.svelte";
-    import GovernancePage  from "./pages/GovernancePage.svelte";
-    import BottomNav       from "./components/BottomNav.svelte";
+    import GovernancePage     from "./pages/GovernancePage.svelte";
+    import ApplicationsPage   from "./pages/ApplicationsPage.svelte";
+    import HowItWorksPage      from "./pages/HowItWorksPage.svelte";
+    import BudgetPage          from "./pages/BudgetPage.svelte";
+    import AssociationsPage    from "./pages/AssociationsPage.svelte";
+    import AssociationPage     from "./pages/AssociationPage.svelte";
+    import BottomNav           from "./components/BottomNav.svelte";
 
     type AppState = "loading" | "setup" | "login" | "app";
     let appState: AppState = $state("loading");
@@ -57,6 +65,12 @@
             <ConstitutionPage />
         {:else if $currentPage === "economy"}
             <EconomicsPage />
+        {:else if $currentPage === "central-bank"}
+            <CentralBankPage />
+        {:else if $currentPage === "currency-board"}
+            <CurrencyBoardPage />
+        {:else if $currentPage === "social-insurance"}
+            <SocialInsurancePage />
         {:else if $currentPage === "settings"}
             <SettingsPage />
         {:else if $currentPage === "domains"}
@@ -65,6 +79,16 @@
             <DomainPage />
         {:else if $currentPage === "governance"}
             <GovernancePage />
+        {:else if $currentPage === "applications"}
+            <ApplicationsPage />
+        {:else if $currentPage === "how-it-works"}
+            <HowItWorksPage />
+        {:else if $currentPage === "budget"}
+            <BudgetPage />
+        {:else if $currentPage === "associations"}
+            <AssociationsPage />
+        {:else if $currentPage === "association"}
+            <AssociationPage />
         {/if}
     </main>
     <BottomNav />

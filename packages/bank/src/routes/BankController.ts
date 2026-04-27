@@ -36,6 +36,14 @@ export function getAllAccounts(_req: Request, res: Response): void {
     res.json(bank().getAllAccounts().map(toAccountDto));
 }
 
+// GET /api/me/accounts — returns accounts for the authenticated person
+export function getMyAccounts(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+    const accounts = bank().getAccounts(personId);
+    res.json(accounts.map(toAccountDto));
+}
+
 // GET /api/accounts/:ownerId
 export function getAccounts(req: Request, res: Response): void {
     const accounts = bank().getAccounts(req.params.ownerId as string);

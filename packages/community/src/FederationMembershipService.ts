@@ -146,4 +146,42 @@ export class FederationMembershipService {
         this.save();
         return this.record;
     }
+
+    /**
+     * Submit (or refresh) this community's member census to the federation.
+     *
+     * The census contains one nullifier per member — a pseudonymous ID derived
+     * from the member's public key via HMAC. The federation stores these and
+     * checks for overlap with other communities to detect double-counting.
+     *
+     * Returns the list of duplicate nullifiers detected by the federation, or
+     * throws if the community is not an approved federation member.
+     */
+    async submitCensus(nullifiers: string[], memberCount: number): Promise<{ duplicates: string[] }> {
+        if (!this.record || this.record.status !== "approved") {
+            throw new Error("Community is not an approved federation member");
+        }
+
+        const node = NodeService.getInstance();
+        const body = JSON.stringify({ memberCount, nullifiers });
+        const signature = node.getSigner().signBody(body);
+        const base = this.record.federationUrl.replace(/\/$/, "");
+
+        const res = await fetch(`${base}/api/census`, {
+            method: "POST",
+            headers: {
+                "Content-Type":     "application/json",
+                "x-node-id":        node.getIdentity().id,
+                "x-node-signature": signature,
+            },
+            body,
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({})) as { error?: string };
+            throw new Error(`Census submission failed (${res.status}): ${err.error ?? "unknown error"}`);
+        }
+
+        return res.json() as Promise<{ duplicates: string[] }>;
+    }
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { currentPage, type Page } from "../lib/session.js";
+    import AppSwitcher from "./AppSwitcher.svelte";
 
     interface NavItem { id: Page; label: string; icon: string; }
 
@@ -15,6 +16,7 @@
     <div class="nav-brand">
         <span class="brand-icon">◈</span>
         <span class="brand-name">Bank</span>
+        <div class="brand-switcher"><AppSwitcher /></div>
     </div>
     {#each items as item}
         <button
@@ -87,6 +89,10 @@
             padding: 0.25rem 1.25rem 1.25rem;
             border-bottom: 1px solid #f1f5f9;
             margin-bottom: 0.5rem;
+        }
+
+        .brand-switcher {
+            margin-left: auto;
         }
 
         .brand-icon { font-size: 1.4rem; color: #2563eb; }
