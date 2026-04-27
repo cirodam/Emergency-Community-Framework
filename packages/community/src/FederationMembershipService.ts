@@ -60,7 +60,7 @@ export class FederationMembershipService {
      * node's Ed25519 key — the federation verifies it against the public key
      * provided in the body (proves key ownership before membership exists).
      */
-    async apply(federationUrl: string, communityName: string): Promise<FederationMembershipRecord> {
+    async apply(federationUrl: string, communityName: string, communityHandle: string): Promise<FederationMembershipRecord> {
         if (this.record && this.record.status !== "rejected") {
             throw new Error(
                 `Already have a federation application in status "${this.record.status}"`,
@@ -70,6 +70,7 @@ export class FederationMembershipService {
         const node = NodeService.getInstance();
         const body = JSON.stringify({
             communityName,
+            communityHandle,
             communityNodeId:    node.getIdentity().id,
             communityPublicKey: node.getSigner().publicKeyHex,
         });

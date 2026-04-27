@@ -114,7 +114,7 @@ export class SmsService {
         }
 
         // ── PIN verification ──────────────────────────────────────────────────
-        const pinOk = personSvc.verifyPin(senderId, pin);
+        const pinOk = await personSvc.verifyPin(senderId, pin);
         if (!pinOk) {
             const remaining = this.rateLimiter.recordFailure(fromPhone);
             if (remaining === 0) {

@@ -33,12 +33,16 @@ export interface ConstitutionAmendment {
 }
 
 export interface ConstitutionDocument {
-    version:       number;
-    adoptedAt:     string;
-    communityName: string;
-    parameters:    Record<string, ConstitutionalParameter<number | boolean>>;
-    amendments:    ConstitutionAmendment[];
-    authorityMap:  ActionAuthority[];
+    version:         number;
+    adoptedAt:       string;
+    communityName:   string;
+    /** URL-safe handle used to identify this community within a federation.
+     *  Lowercase letters, digits, and hyphens only. Must be set before applying
+     *  to join a federation. Unique within a given federation. */
+    communityHandle: string;
+    parameters:      Record<string, ConstitutionalParameter<number | boolean>>;
+    amendments:      ConstitutionAmendment[];
+    authorityMap:    ActionAuthority[];
 }
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
@@ -46,7 +50,8 @@ export interface ConstitutionDocument {
 export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
     version:       1,
     adoptedAt:     new Date().toISOString(),
-    communityName: "My Community",
+    communityName:   "My Community",
+    communityHandle: "",
     parameters: {
 
         // ── Axioms — unit definitions, never changeable ──────────────────────
@@ -142,16 +147,16 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
             value: 1_000,
             authority: "referendum",
             description:
-                "Balance floor below which no demurrage is charged. Only the portion of an account balance above this threshold is subject to the levy or bank demurrage. Protects small balances from being eroded.",
+                "Balance floor below which no demurrage is charged. Only the portion of an account balance above this threshold is subject to dues or bank demurrage. Protects small balances from being eroded.",
             constraints: { min: 0, max: 5_000 },
         },
 
-        // ── Community levy ──────────────────────────────────────────────────
-        communityLevyRate: {
+        // ── Community dues ───────────────────────────────────────────────────
+        communityDuesRate: {
             value: 0.01,
             authority: "referendum",
             description:
-                "Monthly rate collected from every member's primary account into the community treasury. Functions as community dues — kin is not retired, it moves from members to the shared budget. Applied after Central Bank demurrage.",
+                "Monthly rate collected from every member's primary account into the community treasury as community dues — kin is not retired, it moves from members to the shared budget. Applied after Central Bank demurrage.",
             constraints: { min: 0, max: 0.10 },
         },
 
@@ -220,7 +225,7 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
         { action: "admit-member",            body: "assembly",   description: "Admitting a new member to the community" },
         { action: "suspend-member",          body: "assembly",   description: "Suspending a member pending review" },
         { action: "exclude-member",          body: "referendum", description: "Permanently excluding a member" },
-        { action: "change-levy-rate",        body: "referendum", description: "Changing the commons levy rate" },
+        { action: "change-dues-rate",         body: "referendum", description: "Changing the community dues rate" },
         { action: "change-demurrage-rate",   body: "referendum", description: "Changing the bank demurrage rate" },
         { action: "change-demurrage-floor",  body: "referendum", description: "Changing the demurrage-free balance floor" },
         { action: "amend-constitution",      body: "referendum", description: "Amending the constitution" },
@@ -266,10 +271,23 @@ export class Constitution {
 
     get version(): number       { return this.doc.version; }
     get adoptedAt(): string     { return this.doc.adoptedAt; }
-    get communityName(): string { return this.doc.communityName ?? "Community"; }
+    get communityName(): string   { return this.doc.communityName ?? "Community"; }
+    get communityHandle(): string  { return this.doc.communityHandle ?? ""; }
 
     setCommunityName(name: string): void {
         this.doc = { ...this.doc, communityName: name };
+    }
+
+    /** Set the community's federation handle. Validated: lowercase alphanumeric + hyphens,
+     *  no leading/trailing hyphens, 2–32 characters. */
+    setCommunityHandle(handle: string): void {
+        const h = handle.toLowerCase().trim();
+        if (!/^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$|^[a-z0-9]{1,2}$/.test(h)) {
+            throw new Error(
+                `Invalid community handle "${handle}". Use 2–32 characters: lowercase letters, digits, hyphens (no leading/trailing hyphens).`,
+            );
+        }
+        this.doc = { ...this.doc, communityHandle: h };
     }
 
     get amendments(): readonly ConstitutionAmendment[] { return this.doc.amendments; }
@@ -343,7 +361,7 @@ export class Constitution {
     get retirementAge(): number                { return this.get<number>("retirementAge"); }
     get retirementPayoutRate(): number         { return this.get<number>("retirementPayoutRate"); }
     get birthdayCirculationFraction(): number  { return this.get<number>("birthdayCirculationFraction"); }
-    get communityLevyRate(): number             { return this.get<number>("communityLevyRate"); }
+    get communityDuesRate(): number             { return this.get<number>("communityDuesRate"); }
     get endowmentPoolFraction(): number        { return this.get<number>("endowmentPoolFraction"); }
     get endowmentSeedBalance(): number         { return this.get<number>("endowmentSeedBalance"); }
     get birthGrant(): number                   { return this.get<number>("birthGrant"); }

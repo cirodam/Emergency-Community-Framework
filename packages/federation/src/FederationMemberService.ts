@@ -38,15 +38,25 @@ export class FederationMemberService {
         return undefined;
     }
 
+    getByHandle(handle: string): FederationMember | undefined {
+        for (const m of this.members.values()) {
+            if (m.handle === handle) return m;
+        }
+        return undefined;
+    }
+
     /**
      * Register a new member community. Does NOT open a bank account — that is
      * done by the caller after registration so the account ID can be set.
      */
-    add(name: string, communityNodeId: string, communityPublicKey: string, isFounder = false): FederationMember {
+    add(name: string, handle: string, communityNodeId: string, communityPublicKey: string, isFounder = false): FederationMember {
         if (this.getByNodeId(communityNodeId)) {
             throw new Error(`Community node ${communityNodeId} is already a member`);
         }
-        const member = createFederationMember(name, communityNodeId, communityPublicKey, isFounder);
+        if (this.getByHandle(handle)) {
+            throw new Error(`Handle "${handle}" is already taken by an existing member`);
+        }
+        const member = createFederationMember(name, handle, communityNodeId, communityPublicKey, isFounder);
         this.members.set(member.id, member);
         this.loader.save(member);
         return member;

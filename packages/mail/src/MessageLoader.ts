@@ -1,14 +1,17 @@
 import { FileStore } from "@ecf/core";
 import { Message } from "./Message.js";
+import { MessageReceipt } from "./MessageReceipt.js";
 import { Thread } from "./Thread.js";
 
 export class MessageLoader {
     private readonly messages: FileStore;
-    private readonly threads: FileStore;
+    private readonly threads:  FileStore;
+    private readonly receipts: FileStore;
 
     constructor(dataDir: string) {
         this.messages = new FileStore(`${dataDir}/messages`);
         this.threads  = new FileStore(`${dataDir}/threads`);
+        this.receipts = new FileStore(`${dataDir}/receipts`);
     }
 
     // ── Messages ───────────────────────────────────────────────────────────
@@ -23,6 +26,16 @@ export class MessageLoader {
 
     loadAllMessages(): Message[] {
         return this.messages.readAll<Message>();
+    }
+
+    // ── Receipts ───────────────────────────────────────────────────────────
+
+    saveReceipt(receipt: MessageReceipt): void {
+        this.receipts.write(receipt.id, receipt);
+    }
+
+    loadAllReceipts(): MessageReceipt[] {
+        return this.receipts.readAll<MessageReceipt>();
     }
 
     // ── Threads ────────────────────────────────────────────────────────────

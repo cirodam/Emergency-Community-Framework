@@ -85,7 +85,7 @@ export function getTransactions(req: Request, res: Response): void {
 
 // POST /api/transfers
 // Body: { fromAccountId, toAccountId, amount, memo? }
-export function createTransfer(req: Request, res: Response): void {
+export async function createTransfer(req: Request, res: Response): Promise<void> {
     const { fromAccountId, toAccountId, amount, memo } = req.body ?? {};
 
     if (typeof fromAccountId !== "string" || !fromAccountId) {
@@ -106,7 +106,7 @@ export function createTransfer(req: Request, res: Response): void {
     }
 
     try {
-        const tx = bank().transfer(fromAccountId, toAccountId, amount, memo ?? "");
+        const tx = await bank().transfer(fromAccountId, toAccountId, amount, memo ?? "");
         res.status(201).json(toTxDto(tx));
     } catch (err) {
         res.status(422).json({ error: (err as Error).message });

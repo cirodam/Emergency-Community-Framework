@@ -19,6 +19,13 @@ export class Bank {
     private accountLoader: AccountLoader | null = null;
     private transactionLoader: TransactionLoader | null = null;
 
+    /**
+     * Serial queue for external transfers. Ensures balance-check and debit are
+     * atomic even if storage later becomes async. Each call to transfer() chains
+     * onto this promise so concurrent HTTP requests are serialized.
+     */
+    private _txQueue: Promise<void> = Promise.resolve();
+
     private constructor() {}
 
     static getInstance(): Bank {
@@ -91,7 +98,27 @@ export class Bank {
 
     // ── Transfers ─────────────────────────────────────────────────────────────
 
+    /**
+     * Enqueue a transfer. Serialized via _txQueue so the balance check and debit
+     * are always atomic — safe against concurrent HTTP requests and future async
+     * storage backends.
+     */
     transfer(
+        fromAccountId: string,
+        toAccountId: string,
+        amount: number,
+        memo: string = ""
+    ): Promise<BankTransaction> {
+        const result = this._txQueue.then(() =>
+            this._transferSync(fromAccountId, toAccountId, amount, memo)
+        );
+        // Advance the queue; swallow errors so the queue never deadlocks
+        this._txQueue = result.then(() => undefined, () => undefined);
+        return result;
+    }
+
+    /** Synchronous core — called by the queue and internally by applyDemurrage. */
+    private _transferSync(
         fromAccountId: string,
         toAccountId: string,
         amount: number,
@@ -176,7 +203,7 @@ export class Bank {
             const chargeable = Math.min(fullFee, headroom);
             if (chargeable <= 0) continue;
 
-            txs.push(this.transfer(account.accountId, sinkAccountId, chargeable, memo));
+            txs.push(this._transferSync(account.accountId, sinkAccountId, chargeable, memo));
         }
         return txs;
     }

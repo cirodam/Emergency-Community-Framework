@@ -124,7 +124,7 @@
                 <div class="inst-icon bud-icon">⊟</div>
                 <div class="inst-text">
                     <h3>Community Budget</h3>
-                    <p>Monthly inflow from the levy vs. outflow across all domains. Is the community solvent?</p>
+                    <p>Monthly dues vs. outflow across all domains. Is the community solvent?</p>
                 </div>
             </div>
             <div class="inst-right">

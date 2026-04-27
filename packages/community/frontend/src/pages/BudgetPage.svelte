@@ -10,7 +10,7 @@
     let expanded: Set<string> = $state(new Set());
 
     const net = $derived(
-        data ? data.inflow.estimatedMonthlyLevy - data.outflow.monthlyTotal : 0
+        data ? data.inflow.estimatedMonthlyDues - data.outflow.monthlyTotal : 0
     );
 
     async function load() {
@@ -89,9 +89,9 @@
                     <strong>{data.solvent ? "Solvent" : "At risk"}</strong>
                     <p>
                         {#if data.solvent}
-                            The monthly levy covers all commitments.
+                            The monthly dues cover all commitments.
                         {:else}
-                            Monthly outflow exceeds the estimated levy.
+                            Monthly outflow exceeds the estimated dues.
                         {/if}
                     </p>
                 </div>
@@ -107,16 +107,12 @@
                         <span class="kv-value">{fmt(data.inflow.treasuryBalance)} <span class="unit">kin</span></span>
                     </div>
                     <div class="kv-row">
-                        <span class="kv-label">Levy rate</span>
-                        <span class="kv-value">{(data.inflow.levyRate * 100).toFixed(1)}%</span>
-                    </div>
-                    <div class="kv-row">
-                        <span class="kv-label">Kin in circulation</span>
-                        <span class="kv-value">{fmt(data.inflow.kinInCirculation)} <span class="unit">kin</span></span>
+                        <span class="kv-label">Dues rate</span>
+                        <span class="kv-value">{(data.inflow.duesRate * 100).toFixed(1)}%</span>
                     </div>
                     <div class="kv-row highlight-row">
-                        <span class="kv-label">Estimated monthly levy</span>
-                        <span class="kv-value strong">{fmt(data.inflow.estimatedMonthlyLevy)} <span class="unit">kin</span></span>
+                        <span class="kv-label">Estimated monthly dues</span>
+                        <span class="kv-value strong">{fmt(data.inflow.estimatedMonthlyDues)} <span class="unit">kin</span></span>
                     </div>
                     {#if data.outflow.monthlyTotal > 0}
                         <div class="kv-row">

@@ -37,11 +37,7 @@ export function verifyNodeSignature(
             return;
         }
 
-        const rawBody = (req as Request & { rawBody?: string }).rawBody;
-        if (rawBody === undefined) {
-            res.status(500).json({ error: "Raw body unavailable" });
-            return;
-        }
+        const rawBody = (req as Request & { rawBody?: string }).rawBody ?? "";
 
         if (!NodeSigner.verify(rawBody, signature, publicKey)) {
             res.status(401).json({ error: "Invalid signature" });

@@ -114,8 +114,8 @@ export interface CommunityBudgetDto {
     ready: boolean;
     inflow: {
         treasuryBalance:      number;
-        levyRate:             number;
-        estimatedMonthlyLevy: number;
+        duesRate:             number;
+        estimatedMonthlyDues: number;
         kinInCirculation:     number;
     };
     outflow: {

@@ -16,6 +16,9 @@ export interface FederationMember {
     communityPublicKey: string;
     /** Human-readable name, e.g. "Riverside Community". */
     name: string;
+    /** URL-safe handle chosen by the community, unique within this federation.
+     *  Used in addresses: federation:community-handle:member-handle */
+    handle: string;
     /** ISO 8601 join timestamp. */
     joinedAt: string;
     /**
@@ -32,6 +35,7 @@ export interface FederationMember {
 
 export function createFederationMember(
     name: string,
+    handle: string,
     communityNodeId: string,
     communityPublicKey: string,
     isFounder = false,
@@ -41,6 +45,7 @@ export function createFederationMember(
         communityNodeId,
         communityPublicKey,
         name,
+        handle,
         joinedAt:           new Date().toISOString(),
         isFounder,
         bankAccountId:      null,

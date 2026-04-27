@@ -13,6 +13,7 @@ import { FederationTreasuryLoader } from "./domains/treasury/FederationTreasuryL
 import { FederationConstitution } from "./governance/FederationConstitution.js";
 import { FederationDomainService } from "./common/FederationDomainService.js";
 import { InsuranceDomain } from "./domains/insurance/InsuranceDomain.js";
+import { LogisticsDomain } from "./domains/logistics/LogisticsDomain.js";
 import { BankClient } from "./BankClient.js";
 import { CensusRecordLoader } from "./census/CensusRecordLoader.js";
 import { FederationCensusService } from "./census/FederationCensusService.js";
@@ -53,9 +54,14 @@ async function bootstrapFoundingMember(bank: BankClient, attempt = 1): Promise<v
         const res  = await fetch(`${base}/api/identity`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        const identity = await res.json() as { id: string; publicKey: string; name: string };
+        const identity = await res.json() as { id: string; publicKey: string; name: string; handle?: string };
 
-        const member  = memberSvc.add(identity.name, identity.id, identity.publicKey, true);
+        // Derive a handle from the community name if it hasn't set one yet
+        const handle = identity.handle?.trim()
+            || identity.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32)
+            || "founding-community";
+
+        const member  = memberSvc.add(identity.name, handle, identity.id, identity.publicKey, true);
         const owner   = await bank.createOwner("institution", identity.name);
         const account = await bank.openAccount(owner.ownerId, `${identity.name} — kithe reserve`, "kithe");
         memberSvc.setBankAccount(member.id, account.accountId);
@@ -115,6 +121,7 @@ async function main(): Promise<void> {
     // ── Federation functional domains ─────────────────────────────────────
     const domainSvc = FederationDomainService.getInstance();
     domainSvc.registerDomain(InsuranceDomain.getInstance());
+    domainSvc.registerDomain(LogisticsDomain.getInstance());
 
     // ── Founding member bootstrap ──────────────────────────────────────────
     await bootstrapFoundingMember(bank);
@@ -126,11 +133,12 @@ async function main(): Promise<void> {
     // Identity endpoint — member communities and other nodes resolve public key here
     app.get("/api/identity", (_req, res) => {
         const node = NodeService.getInstance();
+        const identity = node.getIdentity();
         res.json({
-            id:        node.nodeId,
+            id:        identity.id,
             publicKey: node.getSigner().publicKeyHex,
             type:      "federation",
-            name:      node.nodeName,
+            name:      identity.name,
         });
     });
 

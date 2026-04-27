@@ -340,41 +340,41 @@ async function main(): Promise<void> {
         }
     });
 
-    // Collect the community levy monthly — moves kin from member accounts
+    // Collect community dues monthly — moves kin from member accounts
     // to the treasury. Runs 30 days after startup, then every 30 days.
     // Excludes institutional accounts (issuance, SI pool, treasury itself).
-    const runCommunityLevy = (): void => {
+    const runCommunityDues = (): void => {
         const centralBank  = CentralBank.getInstance();
         const siBank       = SocialInsuranceBank.getInstance();
         const treasury     = CommunityTreasury.getInstance();
         const constitution = Constitution.getInstance();
         if (!centralBank.isReady() || !siBank.isReady() || !treasury.isReady()) {
-            console.warn("[community] monetary institutions not ready — skipping community levy");
+            console.warn("[community] monetary institutions not ready — skipping community dues collection");
             return;
         }
-        treasury.collectLevy(
-            constitution.communityLevyRate,
+        treasury.collectDues(
+            constitution.communityDuesRate,
             constitution.demurrageFloor,
             [centralBank.issuanceAccountId, siBank.poolAccountId],
         ).then(({ count }) => {
-            console.log(`[community] community levy collected from ${count} accounts`);
+            console.log(`[community] community dues collected from ${count} accounts`);
         }).catch(err => {
-            console.error("[community] community levy failed:", err);
+            console.error("[community] community dues collection failed:", err);
         });
     };
-    // Run the levy check daily; collectLevy() fires only when a full 30-day
+    // Run the dues check daily; collectDues() fires only when a full 30-day
     // cycle has elapsed. Using a daily tick avoids Node.js's 32-bit timer
     // overflow (setTimeout > ~24.8 days fires immediately).
-    let lastLevyDate: Date | null = null;
+    let lastDuesDate: Date | null = null;
     const MS_PER_DAY = 24 * 60 * 60 * 1000;
     setInterval(() => {
         const now = new Date();
         if (
-            lastLevyDate === null ||
-            now.getTime() - lastLevyDate.getTime() >= 30 * MS_PER_DAY
+            lastDuesDate === null ||
+            now.getTime() - lastDuesDate.getTime() >= 30 * MS_PER_DAY
         ) {
-            lastLevyDate = now;
-            runCommunityLevy();
+            lastDuesDate = now;
+            runCommunityDues();
         }
     }, MS_PER_DAY);
 
@@ -437,7 +437,8 @@ async function main(): Promise<void> {
     // Expose the community's public key so federation / other nodes can verify credentials
     app.get("/api/identity", (_req, res) => {
         const identity = NodeService.getInstance().getIdentity();
-        res.json({ id: identity.id, publicKey: identity.publicKey, name: identity.name });
+        const handle   = Constitution.getInstance().communityHandle;
+        res.json({ id: identity.id, publicKey: identity.publicKey, name: identity.name, handle });
     });
 
     app.get("/api/constitution", (_req, res) => {

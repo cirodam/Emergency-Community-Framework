@@ -53,27 +53,33 @@ export function getUnreadCount(req: Request & { personId?: string }, res: Respon
 // ── Send ───────────────────────────────────────────────────────────────────
 
 // POST /api/messages
-// Body: { toPersonId, subject, body, threadId? }
+// Body: { toPersonIds: string[], subject?, body, threadId? }
+//       toPersonIds may also be sent as the legacy toPersonId: string for
+//       backwards compat with existing clients.
 export function sendMessage(req: Request & { personId?: string }, res: Response): void {
     const fromPersonId = req.personId;
     if (!fromPersonId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
-    const { toPersonId, subject, body, threadId } = req.body ?? {};
+    const { toPersonIds, toPersonId, subject, body, threadId } = req.body ?? {};
 
-    if (typeof toPersonId !== "string" || !toPersonId.trim()) {
-        res.status(400).json({ error: "toPersonId is required" }); return;
+    // Accept both array and legacy single-string form
+    const recipients: string[] = Array.isArray(toPersonIds)
+        ? toPersonIds
+        : typeof toPersonId === "string" && toPersonId.trim()
+            ? [toPersonId.trim()]
+            : [];
+
+    if (!recipients.length) {
+        res.status(400).json({ error: "toPersonIds is required" }); return;
     }
     if (typeof body !== "string" || !body.trim()) {
         res.status(400).json({ error: "body is required" }); return;
-    }
-    if (toPersonId === fromPersonId) {
-        res.status(400).json({ error: "Cannot send a message to yourself" }); return;
     }
 
     const subjectStr = typeof subject === "string" ? subject : "";
 
     try {
-        const msg = svc().send(fromPersonId, toPersonId.trim(), subjectStr, body.trim(), threadId as string | undefined);
+        const msg = svc().send(fromPersonId, recipients, subjectStr, body.trim(), threadId as string | undefined);
         res.status(201).json(msg);
     } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to send";
@@ -89,8 +95,8 @@ export function markRead(req: Request & { personId?: string }, res: Response): v
     if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
     try {
-        const msg = svc().markRead(req.params.id as string, personId);
-        res.json(msg);
+        const receipt = svc().markRead(req.params.id as string, personId);
+        res.json(receipt);
     } catch (err) {
         const e = err instanceof Error ? err.message : "Error";
         const status = e === "Forbidden" ? 403 : e === "Message not found" ? 404 : 422;

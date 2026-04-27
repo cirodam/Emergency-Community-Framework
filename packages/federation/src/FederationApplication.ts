@@ -10,6 +10,7 @@ export type ApplicationStatus =
 export interface FederationApplication {
     id:                 string;
     communityName:      string;
+    communityHandle:    string;   // URL-safe, unique within this federation
     communityNodeId:    string;
     communityPublicKey: string;
     status:             ApplicationStatus;
@@ -22,12 +23,14 @@ export interface FederationApplication {
 
 export function createApplication(
     communityName:      string,
+    communityHandle:    string,
     communityNodeId:    string,
     communityPublicKey: string,
 ): FederationApplication {
     return {
         id:                 randomUUID(),
         communityName,
+        communityHandle,
         communityNodeId,
         communityPublicKey,
         status:             "submitted",

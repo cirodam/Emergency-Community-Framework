@@ -32,10 +32,17 @@ function bank(): BankClient {
  * proving it controls the private key.
  */
 export async function submitApplication(req: Request, res: Response): Promise<void> {
-    const { communityName, communityNodeId, communityPublicKey } = req.body ?? {};
+    const { communityName, communityHandle, communityNodeId, communityPublicKey } = req.body ?? {};
 
     if (typeof communityName      !== "string" || !communityName.trim()) {
         res.status(400).json({ error: "communityName is required" }); return;
+    }
+    if (typeof communityHandle !== "string" || !communityHandle.trim()) {
+        res.status(400).json({ error: "communityHandle is required" }); return;
+    }
+    const handle = communityHandle.toLowerCase().trim();
+    if (!/^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$|^[a-z0-9]{1,2}$/.test(handle)) {
+        res.status(400).json({ error: "communityHandle must be 2–32 characters: lowercase letters, digits, hyphens (no leading/trailing hyphens)" }); return;
     }
     if (typeof communityNodeId    !== "string" || !communityNodeId.trim()) {
         res.status(400).json({ error: "communityNodeId is required" }); return;
@@ -57,10 +64,11 @@ export async function submitApplication(req: Request, res: Response): Promise<vo
     try {
         const app = FederationApplicationService.getInstance().submit(
             communityName.trim(),
+            handle,
             communityNodeId.trim(),
             communityPublicKey.trim(),
         );
-        console.log(`[federation] application submitted: ${communityName} (${communityNodeId})`);
+        console.log(`[federation] application submitted: ${communityName} (${handle}, ${communityNodeId})`);
         res.status(201).json(appToDto(app));
     } catch (err) {
         res.status(409).json({ error: (err as Error).message });
@@ -112,7 +120,7 @@ export async function reviewApplication(req: Request, res: Response): Promise<vo
         const memberSvc = FederationMemberService.getInstance();
         let member;
         try {
-            member = memberSvc.add(app.communityName, app.communityNodeId, app.communityPublicKey);
+            member = memberSvc.add(app.communityName, app.communityHandle, app.communityNodeId, app.communityPublicKey);
         } catch (err) {
             res.status(409).json({ error: (err as Error).message }); return;
         }

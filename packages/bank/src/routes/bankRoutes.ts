@@ -22,16 +22,16 @@ function requireAuthOrNodeSignature(req: Request, res: Response, next: NextFunct
     }
 }
 
-// Admin / infrastructure routes — no user auth required
-router.get( "/accounts",                         getAllAccounts);
-router.post("/accounts",                         createAccount);
-router.get( "/account/:accountId",               getAccountById);
+// Admin / infrastructure routes — node signature required
+router.get( "/accounts",                         requireNodeAuth, getAllAccounts);
+router.post("/accounts",                         requireNodeAuth, createAccount);
+router.get( "/account/:accountId",               requireNodeAuth, getAccountById);
 router.post("/demurrage",                        requireAuthOrNodeSignature, applyDemurrage);
 
 // Member routes — require a valid community-issued credential or node signature
 router.get( "/me/accounts",                      requireAuth, getMyAccounts);
-router.get( "/accounts/:ownerId",                requireAuth, getAccounts);
-router.get( "/accounts/:accountId/transactions", requireAuth, getTransactions);
+router.get( "/accounts/:ownerId",                requireAuthOrNodeSignature, getAccounts);
+router.get( "/accounts/:accountId/transactions", requireAuthOrNodeSignature, getTransactions);
 router.post("/transfers",                        requireAuthOrNodeSignature, createTransfer);
 
 export default router;

@@ -42,12 +42,21 @@ export class FederationApplicationService {
         return undefined;
     }
 
+    getByHandle(handle: string): FederationApplication | undefined {
+        for (const app of this.applications.values()) {
+            if (app.communityHandle === handle) return app;
+        }
+        return undefined;
+    }
+
     /**
      * Submit a new application. A community may not apply if it already has
-     * a non-rejected application on record.
+     * a non-rejected application on record. The requested handle must be
+     * unique across all non-rejected applications.
      */
     submit(
         communityName:      string,
+        communityHandle:    string,
         communityNodeId:    string,
         communityPublicKey: string,
     ): FederationApplication {
@@ -58,7 +67,13 @@ export class FederationApplicationService {
             );
         }
 
-        const app = createApplication(communityName, communityNodeId, communityPublicKey);
+        // Handle uniqueness: check both pending applications and existing members
+        const handleConflict = this.getByHandle(communityHandle);
+        if (handleConflict && handleConflict.status !== "rejected") {
+            throw new Error(`Handle "${communityHandle}" is already taken`);
+        }
+
+        const app = createApplication(communityName, communityHandle, communityNodeId, communityPublicKey);
         this.applications.set(app.id, app);
         this.loader.save(app);
         return app;

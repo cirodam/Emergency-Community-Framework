@@ -18,10 +18,16 @@ export class BankClient {
         };
     }
 
+    private signedGetHeaders(): Record<string, string> {
+        return { "x-node-signature": this.sign("") };
+    }
+
     async getPrimaryAccountAsync(
         ownerId: string,
     ): Promise<{ accountId: string; currency: string; amount: number } | undefined> {
-        const res = await fetch(`${this.baseUrl}/api/accounts/${encodeURIComponent(ownerId)}`);
+        const res = await fetch(`${this.baseUrl}/api/accounts/${encodeURIComponent(ownerId)}`, {
+            headers: this.signedGetHeaders(),
+        });
         if (res.status === 404) return undefined;
         if (!res.ok) throw new Error(`[BankClient] getAccounts(${ownerId}) failed: ${res.status}`);
         const accounts = (await res.json()) as { accountId: string; currency: string; amount: number; label: string }[];
@@ -31,7 +37,9 @@ export class BankClient {
     async getAccountById(
         accountId: string,
     ): Promise<{ accountId: string; currency: string; amount: number } | undefined> {
-        const res = await fetch(`${this.baseUrl}/api/account/${encodeURIComponent(accountId)}`);
+        const res = await fetch(`${this.baseUrl}/api/account/${encodeURIComponent(accountId)}`, {
+            headers: this.signedGetHeaders(),
+        });
         if (res.status === 404) return undefined;
         if (!res.ok) throw new Error(`[BankClient] getAccountById(${accountId}) failed: ${res.status}`);
         return res.json() as Promise<{ accountId: string; currency: string; amount: number }>;

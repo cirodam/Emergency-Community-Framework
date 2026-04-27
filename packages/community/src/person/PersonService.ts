@@ -1,4 +1,4 @@
-import { createHash, scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { NodeService, NodeSigner } from "@ecf/core";
 import { Person, PersonCredential, LanguageProficiency } from "./Person.js";
@@ -206,17 +206,22 @@ export class PersonService {
 
     // ── Auth ──────────────────────────────────────────────────────────────────
 
-    setPin(personId: string, pin: string): void {
+    async setPin(personId: string, pin: string): Promise<void> {
         const person = this.persons.get(personId);
         if (!person) throw new Error(`Person ${personId} not found`);
-        person.setPinHash(createHash("sha256").update(pin).digest("hex"));
+        if (!/^\d{4,8}$/.test(pin)) throw new Error("PIN must be 4–8 digits");
+        person.setPinHash(await hashSecret(pin));
         this.save(person);
     }
 
-    verifyPin(personId: string, pin: string): boolean {
+    async verifyPin(personId: string, pin: string): Promise<boolean> {
         const person = this.persons.get(personId);
-        if (!person) return false;
-        return person.matchesPinHash(createHash("sha256").update(pin).digest("hex"));
+        const stored = person?.getCredentialsForPersistence().pinHash ?? null;
+        if (!stored) {
+            await hashSecret(pin); // timing uniformity — prevent user-existence oracle
+            return false;
+        }
+        return verifySecret(pin, stored);
     }
 
     async setPassword(personId: string, password: string): Promise<void> {

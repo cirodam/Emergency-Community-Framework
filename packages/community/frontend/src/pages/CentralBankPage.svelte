@@ -146,10 +146,10 @@
 
                 <div class="policy-row">
                     <div class="policy-label">
-                        <span class="policy-name">Community levy rate</span>
+                        <span class="policy-name">Community dues rate</span>
                         <span class="policy-auth">referendum</span>
                     </div>
-                    <strong class="policy-value">{pct(param("communityLevyRate", 0.01))} / month</strong>
+                    <strong class="policy-value">{pct(param("communityDuesRate", 0.01))} / month</strong>
                 </div>
 
                 <div class="policy-row">
@@ -211,10 +211,10 @@
             <div class="explainer-block">
                 <div class="expl-icon">⊞</div>
                 <div>
-                    <strong>Community levy</strong>
+                    <strong>Community dues</strong>
                     <p>
-                        A separate monthly levy moves kin from member accounts into the
-                        community treasury. Unlike demurrage, levied kin is not retired —
+                        A separate monthly dues collection moves kin from member accounts into the
+                        community treasury. Unlike demurrage, collected kin is not retired —
                         it is available for collective spending. This is the community's
                         operating budget.
                     </p>
@@ -226,7 +226,7 @@
                 <div>
                     <strong>Governance</strong>
                     <p>
-                        The demurrage rate, demurrage floor, and levy rate can all be
+                        The demurrage rate, demurrage floor, and dues rate can all be
                         changed by a community-wide referendum. Changes take effect at
                         the next scheduled monthly processing.
                     </p>

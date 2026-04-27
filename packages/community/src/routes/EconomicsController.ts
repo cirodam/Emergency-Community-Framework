@@ -8,8 +8,16 @@ import { FederationMembershipService } from "../FederationMembershipService.js";
 import { Constitution } from "../governance/Constitution.js";
 import { DomainService } from "../DomainService.js";
 import { PersonService } from "../person/PersonService.js";
+import { NodeService } from "@ecf/core";
 
 const BANK_URL = process.env.BANK_URL ?? "http://localhost:3001";
+
+function bankClient(): BankClient {
+    return new BankClient(
+        BANK_URL,
+        body => NodeService.getInstance().getSigner().signBody(body),
+    );
+}
 
 // GET /api/economics — public, no auth required.
 // Returns live monetary data: kin/kithe in circulation and SI pool stats.
@@ -24,7 +32,7 @@ export async function getEconomics(_req: Request, res: Response): Promise<void> 
         return;
     }
 
-    const bank = new BankClient(BANK_URL);
+    const bank = bankClient();
 
     const [cbAccount, curBoardAccount, siAccount] = await Promise.all([
         bank.getAccountById(cb.issuanceAccountId),
@@ -83,17 +91,18 @@ export async function getFederationStatus(_req: Request, res: Response): Promise
 
 /** POST /api/federation/apply — submit an application to join a federation */
 export async function applyToFederation(req: Request, res: Response): Promise<void> {
-    const { federationUrl, communityName } = req.body as {
-        federationUrl?: string;
-        communityName?: string;
+    const { federationUrl, communityName, communityHandle } = req.body as {
+        federationUrl?:   string;
+        communityName?:   string;
+        communityHandle?: string;
     };
-    if (!federationUrl || !communityName) {
-        res.status(400).json({ error: "federationUrl and communityName are required" });
+    if (!federationUrl || !communityName || !communityHandle) {
+        res.status(400).json({ error: "federationUrl, communityName, and communityHandle are required" });
         return;
     }
 
     try {
-        const membership = await FederationMembershipService.getInstance().apply(federationUrl, communityName);
+        const membership = await FederationMembershipService.getInstance().apply(federationUrl, communityName, communityHandle);
         res.status(201).json(membership);
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -113,11 +122,11 @@ export async function syncFederationStatus(_req: Request, res: Response): Promis
  * GET /api/budget — public transparency endpoint.
  *
  * Returns the community's full budget:
- *   inflow  — treasury balance + estimated monthly levy
+ *   inflow  — treasury balance + estimated monthly dues
  *   outflow — sum of every domain's payroll + budget line items
  *   solvency — whether monthly inflow covers monthly outflow
  *
- * The community levy moves kin from member accounts into the treasury
+ * Community dues move kin from member accounts into the treasury
  * (the spending pool). Central-bank demurrage retires kin and is NOT
  * counted here since it doesn't flow to the treasury.
  */
@@ -131,35 +140,38 @@ export async function getCommunityBudget(_req: Request, res: Response): Promise<
         return;
     }
 
-    const bank = new BankClient(BANK_URL);
+    const bank = bankClient();
+    const si = SocialInsuranceBank.getInstance();
 
-    const [cbAccount, treasuryAccount] = await Promise.all([
+    const [cbAccount, treasuryAccount, siAccount] = await Promise.all([
         bank.getAccountById(cb.issuanceAccountId),
         bank.getAccountById(treasury.accountId),
+        si.isReady() ? bank.getAccountById(si.poolAccountId) : Promise.resolve(null),
     ]);
 
     // kinInCirculation = −(issuance account balance) since it starts at 0
     // and goes negative as kin is issued.
     const kinInCirculation = cbAccount ? Math.max(0, -cbAccount.amount) : 0;
-    const levyRate         = constitution.communityLevyRate;
+    const duesRate          = constitution.communityDuesRate;
     const treasuryBalance  = treasuryAccount?.amount ?? 0;
 
-    // Estimated monthly inflow = levy on all circulating kin
-    // (conservative: levy is applied per-account above the floor; this is
-    //  the theoretical upper bound since the floor exempts small balances)
-    const estimatedMonthlyLevy = Math.round(kinInCirculation * levyRate * 100) / 100;
+    // Dues exclude the SI pool and the treasury itself, so subtract them
+    // from the circulation figure to get an accurate estimate.
+    const siPoolBalance        = siAccount?.amount ?? 0;
+    const duesableKin          = Math.max(0, kinInCirculation - siPoolBalance - treasuryBalance);
+    const estimatedMonthlyDues = Math.round(duesableKin * duesRate * 100) / 100;
 
     const domainBudget = DomainService.getInstance().getCommunityBudget();
 
     const monthlyOutflow = domainBudget.totals.total;
-    const solvent        = estimatedMonthlyLevy >= monthlyOutflow;
+    const solvent        = estimatedMonthlyDues >= monthlyOutflow;
 
     res.json({
         ready: true,
         inflow: {
             treasuryBalance,
-            levyRate,
-            estimatedMonthlyLevy,
+            duesRate,
+            estimatedMonthlyDues,
             kinInCirculation,
         },
         outflow: {

@@ -10,9 +10,9 @@ export const COMMUNITY_TREASURY_DOMAIN_ID = "ecf-domain-community-treasury-00000
  * Funded by two sources:
  *  1. A share of every new adult member's join endowment (the circulating
  *     fraction minus the seed balance).
- *  2. A monthly community levy collected from all member accounts
- *     (communityLevyRate). This is distinct from Central Bank demurrage:
- *     demurrage retires kin from circulation; the levy moves kin from
+ *  2. Monthly community dues collected from all member accounts
+ *     (communityDuesRate). This is distinct from Central Bank demurrage:
+ *     demurrage retires kin from circulation; dues move kin from
  *     members to the treasury for the community to spend.
  *
  * Spending is a governance act — referenda and domain budget allocations
@@ -46,17 +46,17 @@ export class CommunityTreasury extends FunctionalDomain {
     get accountId(): string  { if (!this._ready) throw new Error("CommunityTreasury not ready"); return this._accountId; }
 
     /**
-     * Collect the community levy from all member kin accounts into the treasury.
+     * Collect community dues from all member kin accounts into the treasury.
      *
      * Unlike Central Bank demurrage (which retires kin by routing to the
-     * issuance account), the levy moves kin from members to the treasury
+     * issuance account), dues move kin from members to the treasury
      * account — the money stays in circulation, just redistributed.
      *
      * @param rate             Fraction of each account balance to collect
-     * @param floor            Balance floor exempt from the levy
+     * @param floor            Balance floor exempt from dues
      * @param excludeAccountIds  Institutional accounts to skip (pool, issuance, treasury itself)
      */
-    async collectLevy(
+    async collectDues(
         rate: number,
         floor = 0,
         excludeAccountIds: string[] = [],
@@ -66,7 +66,7 @@ export class CommunityTreasury extends FunctionalDomain {
             "kin",
             rate,
             this._accountId,
-            "community levy",
+            "community dues",
             floor,
             [this._accountId, ...excludeAccountIds],
         );
