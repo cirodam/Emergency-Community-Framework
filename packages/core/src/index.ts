@@ -11,6 +11,7 @@ export * from "./network/NodeService.js";
 export * from "./network/NetworkController.js";
 export * from "./network/signatureMiddleware.js";
 export * from "./network/ServiceNode.js";
+export * from "./network/communityIdentityCache.js";
 export { default as networkRouter } from "./network/networkRoutes.js";
 
 // storage

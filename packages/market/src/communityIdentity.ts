@@ -1,20 +1,5 @@
-/**
- * Caches the governing community's node identity at startup.
- * Used by requirePersonCredential middleware to verify member credentials.
- */
+import { createCommunityIdentityCache } from "@ecf/core";
 
-interface CommunityIdentity {
-    nodeId:    string;
-    publicKey: string;
-}
+export const { setCommunityIdentity, getCommunityIdentity } =
+    createCommunityIdentityCache("market");
 
-let cached: CommunityIdentity | null = null;
-
-export function setCommunityIdentity(id: string, publicKey: string): void {
-    cached = { nodeId: id, publicKey };
-}
-
-export function getCommunityIdentity(): { nodeId: string; publicKey: string } {
-    if (!cached) throw new Error("[market] Community identity not yet resolved");
-    return cached;
-}
