@@ -3,6 +3,8 @@
     import { session, currentPage } from "../lib/session.js";
     import { login } from "../lib/api.js";
 
+    const { onApply }: { onApply?: () => void } = $props();
+
     let handle   = $state("");
     let password = $state("");
     let error    = $state("");
@@ -87,6 +89,13 @@
                 {loading ? "Signing in…" : "Sign in"}
             </button>
         </form>
+
+        {#if onApply}
+            <p class="apply-link">
+                Not a member yet?
+                <button class="link-btn" onclick={onApply}>Apply to join</button>
+            </p>
+        {/if}
     </div>
 </div>
 
@@ -189,4 +198,22 @@
 
     .btn-primary:disabled { background: #86efac; cursor: default; }
     .btn-primary:not(:disabled):active { background: #15803d; }
+
+    .apply-link {
+        text-align: center;
+        font-size: 0.9rem;
+        color: #64748b;
+        margin: 0;
+    }
+
+    .link-btn {
+        background: none;
+        border: none;
+        color: #16a34a;
+        font-size: inherit;
+        cursor: pointer;
+        padding: 0;
+        font-weight: 500;
+        text-decoration: underline;
+    }
 </style>

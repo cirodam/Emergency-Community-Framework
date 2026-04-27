@@ -22,9 +22,11 @@
     import AssociationPage     from "./pages/AssociationPage.svelte";
     import AddPersonPage       from "./pages/AddPersonPage.svelte";
     import LocationsPage       from "./pages/LocationsPage.svelte";
+    import ProposalsPage       from "./pages/ProposalsPage.svelte";
+    import ApplyPage           from "./pages/ApplyPage.svelte";
     import BottomNav           from "./components/BottomNav.svelte";
 
-    type AppState = "loading" | "setup" | "login" | "app";
+    type AppState = "loading" | "setup" | "login" | "apply" | "app";
     let appState: AppState = $state("loading");
 
     onMount(async () => {
@@ -54,8 +56,11 @@
 {:else if appState === "setup"}
     <SetupPage onComplete={() => { appState = "login"; }} />
 
+{:else if appState === "apply"}
+    <ApplyPage onBack={() => { appState = "login"; }} />
+
 {:else if !loggedIn}
-    <LoginPage />
+    <LoginPage onApply={() => { appState = "apply"; }} />
 
 {:else}
     <main>
@@ -95,6 +100,8 @@
             <AddPersonPage />
         {:else if $currentPage === "locations"}
             <LocationsPage />
+        {:else if $currentPage === "proposals"}
+            <ProposalsPage />
         {/if}
     </main>
     <BottomNav />

@@ -11,6 +11,7 @@
         { id: "applications",  label: "Applications",  icon: "◎" },
         { id: "domains",       label: "Domains",       icon: "⊛" },
         { id: "governance",    label: "Governance",    icon: "⚖" },
+        { id: "proposals",     label: "Proposals",     icon: "✦" },
         { id: "economy",       label: "Economy",       icon: "⊕" },
         { id: "locations",     label: "Locations",     icon: "⊕" },
         { id: "how-it-works",  label: "How It Works",  icon: "⊙" },

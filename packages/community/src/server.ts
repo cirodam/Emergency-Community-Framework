@@ -24,6 +24,8 @@ import { FunctionalDomainLoader } from "./common/domain/FunctionalDomainLoader.j
 import { LeaderPoolLoader } from "./governance/LeaderPoolLoader.js";
 import { Constitution } from "./governance/Constitution.js";
 import { ConstitutionLoader } from "./governance/ConstitutionLoader.js";
+import { ProposalLoader } from "./governance/ProposalLoader.js";
+import { ProposalService } from "./governance/ProposalService.js";
 import { DomainService } from "./DomainService.js";
 import { BankClient } from "./BankClient.js";
 import { CentralBank } from "./domains/central_bank/CentralBank.js";
@@ -106,7 +108,8 @@ async function main(): Promise<void> {
     );
 
     // ── Constitution ───────────────────────────────────────────────────────
-    new ConstitutionLoader(resolve(DATA_DIR, "governance")).load();
+    const constitutionLoader = new ConstitutionLoader(resolve(DATA_DIR, "governance"));
+    constitutionLoader.load();
 
     // ── Persons ────────────────────────────────────────────────────────────
     const personLoader = new PersonLoader(resolve(DATA_DIR, "persons"));
@@ -131,6 +134,10 @@ async function main(): Promise<void> {
     // ── Locations ─────────────────────────────────────────────────────────────
     const locationLoader = new LocationLoader(resolve(DATA_DIR, "locations"));
     LocationService.getInstance().init(locationLoader);
+
+    // ── Governance proposals ───────────────────────────────────────────────
+    const proposalLoader = new ProposalLoader(resolve(DATA_DIR, "proposals"));
+    ProposalService.getInstance().init(proposalLoader, constitutionLoader);
 
     // When an application collects enough vouches, admit the applicant as a full Person.
     MemberApplicationService.getInstance().onAdmitted(async (app) => {

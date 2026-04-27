@@ -4,11 +4,11 @@
     import type { SessionData } from "./lib/session.js";
     import { currentPage } from "./lib/nav.js";
     import ClassifiedsPage  from "./pages/ClassifiedsPage.svelte";
-    import StallsPage        from "./pages/StallsPage.svelte";
     import StallPage         from "./pages/StallPage.svelte";
     import ServicesPage      from "./pages/ServicesPage.svelte";
     import MarketplacesPage  from "./pages/MarketplacesPage.svelte";
     import MarketplacePage   from "./pages/MarketplacePage.svelte";
+    import AppSwitcher       from "./components/AppSwitcher.svelte";
 
     let ready = $state(false);
 
@@ -67,26 +67,22 @@
         <button class="tab" class:active={$currentPage === "classifieds"} onclick={() => currentPage.set("classifieds")}>
             Classifieds
         </button>
-        <button class="tab" class:active={$currentPage === "stalls" || $currentPage === "stall"} onclick={() => currentPage.set("stalls")}>
-            Stalls
-        </button>
         <button class="tab" class:active={$currentPage === "services"} onclick={() => currentPage.set("services")}>
             Services
         </button>
-        <button class="tab" class:active={$currentPage === "marketplaces" || $currentPage === "marketplace"} onclick={() => currentPage.set("marketplaces")}>
-            Markets
+        <button class="tab" class:active={$currentPage === "marketplaces" || $currentPage === "marketplace" || $currentPage === "stalls" || $currentPage === "stall"} onclick={() => currentPage.set("marketplaces")}>
+            Marketplaces
         </button>
+        <div class="switcher-slot"><AppSwitcher /></div>
     </nav>
 
     <main>
         {#if $currentPage === "classifieds"}
             <ClassifiedsPage />
-        {:else if $currentPage === "stall"}
-            <StallPage />
-        {:else if $currentPage === "stalls"}
-            <StallsPage />
         {:else if $currentPage === "services"}
             <ServicesPage />
+        {:else if $currentPage === "stall"}
+            <StallPage />
         {:else if $currentPage === "marketplace"}
             <MarketplacePage />
         {:else}
@@ -112,10 +108,13 @@
         top: 0;
         z-index: 50;
         display: flex;
+        align-items: center;
         background: #fff;
         border-bottom: 1px solid #e2e8f0;
         padding: 0 1rem;
     }
+
+    .switcher-slot { margin-left: auto; display: flex; align-items: center; }
 
     .tab {
         padding: 0.75rem 1.25rem;

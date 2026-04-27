@@ -13,6 +13,8 @@ import * as orgs from "./OrgController.js";
 import * as calendar from "./CalendarController.js";
 import * as locations from "./LocationController.js";
 
+import * as proposals from "./ProposalController.js";
+
 const requireAuth = requirePersonCredential(getCommunityIdentity);
 
 const router = Router();
@@ -45,7 +47,8 @@ router.post("/auth/verify", auth.verifyCredential);
 // SMS banking (inbound webhook — for testing or gammu-smsd RunOnReceive)
 router.post("/sms/inbound", sms.smsInbound);
 
-// Member applications (require auth — applicant data is sensitive)
+// Member applications (list/vouch/withdraw require auth; public submit does not)
+router.post(  "/apply",                     applications.publicSubmitApplication);
 router.get(   "/applications",              requireAuth, applications.listApplications);
 router.post(  "/applications",              requireAuth, applications.submitApplication);
 router.get(   "/applications/:id",          requireAuth, applications.getApplication);
@@ -128,5 +131,12 @@ router.get(   "/locations/:id", locations.getLocation);
 router.post(  "/locations",     requireAuth, locations.createLocation);
 router.patch( "/locations/:id", requireAuth, locations.updateLocation);
 router.delete("/locations/:id", requireAuth, locations.deleteLocation);
+
+// Governance proposals
+router.get(   "/proposals",          proposals.listProposals);
+router.get(   "/proposals/:id",      proposals.getProposal);
+router.post(  "/proposals",          requireAuth, proposals.createProposal);
+router.post(  "/proposals/:id/vote", requireAuth, proposals.voteOnProposal);
+router.delete("/proposals/:id",      requireAuth, proposals.withdrawProposal);
 
 export default router;

@@ -68,7 +68,7 @@ function createSessionStore() {
 
 export const session = createSessionStore();
 
-export type Page = "profile" | "directory" | "constitution" | "economy" | "settings" | "domains" | "domain" | "governance" | "central-bank" | "currency-board" | "social-insurance" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations";
+export type Page = "profile" | "directory" | "constitution" | "economy" | "settings" | "domains" | "domain" | "governance" | "central-bank" | "currency-board" | "social-insurance" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations" | "proposals" | "proposal";
 
 function createPageStore() {
     const { subscribe, set } = writable<Page>("profile");
@@ -82,3 +82,6 @@ export const selectedDomainId = writable<string | null>(null);
 
 /** ID of the association currently being viewed in the association detail page. */
 export const selectedAssociationId = writable<string | null>(null);
+
+/** ID of the proposal currently being viewed in the proposal detail page. */
+export const selectedProposalId = writable<string | null>(null);

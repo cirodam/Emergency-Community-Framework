@@ -520,6 +520,24 @@ export async function submitApplication(payload: {
     return res.json() as Promise<ApplicationDto>;
 }
 
+// Public (no auth required) — applicant submits their own application.
+export async function submitPublicApplication(payload: {
+    firstName: string;
+    lastName: string;
+    birthDate: string;
+    message: string;
+}): Promise<ApplicationDto> {
+    const res = await apiFetch("/api/apply", {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to submit application");
+    }
+    return res.json() as Promise<ApplicationDto>;
+}
+
 export async function vouchForApplication(applicationId: string): Promise<ApplicationDto> {
     const res = await apiFetch(`/api/applications/${encodeURIComponent(applicationId)}/vouch`, {
         method: "POST",
@@ -619,4 +637,120 @@ export async function deleteLocation(id: string): Promise<void> {
         const body = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Failed to delete location");
     }
+}
+
+// ── Governance Proposals ───────────────────────────────────────────────────────
+
+export type ProposalType =
+    | "add-member"
+    | "suspend-member"
+    | "reinstate-member"
+    | "change-role"
+    | "budget-change"
+    | "pool-change"
+    | "constitution-amendment"
+    | "other";
+
+export const PROPOSAL_TYPE_LABELS: Record<ProposalType, string> = {
+    "add-member":             "Add Member",
+    "suspend-member":         "Suspend Member",
+    "reinstate-member":       "Reinstate Member",
+    "change-role":            "Change Role",
+    "budget-change":          "Budget Change",
+    "pool-change":            "Pool Change",
+    "constitution-amendment": "Constitution Amendment",
+    "other":                  "Other",
+};
+
+export const PROPOSAL_TYPES = Object.keys(PROPOSAL_TYPE_LABELS) as ProposalType[];
+
+export type ProposalStatus = "open" | "passed" | "rejected" | "expired" | "withdrawn";
+
+export interface ProposalVoteDto {
+    personId:  string;
+    handle:    string;
+    vote:      "approve" | "reject" | "abstain";
+    votedAt:   string;
+    comment:   string;
+}
+
+export interface ProposalDto {
+    id:              string;
+    type:            ProposalType;
+    poolId:          string;
+    proposerId:      string;
+    proposerHandle:  string;
+    title:           string;
+    description:     string;
+    payload:         Record<string, unknown>;
+    approvalsNeeded: number;
+    status:          ProposalStatus;
+    votes:           ProposalVoteDto[];
+    approvalCount:   number;
+    rejectionCount:  number;
+    createdAt:       string;
+    expiresAt:       string;
+    executedAt:      string | null;
+    outcomeNote:     string;
+}
+
+export async function listProposals(opts: { status?: string; poolId?: string } = {}): Promise<ProposalDto[]> {
+    const params = new URLSearchParams();
+    if (opts.status) params.set("status", opts.status);
+    if (opts.poolId) params.set("poolId", opts.poolId);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    const res = await apiFetch(`/api/proposals${qs}`);
+    if (!res.ok) throw new Error("Failed to load proposals");
+    return res.json() as Promise<ProposalDto[]>;
+}
+
+export async function getProposal(id: string): Promise<ProposalDto> {
+    const res = await apiFetch(`/api/proposals/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error("Proposal not found");
+    return res.json() as Promise<ProposalDto>;
+}
+
+export async function createProposal(data: {
+    type:            ProposalType;
+    poolId:          string;
+    title:           string;
+    description:     string;
+    payload?:        Record<string, unknown>;
+    approvalsNeeded: number;
+    ttlDays?:        number;
+}): Promise<ProposalDto> {
+    const res = await apiFetch("/api/proposals", {
+        method: "POST",
+        body:   JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to create proposal");
+    }
+    return res.json() as Promise<ProposalDto>;
+}
+
+export async function voteOnProposal(
+    id:      string,
+    vote:    "approve" | "reject" | "abstain",
+    comment: string = "",
+): Promise<ProposalDto> {
+    const res = await apiFetch(`/api/proposals/${encodeURIComponent(id)}/vote`, {
+        method: "POST",
+        body:   JSON.stringify({ vote, comment }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to cast vote");
+    }
+    return res.json() as Promise<ProposalDto>;
+}
+
+export async function withdrawProposal(id: string): Promise<ProposalDto> {
+    const res = await apiFetch(`/api/proposals/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to withdraw proposal");
+    }
+    return res.json() as Promise<ProposalDto>;
 }

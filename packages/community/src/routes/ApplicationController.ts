@@ -26,7 +26,7 @@ function toDto(app: ReturnType<typeof svc>["get"] extends (id: string) => infer 
         vouchers,
         vouchesRequired: svc().vouchesRequired(),
         submittedBy:     app.submittedBy,
-        submittedByName: submitter ? `${submitter.firstName} ${submitter.lastName}` : app.submittedBy,
+        submittedByName: submitter ? `${submitter.firstName} ${submitter.lastName}` : (app.submittedBy === "self" ? "Self-submitted" : app.submittedBy),
         submittedAt:     app.submittedAt,
         admittedAt:      app.admittedAt,
     };
@@ -73,6 +73,34 @@ export function submitApplication(req: AuthedRequest, res: Response): void {
         birthDate,
         message.trim(),
         submittedBy,
+    );
+    res.status(201).json(toDto(app));
+}
+
+// POST /api/apply  (public — no auth required)
+// The applicant submits their own application. submittedBy is recorded as "self".
+export function publicSubmitApplication(req: Request, res: Response): void {
+    const { firstName, lastName, birthDate, message } = req.body ?? {};
+
+    if (typeof firstName !== "string" || !firstName.trim()) {
+        res.status(400).json({ error: "firstName is required" }); return;
+    }
+    if (typeof lastName !== "string" || !lastName.trim()) {
+        res.status(400).json({ error: "lastName is required" }); return;
+    }
+    if (!birthDate || isNaN(new Date(birthDate).getTime())) {
+        res.status(400).json({ error: "birthDate must be a valid date" }); return;
+    }
+    if (typeof message !== "string" || !message.trim()) {
+        res.status(400).json({ error: "message is required" }); return;
+    }
+
+    const app = svc().submit(
+        firstName.trim(),
+        lastName.trim(),
+        birthDate,
+        message.trim(),
+        "self",
     );
     res.status(201).json(toDto(app));
 }

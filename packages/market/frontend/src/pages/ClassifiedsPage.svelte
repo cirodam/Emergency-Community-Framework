@@ -228,8 +228,8 @@
 .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
 .page-header h2 { margin: 0; }
 .filter-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
-.filter-bar button { padding: 0.3rem 0.8rem; border: 1px solid #ccc; border-radius: 999px; background: #f5f5f5; cursor: pointer; font-size: 0.85rem; }
-.filter-bar button.active { background: #333; color: #fff; border-color: #333; }
+.filter-bar button { padding: 0.3rem 0.8rem; border: 1px solid #ccc; border-radius: 999px; background: #f5f5f5; color: #333; cursor: pointer; font-size: 0.85rem; }
+.filter-bar button.active { background: #333 !important; color: #fff !important; border-color: #333; }
 .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; }
 .form-card { margin-bottom: 1rem; }
 .card-list { display: flex; flex-direction: column; gap: 0.75rem; }
