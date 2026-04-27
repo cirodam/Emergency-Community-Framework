@@ -200,3 +200,68 @@ export async function listUnits(): Promise<UnitDto[]> {
     if (!res.ok) throw new Error("Failed to load units");
     return res.json() as Promise<UnitDto[]>;
 }
+
+// ── Pools ─────────────────────────────────────────────────────────────────────
+
+export interface PoolDto {
+    id: string;
+    name: string;
+    description: string;
+    personIds: string[];
+    createdAt: string;
+}
+
+export async function listPools(): Promise<PoolDto[]> {
+    const res = await apiFetch("/api/pools");
+    if (!res.ok) throw new Error("Failed to load pools");
+    return res.json() as Promise<PoolDto[]>;
+}
+
+export async function getPool(id: string): Promise<PoolDto> {
+    const res = await apiFetch(`/api/pools/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error("Pool not found");
+    return res.json() as Promise<PoolDto>;
+}
+
+export async function createPool(name: string, description = ""): Promise<PoolDto> {
+    const res = await apiFetch("/api/pools", {
+        method: "POST",
+        body: JSON.stringify({ name, description }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to create pool");
+    }
+    return res.json() as Promise<PoolDto>;
+}
+
+export async function addPoolMember(poolId: string, personId: string): Promise<PoolDto> {
+    const res = await apiFetch(`/api/pools/${encodeURIComponent(poolId)}/members`, {
+        method: "POST",
+        body: JSON.stringify({ personId }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to add pool member");
+    }
+    return res.json() as Promise<PoolDto>;
+}
+
+export async function removePoolMember(poolId: string, personId: string): Promise<PoolDto> {
+    const res = await apiFetch(`/api/pools/${encodeURIComponent(poolId)}/members/${encodeURIComponent(personId)}`, {
+        method: "DELETE",
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to remove pool member");
+    }
+    return res.json() as Promise<PoolDto>;
+}
+
+export async function deletePool(poolId: string): Promise<void> {
+    const res = await apiFetch(`/api/pools/${encodeURIComponent(poolId)}`, { method: "DELETE" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to delete pool");
+    }
+}

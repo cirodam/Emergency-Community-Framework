@@ -38,7 +38,7 @@
 
 <div class="domain-page">
     <div class="page-header">
-        <button class="back-btn" onclick={back} aria-label="Back to domains">‹ Governance</button>
+        <button class="back-btn" onclick={back} aria-label="Back to domains">‹ Domains</button>
     </div>
 
     {#if loading}

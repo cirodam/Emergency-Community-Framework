@@ -9,8 +9,9 @@
     import ConstitutionPage from "./pages/ConstitutionPage.svelte";
     import EconomicsPage   from "./pages/EconomicsPage.svelte";
     import SettingsPage    from "./pages/SettingsPage.svelte";
-    import DomainsPage     from "./pages/DomainsPage.svelte";
+    import DomainsPage      from "./pages/DomainsPage.svelte";
     import DomainPage      from "./pages/DomainPage.svelte";
+    import GovernancePage  from "./pages/GovernancePage.svelte";
     import BottomNav       from "./components/BottomNav.svelte";
 
     type AppState = "loading" | "setup" | "login" | "app";
@@ -62,6 +63,8 @@
             <DomainsPage />
         {:else if $currentPage === "domain"}
             <DomainPage />
+        {:else if $currentPage === "governance"}
+            <GovernancePage />
         {/if}
     </main>
     <BottomNav />

@@ -3,6 +3,8 @@
     import type { PersonDto } from "../lib/api.js";
     import { getPerson } from "../lib/api.js";
 
+    function signOut() { session.logout(); }
+
     const s = $derived($session!);
 
     let person: PersonDto | null = $state(null);
@@ -61,6 +63,8 @@
     {:else if error}
         <p class="error-msg">{error}</p>
     {/if}
+
+    <button class="signout-btn" onclick={signOut}>Sign out</button>
 </div>
 
 <style>
@@ -138,4 +142,20 @@
     }
 
     .error-msg { text-align: center; color: #94a3b8; padding: 2rem 0; }
+
+    .signout-btn {
+        width: 100%;
+        margin-top: 1.5rem;
+        padding: 0.85rem;
+        background: none;
+        border: 1px solid #fca5a5;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #dc2626;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+
+    .signout-btn:active { background: #fef2f2; }
 </style>

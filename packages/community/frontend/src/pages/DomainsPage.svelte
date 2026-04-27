@@ -28,7 +28,7 @@
 </script>
 
 <div class="domains-page">
-    <h2 class="page-title">Governance</h2>
+    <h2 class="page-title">Domains</h2>
     <p class="page-subtitle">Functional domains that organise community life.</p>
 
     {#if loading}

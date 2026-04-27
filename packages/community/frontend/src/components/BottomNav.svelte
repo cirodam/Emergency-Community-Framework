@@ -6,8 +6,8 @@
     const items: NavItem[] = [
         { id: "profile",      label: "Profile",      icon: "◉" },
         { id: "directory",    label: "Directory",    icon: "⊞" },
-        { id: "domains",      label: "Governance",   icon: "⊛" },
-        { id: "constitution", label: "Constitution", icon: "§" },
+        { id: "domains",      label: "Domains",      icon: "⊛" },
+        { id: "governance",   label: "Governance",   icon: "⚖" },
         { id: "economy",      label: "Economy",      icon: "⊕" },
         { id: "settings",     label: "Settings",     icon: "⚙" },
     ];
@@ -21,7 +21,7 @@
     {#each items as item}
         <button
             class="nav-item"
-            class:active={$currentPage === item.id}
+            class:active={$currentPage === item.id || (item.id === "domains" && $currentPage === "domain")}
             onclick={() => currentPage.go(item.id)}
             aria-current={$currentPage === item.id ? "page" : undefined}
         >

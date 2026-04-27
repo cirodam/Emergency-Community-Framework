@@ -3,6 +3,9 @@ import { NodeSigner } from "@ecf/core";
 import { FederationApplicationService } from "../FederationApplicationService.js";
 import { FederationMemberService } from "../FederationMemberService.js";
 import { FederationCentralBank } from "../domains/central_bank/FederationCentralBank.js";
+import { FederationTreasury } from "../domains/treasury/FederationTreasury.js";
+import { FederationConstitution } from "../governance/FederationConstitution.js";
+import { FederationDomainService } from "../common/FederationDomainService.js";
 import { BankClient } from "../BankClient.js";
 import { NodeService } from "@ecf/core";
 
@@ -274,4 +277,54 @@ function memberToDto(m: ReturnType<typeof FederationMemberService.prototype.getB
         joinedAt:        m.joinedAt,
         bankAccountId:   m.bankAccountId,
     };
+}
+
+// ── Federation Treasury ───────────────────────────────────────────────────────
+
+/** GET /api/treasury — current balance and account info */
+export async function getTreasury(_req: Request, res: Response): Promise<void> {
+    const treasury = FederationTreasury.getInstance();
+    if (!treasury.isReady()) {
+        res.status(503).json({ error: "Federation treasury not ready" }); return;
+    }
+    try {
+        const balance = await treasury.balance();
+        res.json({ accountId: treasury.accountId, balance });
+    } catch (err) {
+        res.status(502).json({ error: (err as Error).message });
+    }
+}
+
+// ── Federation Constitution ───────────────────────────────────────────────────
+
+/** GET /api/constitution — all federation governance parameters */
+export function getConstitution(_req: Request, res: Response): void {
+    res.json(FederationConstitution.getInstance().toJSON());
+}
+
+/** GET /api/budget — computed budget allocation for current treasury balance */
+export async function getBudget(_req: Request, res: Response): Promise<void> {
+    const treasury = FederationTreasury.getInstance();
+    if (!treasury.isReady()) {
+        res.status(503).json({ error: "Federation treasury not ready" }); return;
+    }
+    try {
+        const balance = await treasury.balance();
+        const allocation = FederationConstitution.getInstance().budget(balance);
+        res.json({ treasuryBalance: balance, allocation });
+    } catch (err) {
+        res.status(502).json({ error: (err as Error).message });
+    }
+}
+
+// ── Federation Domains ────────────────────────────────────────────────────────
+
+/** GET /api/domains — list all registered federation functional domains */
+export function listDomains(_req: Request, res: Response): void {
+    const domains = FederationDomainService.getInstance().getDomains().map(d => ({
+        id:          d.id,
+        name:        d.name,
+        description: d.description,
+    }));
+    res.json(domains);
 }

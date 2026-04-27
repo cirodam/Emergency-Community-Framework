@@ -68,7 +68,7 @@ function createSessionStore() {
 
 export const session = createSessionStore();
 
-export type Page = "profile" | "directory" | "constitution" | "economy" | "settings" | "domains" | "domain";
+export type Page = "profile" | "directory" | "constitution" | "economy" | "settings" | "domains" | "domain" | "governance";
 
 function createPageStore() {
     const { subscribe, set } = writable<Page>("profile");

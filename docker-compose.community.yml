@@ -52,7 +52,23 @@ services:
       - bank
       - community
 
+  mail:
+    build:
+      context: .
+      dockerfile: packages/mail/Dockerfile
+    ports:
+      - "3020:3020"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      COMMUNITY_URL: http://community:3002
+    volumes:
+      - mail-data:/app/data
+    depends_on:
+      - community
+
 volumes:
   bank-data:
   community-data:
   market-data:
+  mail-data:

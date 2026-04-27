@@ -10,6 +10,10 @@ import {
     getEconomics,
     transferKithe,
     issueKithe,
+    getTreasury,
+    getConstitution,
+    getBudget,
+    listDomains,
 } from "./FederationController.js";
 
 const router = Router();
@@ -24,6 +28,12 @@ router.patch("/applications/:id",             reviewApplication);  // TODO: oper
 // Members + economics (read-only, public)
 router.get("/members",   listMembers);
 router.get("/economics", getEconomics);
+
+// Treasury, constitution, budget, domains (read-only, public)
+router.get("/treasury",     getTreasury);
+router.get("/constitution",  getConstitution);
+router.get("/budget",        getBudget);
+router.get("/domains",       listDomains);
 
 // Authenticated: registered member community (Currency Board signing)
 const requireMember = requireMemberCommunity();

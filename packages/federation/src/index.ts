@@ -8,6 +8,11 @@ import { FederationApplicationLoader } from "./FederationApplicationLoader.js";
 import { FederationApplicationService } from "./FederationApplicationService.js";
 import { FederationCentralBank } from "./domains/central_bank/FederationCentralBank.js";
 import { FederationCentralBankLoader } from "./domains/central_bank/FederationCentralBankLoader.js";
+import { FederationTreasury } from "./domains/treasury/FederationTreasury.js";
+import { FederationTreasuryLoader } from "./domains/treasury/FederationTreasuryLoader.js";
+import { FederationConstitution } from "./governance/FederationConstitution.js";
+import { FederationDomainService } from "./common/FederationDomainService.js";
+import { InsuranceDomain } from "./domains/insurance/InsuranceDomain.js";
 import { BankClient } from "./BankClient.js";
 import federationRoutes from "./routes/federationRoutes.js";
 
@@ -93,6 +98,17 @@ async function main(): Promise<void> {
     );
     const cbLoader = new FederationCentralBankLoader(resolve(DATA_DIR, "domains"));
     await FederationCentralBank.getInstance().init(bank, cbLoader);
+
+    // ── Federation treasury ────────────────────────────────────────────────
+    const treasuryLoader = new FederationTreasuryLoader(resolve(DATA_DIR, "domains"));
+    await FederationTreasury.getInstance().init(bank, treasuryLoader);
+
+    // ── Federation constitution ────────────────────────────────────────────
+    FederationConstitution.getInstance().load(resolve(DATA_DIR, "governance"));
+
+    // ── Federation functional domains ─────────────────────────────────────
+    const domainSvc = FederationDomainService.getInstance();
+    domainSvc.registerDomain(InsuranceDomain.getInstance());
 
     // ── Founding member bootstrap ──────────────────────────────────────────
     await bootstrapFoundingMember(bank);

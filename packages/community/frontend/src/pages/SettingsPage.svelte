@@ -63,7 +63,6 @@
         {/if}
     </div>
 
-    <button class="signout-btn" onclick={() => session.logout()}>Sign out</button>
 </div>
 
 <style>
@@ -157,18 +156,4 @@
 
     .ok-msg { color: #16a34a; font-weight: 600; text-align: center; }
 
-    .signout-btn {
-        width: 100%;
-        padding: 0.85rem;
-        background: none;
-        border: 1px solid #fca5a5;
-        border-radius: 12px;
-        font-size: 1rem;
-        font-weight: 600;
-        color: #dc2626;
-        cursor: pointer;
-        transition: background 0.15s;
-    }
-
-    .signout-btn:active { background: #fef2f2; }
 </style>

@@ -2,12 +2,13 @@
   "name": "emergency-community-framework",
   "private": true,
   "scripts": {
-    "build": "npm run build -w @ecf/core && npm run build -w @ecf/bank && npm run build -w @ecf/community && npm run build -w @ecf/federation && npm run build -w @ecf/market",
+    "build": "npm run build -w @ecf/core && npm run build -w @ecf/bank && npm run build -w @ecf/community && npm run build -w @ecf/federation && npm run build -w @ecf/market && npm run build -w @ecf/mail",
     "docker:build:bank": "docker build -f packages/bank/Dockerfile -t ecf-bank .",
     "docker:build:community": "docker build -f packages/community/Dockerfile -t ecf-community .",
     "docker:build:federation": "docker build -f packages/federation/Dockerfile -t ecf-federation .",
     "docker:build:market": "docker build -f packages/market/Dockerfile -t ecf-market .",
-    "docker:build": "npm run docker:build:bank && npm run docker:build:community && npm run docker:build:federation && npm run docker:build:market",
+    "docker:build:mail": "docker build -f packages/mail/Dockerfile -t ecf-mail .",
+    "docker:build": "npm run docker:build:bank && npm run docker:build:community && npm run docker:build:federation && npm run docker:build:market && npm run docker:build:mail",
     "docker:up:community": "docker compose -f docker-compose.community.yml up",
     "docker:up:federation": "docker compose -f docker-compose.federation.yml up",
     "docker:down:community": "docker compose -f docker-compose.community.yml down",
@@ -18,6 +19,7 @@
     "packages/bank",
     "packages/community",
     "packages/federation",
-    "packages/market"
+    "packages/market",
+    "packages/mail"
   ]
 }
