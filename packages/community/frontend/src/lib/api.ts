@@ -367,10 +367,46 @@ export async function getDomain(id: string): Promise<DomainDto> {
     return res.json() as Promise<DomainDto>;
 }
 
+export async function updateDomain(id: string, patch: { poolId?: string | null }): Promise<DomainDto> {
+    const res = await apiFetch(`/api/domains/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body:   JSON.stringify(patch),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to update domain");
+    }
+    return res.json() as Promise<DomainDto>;
+}
+
 export async function listUnits(): Promise<UnitDto[]> {
     const res = await fetch("/api/units");
     if (!res.ok) throw new Error("Failed to load units");
     return res.json() as Promise<UnitDto[]>;
+}
+
+export interface TemplateDto {
+    type:        string;
+    label:       string;
+    description: string;
+}
+
+export async function listTemplates(): Promise<TemplateDto[]> {
+    const res = await fetch("/api/templates");
+    if (!res.ok) throw new Error("Failed to load templates");
+    return res.json() as Promise<TemplateDto[]>;
+}
+
+export async function createUnit(type: string, domainId: string): Promise<UnitDto> {
+    const res = await apiFetch("/api/units", {
+        method: "POST",
+        body:   JSON.stringify({ type, domainId }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to create unit");
+    }
+    return res.json() as Promise<UnitDto>;
 }
 
 // ── Pools ─────────────────────────────────────────────────────────────────────

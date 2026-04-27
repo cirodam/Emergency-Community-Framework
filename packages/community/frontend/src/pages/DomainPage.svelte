@@ -1,12 +1,26 @@
 <script lang="ts">
-    import { getDomain, listUnits } from "../lib/api.js";
-    import type { DomainDto, UnitDto } from "../lib/api.js";
+    import { getDomain, listUnits, listTemplates, createUnit, getPool, listPools, updateDomain } from "../lib/api.js";
+    import type { DomainDto, UnitDto, TemplateDto, PoolDto } from "../lib/api.js";
     import { currentPage, selectedDomainId } from "../lib/session.js";
 
     let domain: DomainDto | null = $state(null);
     let units: UnitDto[] = $state([]);
     let loading = $state(true);
     let error = $state("");
+
+    // Unit picker state
+    let showPicker = $state(false);
+    let templates = $state<TemplateDto[]>([]);
+    let templatesLoading = $state(false);
+    let addingType = $state<string | null>(null);
+    let addError = $state("");
+
+    // Leadership pool state
+    let pool = $state<PoolDto | null>(null);
+    let allPools = $state<PoolDto[]>([]);
+    let showPoolPicker = $state(false);
+    let assigningPool = $state(false);
+    let poolError = $state("");
 
     async function load(id: string) {
         loading = true;
@@ -15,6 +29,7 @@
             const [d, allUnits] = await Promise.all([getDomain(id), listUnits()]);
             domain = d;
             units = allUnits.filter(u => d.unitIds.includes(u.id));
+            pool = d.poolId ? await getPool(d.poolId) : null;
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to load domain";
         } finally {
@@ -27,6 +42,68 @@
         if (id) load(id);
     });
 
+    async function openPicker() {
+        showPicker = true;
+        addError = "";
+        if (templates.length === 0) {
+            templatesLoading = true;
+            try {
+                templates = await listTemplates();
+            } finally {
+                templatesLoading = false;
+            }
+        }
+    }
+
+    function closePicker() {
+        showPicker = false;
+        addError = "";
+    }
+
+    async function addUnit(type: string) {
+        if (!domain) return;
+        addingType = type;
+        addError = "";
+        try {
+            await createUnit(type, domain.id);
+            await load(domain.id);
+            showPicker = false;
+        } catch (e) {
+            addError = e instanceof Error ? e.message : "Failed to add unit";
+        } finally {
+            addingType = null;
+        }
+    }
+
+    async function openPoolPicker() {
+        showPoolPicker = true;
+        poolError = "";
+        if (allPools.length === 0) {
+            allPools = await listPools();
+        }
+    }
+
+    function closePoolPicker() {
+        showPoolPicker = false;
+        poolError = "";
+    }
+
+    async function assignPool(poolId: string | null) {
+        if (!domain) return;
+        assigningPool = true;
+        poolError = "";
+        try {
+            const updated = await updateDomain(domain.id, { poolId });
+            domain = updated;
+            pool = updated.poolId ? await getPool(updated.poolId) : null;
+            showPoolPicker = false;
+        } catch (e) {
+            poolError = e instanceof Error ? e.message : "Failed to assign pool";
+        } finally {
+            assigningPool = false;
+        }
+    }
+
     function back() {
         currentPage.go("domains");
     }
@@ -34,6 +111,10 @@
     function fmt(date: string): string {
         return new Date(date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
     }
+
+    // Types already present in this domain
+    const presentTypes = $derived(new Set(units.map(u => u.type)));
+
 </script>
 
 <div class="domain-page">
@@ -57,7 +138,10 @@
         </div>
 
         <section class="units-section">
-            <h3 class="section-title">Functional Units</h3>
+            <div class="section-row">
+                <h3 class="section-title">Functional Units</h3>
+                <button class="add-btn" onclick={openPicker}>+ Add unit</button>
+            </div>
 
             {#if units.length === 0}
                 <p class="empty-msg">No units in this domain yet.</p>
@@ -79,6 +163,101 @@
                             </div>
                         </div>
                     {/each}
+                </div>
+            {/if}
+
+            {#if showPicker}
+                <div class="picker">
+                    <div class="picker-header">
+                        <span class="picker-title">Choose a unit type</span>
+                        <button class="picker-close" onclick={closePicker} aria-label="Close">✕</button>
+                    </div>
+
+                    {#if addError}
+                        <div class="add-error">{addError}</div>
+                    {/if}
+
+                    {#if templatesLoading}
+                        <p class="picker-loading">Loading…</p>
+                    {:else}
+                        <div class="template-list">
+                            {#each templates as tmpl (tmpl.type)}
+                                <div class="template-row" class:already={presentTypes.has(tmpl.type)}>
+                                    <div class="template-info">
+                                        <span class="template-label">{tmpl.label}</span>
+                                        <span class="template-desc">{tmpl.description}</span>
+                                    </div>
+                                    <button
+                                        class="template-add-btn"
+                                        disabled={addingType !== null}
+                                        onclick={() => addUnit(tmpl.type)}
+                                    >
+                                        {addingType === tmpl.type ? "Adding…" : presentTypes.has(tmpl.type) ? "Add again" : "Add"}
+                                    </button>
+                                </div>
+                            {/each}
+                        </div>
+                    {/if}
+                </div>
+            {/if}
+        </section>
+
+        <section class="pool-section">
+            <div class="section-row">
+                <h3 class="section-title">Leadership Pool</h3>
+                <button class="add-btn" onclick={openPoolPicker}
+                    disabled={assigningPool}>
+                    {pool ? "Change pool" : "Assign pool"}
+                </button>
+            </div>
+
+            {#if poolError}
+                <div class="pool-error">{poolError}</div>
+            {/if}
+
+            {#if pool}
+                <div class="pool-card">
+                    <div class="pool-card-header">
+                        <span class="pool-name">{pool.name}</span>
+                        <button class="unassign-btn" onclick={() => assignPool(null)}
+                            disabled={assigningPool}>Unassign</button>
+                    </div>
+                    {#if pool.description}
+                        <p class="pool-desc">{pool.description}</p>
+                    {/if}
+                    <p class="pool-members">{pool.personIds.length} member{pool.personIds.length !== 1 ? "s" : ""}</p>
+                </div>
+            {:else}
+                <p class="empty-msg">No leadership pool assigned.</p>
+            {/if}
+
+            {#if showPoolPicker}
+                <div class="picker">
+                    <div class="picker-header">
+                        <span class="picker-title">Assign a pool</span>
+                        <button class="picker-close" onclick={closePoolPicker} aria-label="Close">✕</button>
+                    </div>
+                    {#if allPools.length === 0}
+                        <p class="picker-loading">No pools exist yet. Create one on the Pools page.</p>
+                    {:else}
+                        <div class="template-list">
+                            {#each allPools as p (p.id)}
+                                <div class="template-row" class:already={p.id === domain?.poolId}>
+                                    <div class="template-info">
+                                        <span class="template-label">{p.name}</span>
+                                        <span class="template-desc">{p.personIds.length} member{p.personIds.length !== 1 ? "s" : ""}{p.description ? " · " + p.description : ""}</span>
+                                    </div>
+                                    <button
+                                        class="template-add-btn"
+                                        disabled={assigningPool || p.id === domain?.poolId}
+                                        onclick={() => assignPool(p.id)}
+                                    >
+                                        {p.id === domain?.poolId ? "Assigned" : assigningPool ? "…" : "Assign"}
+                                    </button>
+                                </div>
+                            {/each}
+                        </div>
+                    {/if}
                 </div>
             {/if}
         </section>
@@ -123,14 +302,36 @@
         line-height: 1.5;
     }
 
+    .units-section { margin-top: 0; }
+
+    .section-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+    }
+
     .section-title {
         font-size: 0.75rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: #94a3b8;
-        margin: 0 0 0.75rem;
+        margin: 0;
     }
+
+    .add-btn {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #3b82f6;
+        background: none;
+        border: 1px solid #bfdbfe;
+        border-radius: 0.375rem;
+        padding: 0.25rem 0.65rem;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .add-btn:hover { background: #eff6ff; }
 
     .unit-list {
         display: flex;
@@ -231,4 +432,174 @@
         color: #ef4444;
         padding: 1rem 0;
     }
+
+    /* ── Unit picker ─────────────────────────────────────────────────────────── */
+
+    .picker {
+        margin-top: 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .picker-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+    }
+
+    .picker-title {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .picker-close {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 0.85rem;
+        color: #94a3b8;
+        padding: 0;
+        line-height: 1;
+    }
+    .picker-close:hover { color: #475569; }
+
+    .picker-loading {
+        padding: 1rem;
+        font-size: 0.875rem;
+        color: #94a3b8;
+    }
+
+    .add-error {
+        padding: 0.5rem 1rem;
+        font-size: 0.82rem;
+        color: #ef4444;
+        background: #fef2f2;
+        border-bottom: 1px solid #fecaca;
+    }
+
+    .template-list {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .template-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .template-row:last-child { border-bottom: none; }
+    .template-row.already { opacity: 0.6; }
+
+    .template-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .template-label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #0f172a;
+    }
+
+    .template-desc {
+        font-size: 0.78rem;
+        color: #64748b;
+        line-height: 1.4;
+    }
+
+    .template-add-btn {
+        flex-shrink: 0;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #fff;
+        background: #3b82f6;
+        border: none;
+        border-radius: 0.375rem;
+        padding: 0.3rem 0.75rem;
+        cursor: pointer;
+        transition: background 0.15s;
+        align-self: center;
+    }
+    .template-add-btn:hover:not(:disabled) { background: #2563eb; }
+    .template-add-btn:disabled { background: #93c5fd; cursor: not-allowed; }
+
+    /* ── Leadership pool ─────────────────────────────────────────────────────── */
+
+    .pool-section { margin-top: 2rem; }
+
+    .pool-error {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.82rem;
+        color: #ef4444;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .pool-card {
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 0.75rem;
+        padding: 0.85rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+    }
+
+    .pool-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+
+    .pool-name {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #0369a1;
+    }
+
+    .pool-desc {
+        font-size: 0.82rem;
+        color: #0369a1;
+        margin: 0;
+        opacity: 0.8;
+    }
+
+    .pool-members {
+        font-size: 0.78rem;
+        color: #0369a1;
+        opacity: 0.7;
+        margin: 0;
+    }
+
+    .unassign-btn {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #64748b;
+        background: none;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.375rem;
+        padding: 0.2rem 0.55rem;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: background 0.15s;
+    }
+    .unassign-btn:hover:not(:disabled) { background: #f1f5f9; }
+    .unassign-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
