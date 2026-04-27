@@ -9,6 +9,8 @@ import * as economics from "./EconomicsController.js";
 import * as sms from "./SmsController.js";
 import * as applications from "./ApplicationController.js";
 import * as associations from "./AssociationController.js";
+import * as orgs from "./OrgController.js";
+import * as calendar from "./CalendarController.js";
 
 const requireAuth = requirePersonCredential(getCommunityIdentity);
 
@@ -101,5 +103,22 @@ router.post(  "/associations/:id/members",                requireAuth, associati
 router.delete("/associations/:id/members/:personId",      requireAuth, associations.removeMember);
 router.post(  "/associations/:id/admins",                 requireAuth, associations.addAdmin);
 router.delete("/associations/:id/admins/:personId",       requireAuth, associations.removeAdmin);
+
+// Organizations
+router.get(   "/orgs",                        orgs.listOrgs);
+router.post(  "/orgs",                        requireAuth, orgs.createOrg);
+router.get(   "/orgs/:id",                    orgs.getOrg);
+router.post(  "/orgs/:id/members",            requireAuth, orgs.addMember);
+router.delete("/orgs/:id/members/:personId",  requireAuth, orgs.removeMember);
+router.delete("/orgs/:id",                    requireAuth, orgs.dissolveOrg);
+
+// Calendar
+router.get(   "/calendar",                       calendar.listEvents);
+router.post(  "/calendar",                       requireAuth, calendar.createEvent);
+router.get(   "/calendar/:id",                   calendar.getEvent);
+router.patch( "/calendar/:id",                   requireAuth, calendar.updateEvent);
+router.delete("/calendar/:id",                   requireAuth, calendar.cancelEvent);
+router.post(  "/calendar/:id/rsvp",              requireAuth, calendar.rsvpToEvent);
+router.delete("/calendar/:id/rsvp/:personId",    requireAuth, calendar.removeRsvp);
 
 export default router;
