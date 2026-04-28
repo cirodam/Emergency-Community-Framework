@@ -120,3 +120,59 @@ export function deleteMessage(req: Request & { personId?: string }, res: Respons
         res.status(status).json({ error: e });
     }
 }
+
+// ── Inbound from community node (cross-community delivery) ────────────────
+
+/**
+ * POST /api/messages/incoming
+ * Called by the local community server when it receives a "mail.message.deliver"
+ * EcfMessage from another community.  Not authenticated with person credentials;
+ * the community server validates the node signature before forwarding here.
+ *
+ * Body: {
+ *   messageId:   string,
+ *   threadId:    string,
+ *   subject:     string,
+ *   fromHandle:  string,  — "handle@src-community"
+ *   toPersonIds: string[], — resolved local person IDs (done by community server)
+ *   body:        string,
+ *   sentAt:      string,
+ * }
+ */
+export function receiveExternalMessage(req: Request, res: Response): void {
+    const { messageId, threadId, subject, fromHandle, toPersonIds, body, sentAt } = req.body ?? {};
+
+    if (typeof messageId !== "string" || !messageId) {
+        res.status(400).json({ error: "messageId is required" }); return;
+    }
+    if (typeof threadId !== "string" || !threadId) {
+        res.status(400).json({ error: "threadId is required" }); return;
+    }
+    if (typeof fromHandle !== "string" || !fromHandle) {
+        res.status(400).json({ error: "fromHandle is required" }); return;
+    }
+    if (!Array.isArray(toPersonIds) || !toPersonIds.length || toPersonIds.some((id: unknown) => typeof id !== "string")) {
+        res.status(400).json({ error: "toPersonIds must be a non-empty array of strings" }); return;
+    }
+    if (typeof body !== "string" || !body.trim()) {
+        res.status(400).json({ error: "body is required" }); return;
+    }
+
+    const stored = svc().storeExternal({
+        messageId,
+        threadId,
+        subject:     typeof subject === "string" ? subject : "(no subject)",
+        fromHandle,
+        toPersonIds,
+        body:        body.trim(),
+        sentAt:      typeof sentAt === "string" ? sentAt : new Date().toISOString(),
+    });
+
+    if (stored === null) {
+        // Already stored — idempotent success
+        res.json({ ok: true, duplicate: true });
+        return;
+    }
+
+    res.status(201).json({ ok: true, messageId: stored.id });
+}

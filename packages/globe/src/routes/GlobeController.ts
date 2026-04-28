@@ -1,11 +1,10 @@
 import { type Request, type Response } from "express";
-import { NodeSigner, NodeService } from "@ecf/core";
+import { NodeSigner, NodeService, BankClient, sendMessage, type EcfMessage } from "@ecf/core";
 import { GlobeApplicationService } from "../GlobeApplicationService.js";
 import { GlobeMemberService } from "../GlobeMemberService.js";
 import { GlobeClearingHouse } from "../domains/central_bank/GlobeClearingHouse.js";
 import { GlobeTreasury } from "../domains/treasury/GlobeTreasury.js";
 import { GlobeConstitution } from "../governance/GlobeConstitution.js";
-import { BankClient } from "../BankClient.js";
 
 const BANK_URL = process.env.BANK_URL ?? "http://localhost:3031";
 
@@ -13,6 +12,7 @@ function bank(): BankClient {
     return new BankClient(
         BANK_URL,
         body => NodeService.getInstance().getSigner().signBody(body),
+        "kithe",
     );
 }
 
@@ -346,93 +346,59 @@ function memberToDto(m: ReturnType<typeof GlobeMemberService.prototype.getById>)
     };
 }
 
-// ── Payment routing ───────────────────────────────────────────────────────────
+// ── EcfMessage handler ────────────────────────────────────────────────────────
+
+interface TransferRouteBody {
+    address: { commonwealth: string; federation: string; community: string };
+    toAccountId: string;
+    amount: number;
+    fromAccountId: string;
+    memo?: string;
+}
 
 /**
- * POST /api/route-payment
- * Body: { address: { commonwealth, federation, community }, token, amount, fromAccountId }
+ * MessageDispatcher handler for "bank.transfer.route" at the globe tier.
+ * Mirrors the logic of `routePayment` but invoked via EcfMessage (sync semantics).
  *
- * Entry point for directed payments. The globe strips the commonwealth segment,
- * looks up the target commonwealth by handle, moves kin inside the globe bank,
- * then forwards the full address to the commonwealth's /api/route-payment.
- *
- * `fromAccountId` is the payer's globe clearing account (or the globe treasury
- * account for grants). External institutions that don't have a globe account
- * should first transfer kin to a gateway account, then call this endpoint.
+ * Moves kithe from the sending commonwealth's globe clearing account to the target
+ * commonwealth's globe clearing account, then sends "bank.transfer.route" onward.
  */
-export async function routePayment(req: Request, res: Response): Promise<void> {
-    const { address, token, amount, fromAccountId } = req.body ?? {};
+export async function handleBankTransferRoute(
+    msg: EcfMessage<TransferRouteBody>,
+): Promise<{ ok: boolean; commonwealth: string; federation: string; community: string; amount: number }> {
+    const { address, toAccountId, amount, fromAccountId, memo } = msg.body ?? {};
 
-    if (typeof address?.commonwealth !== "string" || !address.commonwealth) {
-        res.status(400).json({ error: "address.commonwealth is required" }); return;
-    }
-    if (typeof address?.federation !== "string" || !address.federation) {
-        res.status(400).json({ error: "address.federation is required" }); return;
-    }
-    if (typeof address?.community !== "string" || !address.community) {
-        res.status(400).json({ error: "address.community is required" }); return;
-    }
-    if (typeof token !== "string" || !token) {
-        res.status(400).json({ error: "token is required" }); return;
-    }
-    if (typeof amount !== "number" || amount <= 0) {
-        res.status(400).json({ error: "amount must be a positive number" }); return;
-    }
-    if (typeof fromAccountId !== "string" || !fromAccountId) {
-        res.status(400).json({ error: "fromAccountId is required" }); return;
-    }
+    if (typeof address?.commonwealth !== "string" || !address.commonwealth) throw new Error("address.commonwealth is required");
+    if (typeof address?.federation   !== "string" || !address.federation)   throw new Error("address.federation is required");
+    if (typeof address?.community    !== "string" || !address.community)    throw new Error("address.community is required");
+    if (typeof toAccountId   !== "string" || !toAccountId)                  throw new Error("toAccountId is required");
+    if (typeof amount        !== "number" || amount <= 0)                   throw new Error("amount must be a positive number");
+    if (typeof fromAccountId !== "string" || !fromAccountId)                throw new Error("fromAccountId is required");
 
     const nodes  = GlobeMemberService.getInstance().getAllByHandle(address.commonwealth);
     const member = nodes.find(n => n.bankAccountId != null) ?? nodes[0];
-    if (!member) {
-        res.status(404).json({ error: `No commonwealth with handle "${address.commonwealth}"` }); return;
-    }
-    if (!member.bankAccountId) {
-        res.status(422).json({ error: `Commonwealth "${address.commonwealth}" has no clearing account` }); return;
-    }
+    if (!member)               throw new Error(`No commonwealth with handle "${address.commonwealth}"`);
+    if (!member.bankAccountId) throw new Error(`Commonwealth "${address.commonwealth}" has no clearing account`);
 
-    // Move kin: sender's globe clearing account → commonwealth's globe clearing account
-    try {
-        await bank().transfer(
-            fromAccountId,
-            member.bankAccountId,
-            amount,
-            `directed payment → ${address.commonwealth}:${address.federation}:${address.community} (token ${token.slice(0, 8)}…)`,
-        );
-    } catch (err) {
-        res.status(502).json({ error: `Bank transfer failed: ${(err as Error).message}` }); return;
-    }
-
-    // Forward to the commonwealth
-    try {
-        const body = JSON.stringify({ address, token, amount, fromAccountId: member.bankAccountId });
-        const node = NodeService.getInstance();
-        const sig  = node.getSigner().signBody(body);
-        const cwRes = await fetch(`${member.url.replace(/\/$/, "")}/api/route-payment`, {
-            method:  "POST",
-            headers: {
-                "Content-Type":     "application/json",
-                "x-node-id":        node.getIdentity().id,
-                "x-node-signature": sig,
-            },
-            body,
-        });
-        if (!cwRes.ok) {
-            const err = await cwRes.json().catch(() => ({})) as { error?: string };
-            console.warn(
-                `[globe/route-payment] commonwealth ${address.commonwealth} returned ${cwRes.status}: ` +
-                `${err.error ?? "unknown"}`,
-            );
-        }
-    } catch (err) {
-        console.warn(`[globe/route-payment] could not forward to commonwealth: ${(err as Error).message}`);
-    }
-
-    res.json({
-        ok:           true,
-        commonwealth: address.commonwealth,
-        federation:   address.federation,
-        community:    address.community,
+    // Move kithe: sender → target commonwealth's globe clearing account
+    await bank().transfer(
+        fromAccountId,
+        member.bankAccountId,
         amount,
-    });
+        typeof memo === "string" ? memo
+            : `directed payment → ${address.commonwealth}:${address.federation}:${address.community}`,
+    );
+
+    const node = NodeService.getInstance();
+    await sendMessage<TransferRouteBody>(
+        member.url,
+        "bank",
+        "bank.transfer.route",
+        { address, toAccountId, amount, fromAccountId: member.bankAccountId, memo },
+        node.getSigner(),
+        node.getIdentity().id,
+        node.getIdentity().address,
+    );
+
+    return { ok: true, commonwealth: address.commonwealth, federation: address.federation, community: address.community, amount };
 }

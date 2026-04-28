@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
-import { NodeService, DataManifest, networkRouter } from "@ecf/core";
+import { NodeService, DataManifest, networkRouter, messageRouter, MessageDispatcher } from "@ecf/core";
 import { CommonwealthMemberLoader } from "./CommonwealthMemberLoader.js";
 import { CommonwealthMemberService } from "./CommonwealthMemberService.js";
 import { CommonwealthApplicationLoader } from "./CommonwealthApplicationLoader.js";
@@ -11,10 +11,11 @@ import { CommonwealthClearingHouseLoader } from "./domains/central_bank/Commonwe
 import { CommonwealthTreasury } from "./domains/treasury/CommonwealthTreasury.js";
 import { CommonwealthTreasuryLoader } from "./domains/treasury/CommonwealthTreasuryLoader.js";
 import { CommonwealthConstitution } from "./governance/CommonwealthConstitution.js";
-import { BankClient } from "./BankClient.js";
+import { BankClient } from "@ecf/core";
 import { CommonwealthDemurrageScheduler } from "./CommonwealthDemurrageScheduler.js";
 import { GlobeMembershipService } from "./GlobeMembershipService.js";
 import commonwealthRoutes from "./routes/commonwealthRoutes.js";
+import { handleBankTransferRoute } from "./routes/CommonwealthController.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -98,6 +99,7 @@ async function main(): Promise<void> {
     const bankClient = new BankClient(
         BANK_URL,
         body => NodeService.getInstance().getSigner().signBody(body),
+        "kithe",
     );
     const chLoader = new CommonwealthClearingHouseLoader(resolve(DATA_DIR, "domains"));
     await CommonwealthClearingHouse.getInstance().init(bankClient, chLoader);
@@ -118,9 +120,13 @@ async function main(): Promise<void> {
     // ── Monthly demurrage sweep ────────────────────────────────────────────
     new CommonwealthDemurrageScheduler().start();
 
+    // ── Message handlers ───────────────────────────────────────────────────
+    MessageDispatcher.getInstance().register("bank.transfer.route", handleBankTransferRoute, "sync");
+
     // ── Routes ─────────────────────────────────────────────────────────────
     app.use("/api",      commonwealthRoutes);
-    app.use("/api/node", networkRouter);
+    app.use("/api/node",    networkRouter);
+    app.use("/api/message", messageRouter);
 
     app.get("/api/identity", (_req, res) => {
         const node      = NodeService.getInstance();
@@ -133,6 +139,7 @@ async function main(): Promise<void> {
             name:        node.getIdentity().name,
             handle:           globeRec?.commonwealthHandle ?? null,
             globeHandle:      globeRec?.globeHandle        ?? null,
+            globeUrl:         globeRec?.globeUrl           ?? null,
         });
     });
 

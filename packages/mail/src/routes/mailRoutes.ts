@@ -10,6 +10,7 @@ import {
     sendMessage,
     markRead,
     deleteMessage,
+    receiveExternalMessage,
 } from "./MailController.js";
 
 const router = Router();
@@ -25,5 +26,8 @@ router.get(   "/unread-count",           requireAuth, getUnreadCount);
 router.post(  "/messages",               requireAuth, sendMessage);
 router.patch( "/messages/:id/read",      requireAuth, markRead);
 router.delete("/messages/:id",           requireAuth, deleteMessage);
+
+// Internal — cross-community delivery (called by local community server, not by persons)
+router.post("/messages/incoming", receiveExternalMessage);
 
 export default router;

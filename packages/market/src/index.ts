@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
-import { initServiceNode, resolveCommunityIdentity, networkRouter } from "@ecf/core";
+import { initServiceNode, resolveCommunityIdentity, networkRouter, messageRouter } from "@ecf/core";
 import { ClassifiedLoader } from "./ClassifiedLoader.js";
 import { ClassifiedService } from "./ClassifiedService.js";
 import { StallLoader } from "./StallLoader.js";
@@ -59,7 +59,8 @@ async function main(): Promise<void> {
         .catch(err => console.error("[market] community identity resolution failed:", err));
 
     app.use("/api",      marketRoutes);
-    app.use("/api/node", networkRouter);
+    app.use("/api/node",    networkRouter);
+    app.use("/api/message", messageRouter);
 
     app.get("/health", (_req, res) => {
         res.json({

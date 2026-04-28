@@ -16,6 +16,8 @@ import * as locations from "./LocationController.js";
 
 import * as proposals from "./ProposalController.js";
 import * as paymentTokens from "./PaymentTokenController.js";
+import * as transfers from "./TransferController.js";
+import * as mailRelay from "./MailRelayController.js";
 
 const requireAuth = requirePersonCredential(getCommunityIdentity);
 
@@ -163,5 +165,11 @@ router.post(  "/payment-tokens/:token/rotate",            requireSteward, paymen
 router.delete("/payment-tokens/:token",                   requireSteward, paymentTokens.revokeToken);
 router.get(   "/payment-tokens/person/:personId",         requireSteward, paymentTokens.listTokensForPerson);
 router.post(  "/payment-tokens/receive",                  paymentTokens.receivePayment);  // federation-signed
+
+// Cross-community transfers (account-to-account routing)
+router.post(  "/transfers/out",     requireAuth,         transfers.sendTransfer);
+
+// Cross-community mail relay
+router.post(  "/mail/route-external",                    mailRelay.routeExternalMail); // internal — called by local mail service
 
 export default router;

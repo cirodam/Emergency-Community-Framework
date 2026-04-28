@@ -1,9 +1,6 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { join } from "path";
-import { NodeService } from "@ecf/core";
+import { NodeService, UpstreamMembershipService, type UpstreamApplicationStatus, sendMessage } from "@ecf/core";
 
-export type FederationApplicationStatus =
-    | "submitted" | "under_review" | "approved" | "rejected";
+export type FederationApplicationStatus = UpstreamApplicationStatus;
 
 export interface FederationMembershipRecord {
     /** URL of the federation node, e.g. http://federation:3010 */
@@ -22,28 +19,19 @@ export interface FederationMembershipRecord {
     commonwealthHandle:    string | null;
     /** The globe the commonwealth belongs to — forwarded from federation identity */
     globeHandle:           string | null;
+    /** URL of the commonwealth this federation belongs to (fetched on approval) */
+    commonwealthUrl:       string | null;
+    /** URL of the globe the commonwealth belongs to (fetched on approval) */
+    globeUrl:              string | null;
     status:                FederationApplicationStatus;
     appliedAt:             string; // ISO 8601
 }
 
-/**
- * Community-level service that manages the community's relationship with
- * a federation. The community node signs with the node key and tracks state.
- *
- * Once approved, the community holds a clearing account at the federation bank
- * used for inter-community kin transfers.
- */
-export class FederationMembershipService {
+export class FederationMembershipService extends UpstreamMembershipService<FederationMembershipRecord> {
     private static instance: FederationMembershipService;
-    private readonly path: string;
-    private record: FederationMembershipRecord | null = null;
 
     private constructor(dataDir: string) {
-        mkdirSync(dataDir, { recursive: true });
-        this.path = join(dataDir, "federation_membership.json");
-        if (existsSync(this.path)) {
-            this.record = JSON.parse(readFileSync(this.path, "utf-8")) as FederationMembershipRecord;
-        }
+        super(dataDir, "federation_membership.json");
     }
 
     static getInstance(dataDir?: string): FederationMembershipService {
@@ -54,39 +42,93 @@ export class FederationMembershipService {
         return FederationMembershipService.instance;
     }
 
-    getStatus(): FederationMembershipRecord | null {
-        return this.record;
+    // ── UpstreamMembershipService interface ──────────────────────────────────
+
+    protected buildApplyBody(): Record<string, unknown> {
+        // Not used directly — apply() constructs the body itself to include name + handle args
+        return {};
     }
 
-    private save(): void {
-        writeFileSync(this.path, JSON.stringify(this.record, null, 2), "utf-8");
+    protected upstreamUrl(): string {
+        return this.record!.federationUrl;
     }
 
-    /**
-     * Submit an application to join a federation. Signed with the community
-     * node's Ed25519 key — the federation verifies it against the public key
-     * provided in the body (proves key ownership before membership exists).
-     */
-    async apply(federationUrl: string, communityName: string, communityHandle: string): Promise<FederationMembershipRecord> {
+    protected async onApproved(base: string, memberId: string): Promise<void> {
+        if (!this.record) return;
+
+        if (!this.record.federationAccountId) {
+            try {
+                const res = await fetch(`${base}/api/members`);
+                if (res.ok) {
+                    const members = await res.json() as { id: string; bankAccountId: string | null }[];
+                    const member  = members.find(m => m.id === memberId);
+                    if (member?.bankAccountId) this.record.federationAccountId = member.bankAccountId;
+                }
+            } catch { /* non-fatal */ }
+        }
+
+        if (!this.record.federationHandle) {
+            try {
+                const res = await fetch(`${base}/api/identity`);
+                if (res.ok) {
+                    const id = await res.json() as {
+                        handle?: string;
+                        commonwealthHandle?: string;
+                        globeHandle?: string;
+                    };
+                    if (id.handle)             this.record.federationHandle   = id.handle;
+                    if (id.commonwealthHandle) this.record.commonwealthHandle = id.commonwealthHandle;
+                    if (id.globeHandle)        this.record.globeHandle        = id.globeHandle;
+                }
+            } catch { /* non-fatal */ }
+        }
+
+        if (!this.record.commonwealthUrl) {
+            try {
+                const res = await fetch(`${base}/api/membership-chain`);
+                if (res.ok) {
+                    const chain = await res.json() as {
+                        commonwealthUrl:    string | null;
+                        commonwealthHandle: string | null;
+                        globeUrl:           string | null;
+                        globeHandle:        string | null;
+                    };
+                    if (chain.commonwealthUrl)    this.record.commonwealthUrl    = chain.commonwealthUrl;
+                    if (chain.commonwealthHandle) this.record.commonwealthHandle = chain.commonwealthHandle;
+                    if (chain.globeUrl)           this.record.globeUrl           = chain.globeUrl;
+                    if (chain.globeHandle)        this.record.globeHandle        = chain.globeHandle;
+                }
+            } catch { /* non-fatal */ }
+        }
+    }
+
+    // ── Public API ───────────────────────────────────────────────────────────
+
+    async apply(
+        federationUrl:   string,
+        communityName:   string,
+        communityHandle: string,
+    ): Promise<FederationMembershipRecord> {
         if (this.record && this.record.status !== "rejected") {
             throw new Error(
                 `Already have a federation application in status "${this.record.status}"`,
             );
         }
 
-        const node      = NodeService.getInstance();
-        const selfUrl   = node.getIdentity().address;
-        const body = JSON.stringify({
+        const node = NodeService.getInstance();
+        const applyBody = {
             communityName,
             communityHandle,
             communityNodeId:    node.getIdentity().id,
             communityPublicKey: node.getSigner().publicKeyHex,
-            communityUrl:       selfUrl,
+            communityUrl:       node.getIdentity().address,
             communityEntityId:  node.getIdentity().entityId,
-        });
+        };
+        const body      = JSON.stringify(applyBody);
         const signature = node.getSigner().signBody(body);
+        const base      = federationUrl.replace(/\/$/, "");
 
-        const res = await fetch(`${federationUrl.replace(/\/$/, "")}/api/applications`, {
+        const res = await fetch(`${base}/api/applications`, {
             method:  "POST",
             headers: {
                 "Content-Type":     "application/json",
@@ -110,6 +152,8 @@ export class FederationMembershipService {
             federationHandle:    null,
             commonwealthHandle:  null,
             globeHandle:         null,
+            commonwealthUrl:     null,
+            globeUrl:            null,
             status:              data.status as FederationApplicationStatus,
             appliedAt:           new Date().toISOString(),
         };
@@ -118,102 +162,26 @@ export class FederationMembershipService {
         return this.record;
     }
 
-    /**
-     * Poll the federation for the current application status and persist any
-     * changes. On approval, resolves the memberId and federationAccountId so
-     * the community can use the clearing account for inter-community transfers.
-     */
-    async sync(): Promise<FederationMembershipRecord | null> {
-        if (!this.record) return null;
-        if (this.record.status === "approved" || this.record.status === "rejected") {
-            return this.record;
-        }
-
-        const base = this.record.federationUrl.replace(/\/$/, "");
-        let appData: { status: string; memberId?: string | null };
-
-        try {
-            const res = await fetch(`${base}/api/applications/${this.record.applicationId}`);
-            if (!res.ok) return this.record;
-            appData = await res.json() as typeof appData;
-        } catch {
-            return this.record; // federation unreachable — return stale state
-        }
-
-        this.record.status = appData.status as FederationApplicationStatus;
-
-        if (appData.status === "approved" && appData.memberId) {
-            this.record.memberId = appData.memberId;
-
-            if (!this.record.federationAccountId) {
-                // Resolve the bank account ID from the member list
-                try {
-                    const res = await fetch(`${base}/api/members`);
-                    if (res.ok) {
-                        const members = await res.json() as { id: string; bankAccountId: string | null }[];
-                        const member  = members.find(m => m.id === appData.memberId);
-                        if (member?.bankAccountId) this.record.federationAccountId = member.bankAccountId;
-                    }
-                } catch { /* non-fatal */ }
-            }
-
-            // Fetch federation's handle chain from its identity endpoint
-            if (!this.record.federationHandle) {
-                try {
-                    const res = await fetch(`${base}/api/identity`);
-                    if (res.ok) {
-                        const id = await res.json() as {
-                            handle?: string;
-                            commonwealthHandle?: string;
-                            globeHandle?: string;
-                        };
-                        if (id.handle)             this.record.federationHandle     = id.handle;
-                        if (id.commonwealthHandle) this.record.commonwealthHandle   = id.commonwealthHandle;
-                        if (id.globeHandle)        this.record.globeHandle          = id.globeHandle;
-                    }
-                } catch { /* non-fatal */ }
-            }
-        }
-
-        this.save();
-        return this.record;
-    }
-
-    /**
-     * Submit (or refresh) this community's member census to the federation.
-     *
-     * The census contains one nullifier per member — a pseudonymous ID derived
-     * from the member's public key via HMAC. The federation stores these and
-     * checks for overlap with other communities to detect double-counting.
-     *
-     * Returns the list of duplicate nullifiers detected by the federation, or
-     * throws if the community is not an approved federation member.
-     */
     async submitCensus(nullifiers: string[], memberCount: number): Promise<{ duplicates: string[] }> {
         if (!this.record || this.record.status !== "approved") {
             throw new Error("Community is not an approved federation member");
         }
 
         const node = NodeService.getInstance();
-        const body = JSON.stringify({ memberCount, nullifiers });
-        const signature = node.getSigner().signBody(body);
-        const base = this.record.federationUrl.replace(/\/$/, "");
+        const ack  = await sendMessage<{ memberCount: number; nullifiers: string[] }, { duplicates: string[] }>(
+            this.record.federationUrl,
+            "governance",
+            "governance.census.submit",
+            { memberCount, nullifiers },
+            node.getSigner(),
+            node.getIdentity().id,
+            node.getIdentity().address,
+        );
 
-        const res = await fetch(`${base}/api/census`, {
-            method: "POST",
-            headers: {
-                "Content-Type":     "application/json",
-                "x-node-id":        node.getIdentity().id,
-                "x-node-signature": signature,
-            },
-            body,
-        });
-
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({})) as { error?: string };
-            throw new Error(`Census submission failed (${res.status}): ${err.error ?? "unknown error"}`);
+        if (ack.status === "rejected") {
+            throw new Error(`Census submission rejected: ${ack.error ?? "unknown error"}`);
         }
 
-        return res.json() as Promise<{ duplicates: string[] }>;
+        return (ack.result ?? { duplicates: [] });
     }
 }

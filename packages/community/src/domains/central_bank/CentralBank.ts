@@ -1,4 +1,4 @@
-import { BankClient } from "../../BankClient.js";
+import { BankClient } from "@ecf/core";
 import { CentralBankLoader } from "./CentralBankLoader.js";
 import { FunctionalDomain } from "../../common/domain/FunctionalDomain.js";
 

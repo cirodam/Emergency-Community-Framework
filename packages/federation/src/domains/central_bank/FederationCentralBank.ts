@@ -1,4 +1,4 @@
-import { BankClient } from "../../BankClient.js";
+import { BankClient } from "@ecf/core";
 import type { FederationCentralBankLoader, SupplySettlementRecord } from "./FederationCentralBankLoader.js";
 
 export { type SupplySettlementRecord } from "./FederationCentralBankLoader.js";

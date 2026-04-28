@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
-import { initServiceNode, resolveCommunityIdentity, networkRouter } from "@ecf/core";
+import { initServiceNode, resolveCommunityIdentity, networkRouter, messageRouter } from "@ecf/core";
 import { Bank } from "./Bank.js";
 import { AccountLoader } from "./AccountLoader.js";
 import { TransactionLoader } from "./TransactionLoader.js";
@@ -58,7 +58,8 @@ async function main(): Promise<void> {
     // API routes
     app.use("/api", bankRoutes);
     app.use("/api", ownerRoutes);
-    app.use("/api/node", networkRouter);
+    app.use("/api/node",    networkRouter);
+    app.use("/api/message", messageRouter);
 
     // Charter — who governs this bank
     app.get("/api/charter", (_req, res) => { res.json(charter); });

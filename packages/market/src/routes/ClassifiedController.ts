@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { ClassifiedService } from "../ClassifiedService.js";
-import { BankClient } from "../BankClient.js";
+import { BankClient } from "@ecf/core";
 import { NodeService, type PersonCredential } from "@ecf/core";
 import { ClassifiedCategory } from "../Classified.js";
 

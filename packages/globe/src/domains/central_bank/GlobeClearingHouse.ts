@@ -1,4 +1,4 @@
-import { BankClient } from "../../BankClient.js";
+import { BankClient } from "@ecf/core";
 import type { GlobeClearingHouseLoader } from "./GlobeClearingHouseLoader.js";
 
 export const GLOBE_CLEARING_HOUSE_ID = "ecf-globe-clearing-house-000001";

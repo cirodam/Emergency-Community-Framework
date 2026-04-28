@@ -16,9 +16,7 @@ import {
     getConstitution,
     getBudget,
     listDomains,
-    submitCensus,
     getCensusSummary,
-    routePayment,
 } from "./FederationController.js";
 
 const router = Router();
@@ -49,11 +47,7 @@ const requireMember = requireMemberCommunity();
 router.post("/transfers",          requireMember, transferKithe);
 router.post("/kithe/structural-aid", requireMember, structuralAidGrant);
 
-// Census — authenticated submit, public summary
-router.post("/census", requireMember, submitCensus);
+// Census — public summary only (submit is now via EcfMessage "governance.census.submit")
 router.get( "/census", getCensusSummary);
-
-// Payment routing — directed payments forwarded from commonwealth
-router.post("/route-payment", routePayment);
 
 export default router;

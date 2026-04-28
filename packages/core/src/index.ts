@@ -9,12 +9,18 @@ export * from "./network/PeerRecord.js";
 export * from "./network/PeerRegistry.js";
 export * from "./network/PeerRegistryLoader.js";
 export * from "./network/NodeService.js";
+export * from "./network/BankClient.js";
+export * from "./network/UpstreamMembershipService.js";
 export * from "./network/NetworkController.js";
 export * from "./network/signatureMiddleware.js";
 export * from "./network/ServiceNode.js";
 export * from "./network/communityIdentityCache.js";
 export * from "./network/ClusterService.js";
+export * from "./network/EcfMessage.js";
+export * from "./network/MessageDispatcher.js";
+export * from "./network/sendMessage.js";
 export { default as networkRouter } from "./network/networkRoutes.js";
+export { messageRouter } from "./network/networkRoutes.js";
 
 // storage
 export * from "./storage/FileStore.js";

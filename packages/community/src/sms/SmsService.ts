@@ -1,5 +1,5 @@
 import { PersonService } from "../person/PersonService.js";
-import { BankClient } from "../BankClient.js";
+import { BankClient } from "@ecf/core";
 import { parseSmsCommand } from "./SmsCommandParser.js";
 import { SmsRateLimiter } from "./SmsRateLimiter.js";
 import type { SmsProvider } from "./SmsProvider.js";

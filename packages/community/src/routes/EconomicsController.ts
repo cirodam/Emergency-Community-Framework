@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { CentralBank } from "../domains/central_bank/CentralBank.js";
 import { SocialInsuranceBank } from "../domains/social_insurance/SocialInsuranceBank.js";
 import { CommunityTreasury } from "../domains/community_treasury/CommunityTreasury.js";
-import { BankClient } from "../BankClient.js";
+import { BankClient } from "@ecf/core";
 import { FederationMembershipService } from "../FederationMembershipService.js";
 import { Constitution } from "../governance/Constitution.js";
 import { DomainService } from "../DomainService.js";

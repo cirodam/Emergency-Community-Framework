@@ -1,12 +1,9 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { join } from "path";
-import { NodeService } from "@ecf/core";
+import { NodeService, UpstreamMembershipService, type UpstreamApplicationStatus } from "@ecf/core";
 
-export type CommonwealthApplicationStatus =
-    | "submitted" | "under_review" | "approved" | "rejected";
+export type CommonwealthApplicationStatus = UpstreamApplicationStatus;
 
 export interface CommonwealthMembershipRecord {
-    /** URL of the commonwealth node, e.g. http://commonwealth:3020 */
+    /** URL of the commonwealth node */
     commonwealthUrl:         string;
     /** Application ID returned by the commonwealth on submit */
     applicationId:           string;
@@ -24,24 +21,15 @@ export interface CommonwealthMembershipRecord {
     appliedAt:               string; // ISO 8601
 }
 
-/**
- * Federation-level service that manages the federation's relationship with
- * a commonwealth. Mirrors FederationMembershipService one level up.
- *
- * Once approved, the federation holds a clearing account at the commonwealth
- * bank used for inter-federation kin transfers.
- */
-export class CommonwealthMembershipService {
+export class CommonwealthMembershipService extends UpstreamMembershipService<CommonwealthMembershipRecord> {
     private static instance: CommonwealthMembershipService;
-    private readonly path: string;
-    private record: CommonwealthMembershipRecord | null = null;
+
+    private _pendingName:   string = "";
+    private _pendingHandle: string = "";
+    private _pendingPop:    number = 0;
 
     private constructor(dataDir: string) {
-        mkdirSync(dataDir, { recursive: true });
-        this.path = join(dataDir, "commonwealth_membership.json");
-        if (existsSync(this.path)) {
-            this.record = JSON.parse(readFileSync(this.path, "utf-8")) as CommonwealthMembershipRecord;
-        }
+        super(dataDir, "commonwealth_membership.json");
     }
 
     static getInstance(dataDir?: string): CommonwealthMembershipService {
@@ -52,19 +40,53 @@ export class CommonwealthMembershipService {
         return CommonwealthMembershipService.instance;
     }
 
-    getStatus(): CommonwealthMembershipRecord | null {
-        return this.record;
+    // ── UpstreamMembershipService interface ──────────────────────────────────
+
+    protected buildApplyBody(): Record<string, unknown> {
+        const node = NodeService.getInstance();
+        return {
+            federationName:      this._pendingName,
+            federationHandle:    this._pendingHandle,
+            federationNodeId:    node.getIdentity().id,
+            federationPublicKey: node.getSigner().publicKeyHex,
+            federationUrl:       node.getIdentity().address,
+            federationEntityId:  node.getIdentity().entityId,
+            populationCount:     this._pendingPop,
+        };
     }
 
-    private save(): void {
-        writeFileSync(this.path, JSON.stringify(this.record, null, 2), "utf-8");
+    protected upstreamUrl(): string {
+        return this.record!.commonwealthUrl;
     }
 
-    /**
-     * Submit an application to join a commonwealth. Signed with the federation
-     * node's Ed25519 key — the commonwealth verifies it against the public key
-     * provided in the body.
-     */
+    protected async onApproved(base: string, memberId: string): Promise<void> {
+        if (!this.record) return;
+
+        if (!this.record.commonwealthAccountId) {
+            try {
+                const res = await fetch(`${base}/api/members`);
+                if (res.ok) {
+                    const members = await res.json() as { id: string; bankAccountId: string | null }[];
+                    const member  = members.find(m => m.id === memberId);
+                    if (member?.bankAccountId) this.record.commonwealthAccountId = member.bankAccountId;
+                }
+            } catch { /* non-fatal */ }
+        }
+
+        if (!this.record.commonwealthHandle) {
+            try {
+                const res = await fetch(`${base}/api/identity`);
+                if (res.ok) {
+                    const id = await res.json() as { handle?: string; globeHandle?: string };
+                    if (id.handle)      this.record.commonwealthHandle = id.handle;
+                    if (id.globeHandle) this.record.globeHandle        = id.globeHandle;
+                }
+            } catch { /* non-fatal */ }
+        }
+    }
+
+    // ── Public API ───────────────────────────────────────────────────────────
+
     async apply(
         commonwealthUrl:  string,
         federationName:   string,
@@ -77,105 +99,27 @@ export class CommonwealthMembershipService {
             );
         }
 
-        const node    = NodeService.getInstance();
-        const selfUrl = node.getIdentity().address;
-        const body    = JSON.stringify({
-            federationName,
-            federationHandle,
-            federationNodeId:    node.getIdentity().id,
-            federationPublicKey: node.getSigner().publicKeyHex,
-            federationUrl:       selfUrl,
-            federationEntityId:  node.getIdentity().entityId,
-            populationCount,
-        });
-        const signature = node.getSigner().signBody(body);
+        this._pendingName   = federationName;
+        this._pendingHandle = federationHandle;
+        this._pendingPop    = populationCount;
 
-        const res = await fetch(`${commonwealthUrl.replace(/\/$/, "")}/api/applications`, {
-            method:  "POST",
-            headers: {
-                "Content-Type":     "application/json",
-                "x-node-signature": signature,
-            },
-            body,
-        });
-
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({})) as { error?: string };
-            throw new Error(`Commonwealth application failed (${res.status}): ${err.error ?? "unknown error"}`);
-        }
-
-        const data = await res.json() as { id: string; status: string };
-        this.record = {
+        const record = await this.submitApplication(
             commonwealthUrl,
-            applicationId:        data.id,
-            memberId:             null,
-            commonwealthAccountId: null,
-            federationHandle,
-            commonwealthHandle:   null,
-            globeHandle:          null,
-            status:               data.status as CommonwealthApplicationStatus,
-            appliedAt:            new Date().toISOString(),
-        };
-        this.save();
-        console.log(`[CommonwealthMembership] applied to ${commonwealthUrl}: application ${data.id}`);
-        return this.record;
-    }
+            (data) => ({
+                commonwealthUrl,
+                applicationId:         data.id,
+                memberId:              null,
+                commonwealthAccountId: null,
+                federationHandle,
+                commonwealthHandle:    null,
+                globeHandle:           null,
+                status:                data.status as CommonwealthApplicationStatus,
+                appliedAt:             new Date().toISOString(),
+            }),
+            "Commonwealth application failed",
+        );
 
-    /**
-     * Poll the commonwealth for the current application status and persist any
-     * changes. On approval, resolves the memberId, commonwealthAccountId, and
-     * handle chain so the federation can route payments upward.
-     */
-    async sync(): Promise<CommonwealthMembershipRecord | null> {
-        if (!this.record) return null;
-        if (this.record.status === "approved" || this.record.status === "rejected") {
-            return this.record;
-        }
-
-        const base = this.record.commonwealthUrl.replace(/\/$/, "");
-        let appData: { status: string; memberId?: string | null };
-
-        try {
-            const res = await fetch(`${base}/api/applications/${this.record.applicationId}`);
-            if (!res.ok) return this.record;
-            appData = await res.json() as typeof appData;
-        } catch {
-            return this.record;
-        }
-
-        this.record.status = appData.status as CommonwealthApplicationStatus;
-
-        if (appData.status === "approved" && appData.memberId) {
-            this.record.memberId = appData.memberId;
-
-            if (!this.record.commonwealthAccountId) {
-                try {
-                    const res = await fetch(`${base}/api/members`);
-                    if (res.ok) {
-                        const members = await res.json() as { id: string; bankAccountId: string | null }[];
-                        const member  = members.find(m => m.id === appData.memberId);
-                        if (member?.bankAccountId) this.record.commonwealthAccountId = member.bankAccountId;
-                    }
-                } catch { /* non-fatal */ }
-            }
-
-            // Fetch commonwealth's handle chain from its identity endpoint
-            if (!this.record.commonwealthHandle) {
-                try {
-                    const res = await fetch(`${base}/api/identity`);
-                    if (res.ok) {
-                        const id = await res.json() as {
-                            handle?: string;
-                            globeHandle?: string;
-                        };
-                        if (id.handle)      this.record.commonwealthHandle = id.handle;
-                        if (id.globeHandle) this.record.globeHandle        = id.globeHandle;
-                    }
-                } catch { /* non-fatal */ }
-            }
-        }
-
-        this.save();
-        return this.record;
+        console.log(`[CommonwealthMembership] applied to ${commonwealthUrl}: application ${record.applicationId}`);
+        return record;
     }
 }

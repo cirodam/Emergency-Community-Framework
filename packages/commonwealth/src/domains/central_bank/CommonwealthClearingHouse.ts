@@ -1,4 +1,4 @@
-import { BankClient } from "../../BankClient.js";
+import { BankClient } from "@ecf/core";
 import type { CommonwealthClearingHouseLoader } from "./CommonwealthClearingHouseLoader.js";
 
 export const COMMONWEALTH_CLEARING_HOUSE_ID = "ecf-commonwealth-clearing-house-000001";

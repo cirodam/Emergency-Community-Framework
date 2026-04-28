@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
-import { NodeService, DataManifest, networkRouter } from "@ecf/core";
+import { NodeService, DataManifest, networkRouter, messageRouter, MessageDispatcher } from "@ecf/core";
 import { FederationMemberLoader } from "./FederationMemberLoader.js";
 import { FederationMemberService } from "./FederationMemberService.js";
 import { FederationApplicationLoader } from "./FederationApplicationLoader.js";
@@ -14,12 +14,13 @@ import { FederationConstitution } from "./governance/FederationConstitution.js";
 import { FederationDomainService } from "./common/FederationDomainService.js";
 import { InsuranceDomain } from "./domains/insurance/InsuranceDomain.js";
 import { LogisticsDomain } from "./domains/logistics/LogisticsDomain.js";
-import { BankClient } from "./BankClient.js";
+import { BankClient } from "@ecf/core";
 import { CensusRecordLoader } from "./census/CensusRecordLoader.js";
 import { FederationCensusService } from "./census/FederationCensusService.js";
 import federationRoutes from "./routes/federationRoutes.js";
 import { FederationDemurrageScheduler } from "./FederationDemurrageScheduler.js";
 import { CommonwealthMembershipService } from "./CommonwealthMembershipService.js";
+import { handleCensusMessage, handleBankTransferRoute } from "./routes/FederationController.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -108,6 +109,7 @@ async function main(): Promise<void> {
     const bank = new BankClient(
         BANK_URL,
         body => NodeService.getInstance().getSigner().signBody(body),
+        "kithe",
     );
     const chLoader = new FederationClearingHouseLoader(resolve(DATA_DIR, "domains"));
     await FederationClearingHouse.getInstance().init(bank, chLoader);
@@ -138,9 +140,15 @@ async function main(): Promise<void> {
     // surplusDemurrageRate, flowing the excess to the treasury.
     new FederationDemurrageScheduler().start();
 
+    // ── Message handlers ──────────────────────────────────────────
+    const dispatcher = MessageDispatcher.getInstance();
+    dispatcher.register("governance.census.submit", handleCensusMessage,     "sync");
+    dispatcher.register("bank.transfer.route",      handleBankTransferRoute, "sync");
+
     // ── Routes ─────────────────────────────────────────────────────────────
     app.use("/api",      federationRoutes);
-    app.use("/api/node", networkRouter);
+    app.use("/api/node",    networkRouter);
+    app.use("/api/message", messageRouter);
 
     // Identity endpoint — member communities and other nodes resolve public key here
     app.get("/api/identity", (_req, res) => {
@@ -156,6 +164,31 @@ async function main(): Promise<void> {
             handle:            cwRecord?.federationHandle    ?? null,
             commonwealthHandle: cwRecord?.commonwealthHandle ?? null,
             globeHandle:       cwRecord?.globeHandle         ?? null,
+        });
+    });
+
+    // Membership-chain endpoint — member communities resolve upstream URLs here
+    app.get("/api/membership-chain", async (_req, res) => {
+        const cwRecord = CommonwealthMembershipService.getInstance().getStatus();
+        if (!cwRecord || cwRecord.status !== "approved") {
+            res.json({ commonwealthUrl: null, commonwealthHandle: null, globeUrl: null, globeHandle: null });
+            return;
+        }
+
+        let globeUrl: string | null = null;
+        try {
+            const r = await fetch(`${cwRecord.commonwealthUrl.replace(/\/$/, "")}/api/identity`);
+            if (r.ok) {
+                const id = await r.json() as { globeUrl?: string | null };
+                globeUrl = id.globeUrl ?? null;
+            }
+        } catch { /* non-fatal */ }
+
+        res.json({
+            commonwealthUrl:    cwRecord.commonwealthUrl,
+            commonwealthHandle: cwRecord.commonwealthHandle ?? null,
+            globeUrl,
+            globeHandle:        cwRecord.globeHandle ?? null,
         });
     });
 

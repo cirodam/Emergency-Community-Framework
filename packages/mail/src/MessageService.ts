@@ -134,6 +134,80 @@ export class MessageService {
         return msg;
     }
 
+    // ── External (cross-community) delivery ───────────────────────────────
+
+    /**
+     * Store an inbound message delivered from another community node.
+     *
+     * The message retains its original `messageId` and `threadId` so that
+     * re-delivery is idempotent. `fromHandle` (e.g. "bob@src-community") is
+     * stored in `fromPersonId` with an "external:" prefix so the UI can
+     * display it correctly without confusing it with a local person ID.
+     *
+     * Returns the stored message, or `null` if the message already exists
+     * (idempotent).
+     */
+    storeExternal(params: {
+        messageId:   string;
+        threadId:    string;
+        subject:     string;
+        fromHandle:  string;  // "handle@community-handle"
+        toPersonIds: string[];
+        body:        string;
+        sentAt:      string;
+    }): Message | null {
+        const { messageId, threadId, subject, fromHandle, toPersonIds, body, sentAt } = params;
+
+        // Idempotency — skip if already stored
+        if (this.messages.has(messageId)) return null;
+
+        const syntheticFromId = `external:${fromHandle}`;
+
+        // Resolve or create thread
+        let thread = this.threads.get(threadId);
+        if (!thread) {
+            thread = {
+                id:             threadId,
+                subject:        subject.trim() || "(no subject)",
+                participantIds: [...new Set([syntheticFromId, ...toPersonIds])],
+                lastMessageAt:  sentAt,
+            };
+        } else {
+            // Add any new local recipients to existing thread
+            const allParticipants = [...new Set([...thread.participantIds, ...toPersonIds])];
+            thread = { ...thread, participantIds: allParticipants, lastMessageAt: sentAt };
+        }
+
+        const msg: Message = {
+            id:           messageId,
+            threadId:     thread.id,
+            fromPersonId: syntheticFromId,
+            toPersonIds,
+            subject:      thread.subject,
+            body,
+            sentAt,
+        };
+
+        const newReceipts: MessageReceipt[] = toPersonIds.map(personId => ({
+            id:        randomUUID(),
+            messageId: msg.id,
+            personId,
+            readAt:    null,
+            deleted:   false,
+        }));
+
+        this.messages.set(msg.id, msg);
+        this.threads.set(thread.id, thread);
+        this.loader.saveMessage(msg);
+        this.loader.saveThread(thread);
+        for (const r of newReceipts) {
+            this.receipts.set(r.id, r);
+            this.loader.saveReceipt(r);
+        }
+
+        return msg;
+    }
+
     // ── Inbox / Outbox ─────────────────────────────────────────────────────
 
     /** Messages received by personId that haven't been deleted. */

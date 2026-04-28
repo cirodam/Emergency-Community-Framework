@@ -1,0 +1,1 @@
+{"root":["./src/Message.ts","./src/MessageLoader.ts","./src/MessageReceipt.ts","./src/MessageService.ts","./src/Thread.ts","./src/communityIdentity.ts","./src/index.ts","./src/routes/MailController.ts","./src/routes/mailRoutes.ts"],"version":"6.0.3"}

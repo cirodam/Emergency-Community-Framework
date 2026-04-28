@@ -1,14 +1,16 @@
 import { type Request, type Response } from "express";
-import { NodeSigner } from "@ecf/core";
+import { NodeSigner, type EcfMessage, sendMessage } from "@ecf/core";
 import { FederationApplicationService } from "../FederationApplicationService.js";
 import { FederationMemberService } from "../FederationMemberService.js";
 import { FederationClearingHouse } from "../domains/central_bank/FederationClearingHouse.js";
 import { FederationTreasury } from "../domains/treasury/FederationTreasury.js";
 import { FederationConstitution } from "../governance/FederationConstitution.js";
 import { FederationDomainService } from "../common/FederationDomainService.js";
-import { BankClient } from "../BankClient.js";
+import { BankClient } from "@ecf/core";
 import { NodeService } from "@ecf/core";
 import { FederationCensusService } from "../census/FederationCensusService.js";
+import { FederationCentralBank } from "../domains/central_bank/FederationCentralBank.js";
+import { CommonwealthMembershipService } from "../CommonwealthMembershipService.js";
 
 const BANK_URL = process.env.BANK_URL ?? "http://localhost:3011";
 
@@ -16,6 +18,7 @@ function bank(): BankClient {
     return new BankClient(
         BANK_URL,
         body => NodeService.getInstance().getSigner().signBody(body),
+        "kithe",
     );
 }
 
@@ -421,117 +424,153 @@ export function listDomains(_req: Request, res: Response): void {
 
 type AuthedRequest = Request & { communityId: string; communityNodeId: string };
 
-/**
- * POST /api/census
- * Auth: requireMemberCommunity (x-node-id + x-node-signature)
- * Body: { memberCount: number, nullifiers: string[] }
- *
- * The community submits a pseudonymous census. The federation stores it and
- * returns any nullifiers that appear in other communities' censuses.
- */
-export function submitCensus(req: Request, res: Response): void {
-    const { communityId } = req as AuthedRequest;
-    const { memberCount, nullifiers } = req.body ?? {};
-
-    if (typeof memberCount !== "number" || memberCount < 0) {
-        res.status(400).json({ error: "memberCount must be a non-negative number" }); return;
-    }
-    if (!Array.isArray(nullifiers) || nullifiers.some(n => typeof n !== "string")) {
-        res.status(400).json({ error: "nullifiers must be an array of strings" }); return;
-    }
-    if (nullifiers.length !== memberCount) {
-        res.status(400).json({ error: "nullifiers.length must equal memberCount" }); return;
-    }
-
-    const result = FederationCensusService.getInstance().submit(communityId, memberCount, nullifiers);
-    res.json(result);
-}
-
 /** GET /api/census — public summary of unique members across all communities. */
 export function getCensusSummary(_req: Request, res: Response): void {
     res.json(FederationCensusService.getInstance().getSummary());
 }
 
-// ── Payment routing ───────────────────────────────────────────────────────────
+// ── Census message handler (governance.census.submit) ─────────────────────────
+
+export interface CensusSubmitBody {
+    memberCount: number;
+    nullifiers:  string[];
+}
 
 /**
- * POST /api/route-payment
- * Body: { address: { commonwealth, federation, community }, token, amount, fromAccountId }
+ * Message handler for "governance.census.submit".
+ * Registered with MessageDispatcher at startup.
  *
- * Called by the clearing layer (or directly by a commonwealth) when a directed
- * payment arrives for a community in this federation. The federation:
- *   1. Looks up the target community by handle.
- *   2. Transfers `amount` from the sender's clearing account to the community's
- *      clearing account (internal bank move — no fee).
- *   3. Forwards the routing request to the community's /api/payment-tokens/receive
- *      so the community can apply the payment to the correct person.
- *
- * Auth: requireMemberCommunity (or direct from upper layer) — for now open since
- * this is an internal infrastructure call; production should add node-sig auth.
+ * Resolves the sender's communityId from msg.from (the community's URL),
+ * validates the body, and delegates to FederationCensusService.
  */
-export async function routePayment(req: Request, res: Response): Promise<void> {
-    const { address, token, amount, fromAccountId } = req.body ?? {};
+export async function handleCensusMessage(
+    msg: EcfMessage<CensusSubmitBody>,
+): Promise<{ duplicates: string[] }> {
+    const { memberCount, nullifiers } = msg.body ?? {};
 
-    if (typeof address?.community !== "string" || !address.community) {
-        res.status(400).json({ error: "address.community is required" }); return;
-    }
-    if (typeof token !== "string" || !token) {
-        res.status(400).json({ error: "token is required" }); return;
-    }
-    if (typeof amount !== "number" || amount <= 0) {
-        res.status(400).json({ error: "amount must be a positive number" }); return;
-    }
-    if (typeof fromAccountId !== "string" || !fromAccountId) {
-        res.status(400).json({ error: "fromAccountId is required" }); return;
-    }
-
-    const nodes = FederationMemberService.getInstance().getAllByHandle(address.community);
-    const member = nodes.find(n => n.bankAccountId != null) ?? nodes[0];
+    // Resolve community by URL
+    const members = FederationMemberService.getInstance().getAll();
+    const member  = members.find(m => m.url.replace(/\/$/, "") === msg.from.replace(/\/$/, ""));
     if (!member) {
-        res.status(404).json({ error: `No community with handle "${address.community}"` }); return;
-    }
-    if (!member.bankAccountId) {
-        res.status(422).json({ error: `Community "${address.community}" has no clearing account` }); return;
+        throw new Error(`Unknown community sender: ${msg.from}`);
     }
 
-    // Move kin inside the federation bank: sender's clearing account → community's clearing account
-    try {
-        const b = bank();
-        await b.transfer(
-            fromAccountId,
+    if (typeof memberCount !== "number" || memberCount < 0) {
+        throw new Error("memberCount must be a non-negative number");
+    }
+    if (!Array.isArray(nullifiers) || nullifiers.some(n => typeof n !== "string")) {
+        throw new Error("nullifiers must be an array of strings");
+    }
+    if (nullifiers.length !== memberCount) {
+        throw new Error("nullifiers.length must equal memberCount");
+    }
+
+    return FederationCensusService.getInstance().submit(member.id, memberCount, nullifiers);
+}
+
+// ── Payment routing ───────────────────────────────────────────────────────────
+
+// ── EcfMessage handler ────────────────────────────────────────────────────────
+
+interface TransferRouteBody {
+    address: { community: string; federation?: string; commonwealth?: string; globe?: string };
+    toAccountId: string;
+    amount: number;
+    fromAccountId?: string;
+    memo?: string;
+}
+
+/**
+ * MessageDispatcher handler for "bank.transfer.route" at the federation tier.
+ * Mirrors the logic of `routePayment` but is invoked via EcfMessage (sync semantics).
+ *
+ * Cross-federation: retires kithe from the clearing account, sends "bank.transfer.route"
+ *   onward to the commonwealth.
+ * Local delivery: moves kithe to the target community's clearing account, then sends
+ *   "bank.transfer.receive" to the target community.
+ */
+export async function handleBankTransferRoute(
+    msg: EcfMessage<TransferRouteBody>,
+): Promise<{ ok: boolean; community: string; amount: number }> {
+    const { address, toAccountId, amount, fromAccountId, memo } = msg.body ?? {};
+
+    if (typeof address?.community !== "string" || !address.community) throw new Error("address.community is required");
+    if (typeof toAccountId !== "string" || !toAccountId)              throw new Error("toAccountId is required");
+    if (typeof amount !== "number" || amount <= 0)                    throw new Error("amount must be a positive number");
+
+    const node = NodeService.getInstance();
+
+    // ── Cross-federation: forward to commonwealth ─────────────────────────────
+    const cwRecord        = CommonwealthMembershipService.getInstance().getStatus();
+    const thisFedHandle   = cwRecord?.federationHandle ?? node.getIdentity().entityId;
+    const targetFedHandle = typeof address.federation === "string" ? address.federation : null;
+
+    if (targetFedHandle && targetFedHandle !== thisFedHandle) {
+        if (!cwRecord || cwRecord.status !== "approved") throw new Error("Federation is not a commonwealth member — cannot route cross-federation");
+        if (!cwRecord.commonwealthAccountId)             throw new Error("Federation has no commonwealth clearing account");
+
+        // Retire kithe from the sending community's clearing account if local
+        if (typeof fromAccountId === "string" && fromAccountId) {
+            const isLocal = FederationMemberService.getInstance().getAll().some(m => m.bankAccountId === fromAccountId);
+            if (isLocal) {
+                const cb = FederationCentralBank.getInstance();
+                if (cb.isReady()) {
+                    await bank().transfer(
+                        fromAccountId,
+                        cb.issuanceAccountId,
+                        amount,
+                        `outbound cross-fed → ${targetFedHandle}:${address.community}`,
+                    ).catch(err => console.warn("[federation/bank.transfer.route] could not retire kithe:", err));
+                }
+            }
+        }
+
+        await sendMessage<TransferRouteBody>(
+            cwRecord.commonwealthUrl,
+            "bank",
+            "bank.transfer.route",
+            { address, toAccountId, amount, fromAccountId: cwRecord.commonwealthAccountId, memo },
+            node.getSigner(),
+            node.getIdentity().id,
+            node.getIdentity().address,
+        );
+
+        return { ok: true, community: address.community, amount };
+    }
+
+    // ── Local delivery ────────────────────────────────────────────────────────
+    const nodes  = FederationMemberService.getInstance().getAllByHandle(address.community);
+    const member = nodes.find(n => n.bankAccountId != null) ?? nodes[0];
+    if (!member)              throw new Error(`No community with handle "${address.community}"`);
+    if (!member.bankAccountId) throw new Error(`Community "${address.community}" has no clearing account`);
+
+    const isLocalSource = typeof fromAccountId === "string" &&
+        FederationMemberService.getInstance().getAll().some(m => m.bankAccountId === fromAccountId);
+    const cb = FederationCentralBank.getInstance();
+    const sourceId = isLocalSource ? fromAccountId
+        : (cb.isReady() ? cb.issuanceAccountId : null);
+
+    if (sourceId) {
+        await bank().transfer(
+            sourceId,
             member.bankAccountId,
             amount,
-            `directed payment → ${address.community} (token ${token.slice(0, 8)}…)`,
+            typeof memo === "string" ? memo : `directed payment → ${address.community}`,
         );
-    } catch (err) {
-        res.status(502).json({ error: `Bank transfer failed: ${(err as Error).message}` }); return;
+    } else {
+        console.warn("[federation/bank.transfer.route] no source account — skipping federation bank transfer");
     }
 
-    // Forward to the community node to resolve the token and credit the person
-    try {
-        const body = JSON.stringify({ address, token, amount });
-        const node = NodeService.getInstance();
-        const sig  = node.getSigner().signBody(body);
-        const communityRes = await fetch(`${member.url.replace(/\/$/, "")}/api/payment-tokens/receive`, {
-            method:  "POST",
-            headers: {
-                "Content-Type":     "application/json",
-                "x-node-id":        node.getIdentity().id,
-                "x-node-signature": sig,
-            },
-            body,
-        });
-        if (!communityRes.ok) {
-            const err = await communityRes.json().catch(() => ({})) as { error?: string };
-            // Non-fatal for routing — the bank transfer succeeded; community can reconcile
-            console.warn(
-                `[federation/route-payment] community ${address.community} returned ${communityRes.status}: ` +
-                `${err.error ?? "unknown"}`,
-            );
-        }
-    } catch (err) {
-        console.warn(`[federation/route-payment] could not forward to community: ${(err as Error).message}`);
-    }
+    // Notify the community to issue kin to the recipient
+    await sendMessage<{ toAccountId: string; amount: number; memo?: string }>(
+        member.url,
+        "bank",
+        "bank.transfer.receive",
+        { toAccountId, amount, memo: memo ?? "inbound transfer" },
+        node.getSigner(),
+        node.getIdentity().id,
+        node.getIdentity().address,
+    );
 
-    res.json({ ok: true, community: address.community, amount });
+    return { ok: true, community: address.community, amount };
 }

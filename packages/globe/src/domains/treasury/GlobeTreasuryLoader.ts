@@ -9,7 +9,7 @@ interface GlobeTreasuryRecord {
 
 export const GLOBE_TREASURY_ID = "ecf-globe-treasury-000002";
 
-import { BankClient } from "../../BankClient.js";
+import { BankClient } from "@ecf/core";
 
 export class GlobeTreasuryLoader {
     private readonly filePath: string;

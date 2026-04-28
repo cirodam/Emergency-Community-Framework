@@ -12,7 +12,6 @@ import {
     structuralAidGrant,
     getTreasury,
     getConstitution,
-    routePayment,
 } from "./CommonwealthController.js";
 
 const router = Router();
@@ -36,8 +35,5 @@ router.get("/constitution", getConstitution);
 const requireMember = requireMemberFederation();
 router.post("/transfers",        requireMember, transferKin);
 router.post("/kin/structural-aid", requireMember, structuralAidGrant);
-
-// Payment routing — directed payments forwarded from globe
-router.post("/route-payment", routePayment);
 
 export default router;

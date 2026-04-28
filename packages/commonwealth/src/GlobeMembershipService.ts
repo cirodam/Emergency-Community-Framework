@@ -1,12 +1,9 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { join } from "path";
-import { NodeService } from "@ecf/core";
+import { NodeService, UpstreamMembershipService, type UpstreamApplicationStatus } from "@ecf/core";
 
-export type GlobeApplicationStatus =
-    | "submitted" | "under_review" | "approved" | "rejected";
+export type GlobeApplicationStatus = UpstreamApplicationStatus;
 
 export interface GlobeMembershipRecord {
-    /** URL of the globe node, e.g. http://globe:3030 */
+    /** URL of the globe node */
     globeUrl:               string;
     /** Application ID returned by the globe on submit */
     applicationId:          string;
@@ -22,24 +19,15 @@ export interface GlobeMembershipRecord {
     appliedAt:              string; // ISO 8601
 }
 
-/**
- * Commonwealth-level service that manages the commonwealth's relationship with
- * the globe. Mirrors CommonwealthMembershipService one level up.
- *
- * Once approved, the commonwealth holds a clearing account at the globe bank
- * used for inter-commonwealth kin transfers.
- */
-export class GlobeMembershipService {
+export class GlobeMembershipService extends UpstreamMembershipService<GlobeMembershipRecord> {
     private static instance: GlobeMembershipService;
-    private readonly path: string;
-    private record: GlobeMembershipRecord | null = null;
+
+    private _pendingName:   string = "";
+    private _pendingHandle: string = "";
+    private _pendingPop:    number = 0;
 
     private constructor(dataDir: string) {
-        mkdirSync(dataDir, { recursive: true });
-        this.path = join(dataDir, "globe_membership.json");
-        if (existsSync(this.path)) {
-            this.record = JSON.parse(readFileSync(this.path, "utf-8")) as GlobeMembershipRecord;
-        }
+        super(dataDir, "globe_membership.json");
     }
 
     static getInstance(dataDir?: string): GlobeMembershipService {
@@ -50,19 +38,52 @@ export class GlobeMembershipService {
         return GlobeMembershipService.instance;
     }
 
-    getStatus(): GlobeMembershipRecord | null {
-        return this.record;
+    // ── UpstreamMembershipService interface ──────────────────────────────────
+
+    protected buildApplyBody(): Record<string, unknown> {
+        const node = NodeService.getInstance();
+        return {
+            commonwealthName:      this._pendingName,
+            commonwealthHandle:    this._pendingHandle,
+            commonwealthNodeId:    node.getIdentity().id,
+            commonwealthPublicKey: node.getSigner().publicKeyHex,
+            commonwealthUrl:       node.getIdentity().address,
+            commonwealthEntityId:  node.getIdentity().entityId,
+            populationCount:       this._pendingPop,
+        };
     }
 
-    private save(): void {
-        writeFileSync(this.path, JSON.stringify(this.record, null, 2), "utf-8");
+    protected upstreamUrl(): string {
+        return this.record!.globeUrl;
     }
 
-    /**
-     * Submit an application to join the globe. Signed with the commonwealth
-     * node's Ed25519 key — the globe verifies it against the public key
-     * provided in the body.
-     */
+    protected async onApproved(base: string, memberId: string): Promise<void> {
+        if (!this.record) return;
+
+        if (!this.record.globeAccountId) {
+            try {
+                const res = await fetch(`${base}/api/members`);
+                if (res.ok) {
+                    const members = await res.json() as { id: string; bankAccountId: string | null }[];
+                    const member  = members.find(m => m.id === memberId);
+                    if (member?.bankAccountId) this.record.globeAccountId = member.bankAccountId;
+                }
+            } catch { /* non-fatal */ }
+        }
+
+        if (!this.record.globeHandle) {
+            try {
+                const res = await fetch(`${base}/api/identity`);
+                if (res.ok) {
+                    const id = await res.json() as { handle?: string };
+                    if (id.handle) this.record.globeHandle = id.handle;
+                }
+            } catch { /* non-fatal */ }
+        }
+    }
+
+    // ── Public API ───────────────────────────────────────────────────────────
+
     async apply(
         globeUrl:            string,
         commonwealthName:    string,
@@ -75,99 +96,26 @@ export class GlobeMembershipService {
             );
         }
 
-        const node    = NodeService.getInstance();
-        const selfUrl = node.getIdentity().address;
-        const body    = JSON.stringify({
-            commonwealthName,
-            commonwealthHandle,
-            commonwealthNodeId:    node.getIdentity().id,
-            commonwealthPublicKey: node.getSigner().publicKeyHex,
-            commonwealthUrl:       selfUrl,
-            commonwealthEntityId:  node.getIdentity().entityId,
-            populationCount,
-        });
-        const signature = node.getSigner().signBody(body);
+        this._pendingName   = commonwealthName;
+        this._pendingHandle = commonwealthHandle;
+        this._pendingPop    = populationCount;
 
-        const res = await fetch(`${globeUrl.replace(/\/$/, "")}/api/applications`, {
-            method:  "POST",
-            headers: {
-                "Content-Type":     "application/json",
-                "x-node-signature": signature,
-            },
-            body,
-        });
-
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({})) as { error?: string };
-            throw new Error(`Globe application failed (${res.status}): ${err.error ?? "unknown error"}`);
-        }
-
-        const data = await res.json() as { id: string; status: string };
-        this.record = {
+        const record = await this.submitApplication(
             globeUrl,
-            applicationId:      data.id,
-            memberId:           null,
-            globeAccountId:     null,
-            commonwealthHandle,
-            globeHandle:        null,
-            status:             data.status as GlobeApplicationStatus,
-            appliedAt:          new Date().toISOString(),
-        };
-        this.save();
-        console.log(`[GlobeMembership] applied to ${globeUrl}: application ${data.id}`);
-        return this.record;
-    }
+            (data) => ({
+                globeUrl,
+                applicationId:  data.id,
+                memberId:       null,
+                globeAccountId: null,
+                commonwealthHandle,
+                globeHandle:    null,
+                status:         data.status as GlobeApplicationStatus,
+                appliedAt:      new Date().toISOString(),
+            }),
+            "Globe application failed",
+        );
 
-    /**
-     * Poll the globe for the current application status and persist any changes.
-     * On approval, resolves the memberId, globeAccountId, and handle chain.
-     */
-    async sync(): Promise<GlobeMembershipRecord | null> {
-        if (!this.record) return null;
-        if (this.record.status === "approved" || this.record.status === "rejected") {
-            return this.record;
-        }
-
-        const base = this.record.globeUrl.replace(/\/$/, "");
-        let appData: { status: string; memberId?: string | null };
-
-        try {
-            const res = await fetch(`${base}/api/applications/${this.record.applicationId}`);
-            if (!res.ok) return this.record;
-            appData = await res.json() as typeof appData;
-        } catch {
-            return this.record;
-        }
-
-        this.record.status = appData.status as GlobeApplicationStatus;
-
-        if (appData.status === "approved" && appData.memberId) {
-            this.record.memberId = appData.memberId;
-
-            if (!this.record.globeAccountId) {
-                try {
-                    const res = await fetch(`${base}/api/members`);
-                    if (res.ok) {
-                        const members = await res.json() as { id: string; bankAccountId: string | null }[];
-                        const member  = members.find(m => m.id === appData.memberId);
-                        if (member?.bankAccountId) this.record.globeAccountId = member.bankAccountId;
-                    }
-                } catch { /* non-fatal */ }
-            }
-
-            // Fetch globe's own handle from its identity endpoint
-            if (!this.record.globeHandle) {
-                try {
-                    const res = await fetch(`${base}/api/identity`);
-                    if (res.ok) {
-                        const id = await res.json() as { handle?: string };
-                        if (id.handle) this.record.globeHandle = id.handle;
-                    }
-                } catch { /* non-fatal */ }
-            }
-        }
-
-        this.save();
-        return this.record;
+        console.log(`[GlobeMembership] applied to ${globeUrl}: application ${record.applicationId}`);
+        return record;
     }
 }

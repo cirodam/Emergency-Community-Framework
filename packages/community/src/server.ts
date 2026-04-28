@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
-import { NodeService, NodeSigner, ClusterService, DataManifest, networkRouter, parseRoutableAddress } from "@ecf/core";
+import { NodeService, NodeSigner, ClusterService, DataManifest, networkRouter, messageRouter, parseRoutableAddress, MessageDispatcher } from "@ecf/core";
 import { PaymentTokenService } from "./PaymentTokenService.js";
 import { clusterRoutes } from "./routes/clusterRoutes.js";
 import { PersonLoader } from "./person/PersonLoader.js";
@@ -30,13 +30,15 @@ import { ConstitutionLoader } from "./governance/ConstitutionLoader.js";
 import { ProposalLoader } from "./governance/ProposalLoader.js";
 import { ProposalService } from "./governance/ProposalService.js";
 import { DomainService } from "./DomainService.js";
-import { BankClient } from "./BankClient.js";
+import { BankClient } from "@ecf/core";
 import { CentralBank } from "./domains/central_bank/CentralBank.js";
 import { CentralBankLoader } from "./domains/central_bank/CentralBankLoader.js";
 import { SocialInsuranceBank } from "./domains/social_insurance/SocialInsuranceBank.js";
 import { SocialInsuranceBankLoader } from "./domains/social_insurance/SocialInsuranceBankLoader.js";
 import { SocialInsuranceMemberLoader } from "./domains/social_insurance/SocialInsuranceMemberLoader.js";
 import communityRoutes from "./routes/communityRoutes.js";
+import { handleInboundMail } from "./routes/MailRelayController.js";
+import { handleBankTransferReceive } from "./routes/TransferController.js";
 import { CommunityBankDomain } from "./domains/community_bank/CommunityBankDomain.js";
 import { CommunityTreasury } from "./domains/community_treasury/CommunityTreasury.js";
 import { CommunityTreasuryLoader } from "./domains/community_treasury/CommunityTreasuryLoader.js";
@@ -630,9 +632,14 @@ async function main(): Promise<void> {
     // ── Routes ──────────────────────────────────────────────────────────
     // Cluster routes sit outside the write guard — /status is always
     // readable and /snapshot is primary-gated internally.
+    // Register inbound EcfMessage handlers
+    MessageDispatcher.getInstance().register("mail.message.deliver",    handleInboundMail,            "async");
+    MessageDispatcher.getInstance().register("bank.transfer.receive",   handleBankTransferReceive,    "sync");
+
     app.use("/api/cluster", clusterRoutes(communitySigner.publicKeyHex));
     app.use("/api",         cluster.replicaWriteGuard(), communityRoutes);
     app.use("/api/node",    networkRouter);
+    app.use("/api/message", messageRouter);
 
     app.get("/health", (_req, res) => {
         const bankReady = CentralBank.getInstance().isReady();
@@ -698,4 +705,4 @@ export { UnitTemplateRegistry } from "./common/domain/UnitTemplateRegistry.js";
 export { LeaderPool } from "./governance/LeaderPool.js";
 export { LeaderPoolLoader } from "./governance/LeaderPoolLoader.js";
 export { DomainService } from "./DomainService.js";
-export { BankClient } from "./BankClient.js";
+export { BankClient } from "@ecf/core";

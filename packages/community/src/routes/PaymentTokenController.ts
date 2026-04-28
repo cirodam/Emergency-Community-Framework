@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express";
 import { PaymentTokenService } from "../PaymentTokenService.js";
 import { PersonService } from "../person/PersonService.js";
-import { BankClient } from "../BankClient.js";
+import { BankClient } from "@ecf/core";
 import { NodeService, serializeRoutableAddress } from "@ecf/core";
 
 const BANK_URL = process.env.BANK_URL ?? "http://localhost:3001";

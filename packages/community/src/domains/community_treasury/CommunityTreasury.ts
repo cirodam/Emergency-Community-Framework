@@ -1,4 +1,4 @@
-import { BankClient } from "../../BankClient.js";
+import { BankClient } from "@ecf/core";
 import { CommunityTreasuryLoader } from "./CommunityTreasuryLoader.js";
 import { FunctionalDomain } from "../../common/domain/FunctionalDomain.js";
 

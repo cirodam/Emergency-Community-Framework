@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
-import { initServiceNode, resolveCommunityIdentity, networkRouter } from "@ecf/core";
+import { initServiceNode, resolveCommunityIdentity, networkRouter, messageRouter } from "@ecf/core";
 import { MessageLoader } from "./MessageLoader.js";
 import { MessageService } from "./MessageService.js";
 import { setCommunityIdentity } from "./communityIdentity.js";
@@ -38,7 +38,8 @@ async function main(): Promise<void> {
         .catch(err => console.error("[mail] community identity resolution failed:", err));
 
     app.use("/api",      mailRoutes);
-    app.use("/api/node", networkRouter);
+    app.use("/api/node",    networkRouter);
+    app.use("/api/message", messageRouter);
 
     app.get("/health", (_req, res) => {
         res.json({ status: "ok", communityUrl: COMMUNITY_URL });

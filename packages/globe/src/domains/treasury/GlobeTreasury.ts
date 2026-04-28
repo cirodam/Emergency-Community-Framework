@@ -1,4 +1,4 @@
-import { BankClient } from "../../BankClient.js";
+import { BankClient } from "@ecf/core";
 import { GLOBE_TREASURY_ID, GlobeTreasuryLoader } from "./GlobeTreasuryLoader.js";
 
 /**

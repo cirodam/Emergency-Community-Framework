@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
-import { NodeService, DataManifest, networkRouter } from "@ecf/core";
+import { NodeService, DataManifest, networkRouter, messageRouter, MessageDispatcher } from "@ecf/core";
 import { GlobeMemberLoader } from "./GlobeMemberLoader.js";
 import { GlobeMemberService } from "./GlobeMemberService.js";
 import { GlobeApplicationLoader } from "./GlobeApplicationLoader.js";
@@ -11,9 +11,10 @@ import { GlobeClearingHouseLoader } from "./domains/central_bank/GlobeClearingHo
 import { GlobeTreasury } from "./domains/treasury/GlobeTreasury.js";
 import { GlobeTreasuryLoader } from "./domains/treasury/GlobeTreasuryLoader.js";
 import { GlobeConstitution } from "./governance/GlobeConstitution.js";
-import { BankClient } from "./BankClient.js";
+import { BankClient } from "@ecf/core";
 import { GlobeDemurrageScheduler } from "./GlobeDemurrageScheduler.js";
 import globeRoutes from "./routes/globeRoutes.js";
+import { handleBankTransferRoute } from "./routes/GlobeController.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -96,6 +97,7 @@ async function main(): Promise<void> {
     const bankClient = new BankClient(
         BANK_URL,
         body => NodeService.getInstance().getSigner().signBody(body),
+        "kithe",
     );
     const chLoader = new GlobeClearingHouseLoader(resolve(DATA_DIR, "domains"));
     await GlobeClearingHouse.getInstance().init(bankClient, chLoader);
@@ -113,9 +115,13 @@ async function main(): Promise<void> {
     // ── Monthly demurrage sweep ────────────────────────────────────────────
     new GlobeDemurrageScheduler().start();
 
+    // ── Message handlers ───────────────────────────────────────────────────────
+    MessageDispatcher.getInstance().register("bank.transfer.route", handleBankTransferRoute, "sync");
+
     // ── Routes ─────────────────────────────────────────────────────────────
     app.use("/api",      globeRoutes);
-    app.use("/api/node", networkRouter);
+    app.use("/api/node",    networkRouter);
+    app.use("/api/message", messageRouter);
 
     app.get("/api/identity", (_req, res) => {
         const node     = NodeService.getInstance();

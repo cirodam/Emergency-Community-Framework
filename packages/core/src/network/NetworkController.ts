@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import { NodeService } from "./NodeService.js";
 import { NodeIdentity } from "./NodeIdentity.js";
+import { isEcfMessage } from "./EcfMessage.js";
+import { MessageDispatcher } from "./MessageDispatcher.js";
 
 const node = () => NodeService.getInstance();
 
@@ -62,4 +64,24 @@ export function announce(req: Request, res: Response): void {
 
     node().handleAnnounce(identity);
     res.status(204).end();
+}
+
+// POST /api/message
+// Body: EcfMessage — dispatched to the registered handler for msg.type
+export async function receiveMessage(req: Request, res: Response): Promise<void> {
+    const msg = req.body;
+
+    if (!isEcfMessage(msg)) {
+        res.status(400).json({ error: "Invalid message envelope: id, layer, type, from, to, sentAt, and body are required" });
+        return;
+    }
+
+    const ack = await MessageDispatcher.getInstance().dispatch(msg, req);
+
+    if (ack.status === "rejected") {
+        res.status(422).json(ack);
+        return;
+    }
+
+    res.json(ack);
 }

@@ -1,4 +1,4 @@
-import { BankClient } from "../../BankClient.js";
+import { BankClient } from "@ecf/core";
 import { Person } from "../../person/Person.js";
 import { SocialInsuranceMember } from "./SocialInsuranceMember.js";
 import { SocialInsuranceMemberLoader } from "./SocialInsuranceMemberLoader.js";

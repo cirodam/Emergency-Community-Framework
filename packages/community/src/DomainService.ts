@@ -8,7 +8,7 @@ import { RoleType } from "./common/RoleType.js";
 import { RoleTypeLoader } from "./common/RoleTypeLoader.js";
 import { LeaderPool } from "./governance/LeaderPool.js";
 import { LeaderPoolLoader } from "./governance/LeaderPoolLoader.js";
-import { BankClient } from "./BankClient.js";
+import { BankClient } from "@ecf/core";
 
 /**
  * DomainService is the single source of truth for the community's operational structure.

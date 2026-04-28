@@ -1,4 +1,4 @@
-import { BankClient } from "../../BankClient.js";
+import { BankClient } from "@ecf/core";
 import type { FederationTreasuryLoader } from "./FederationTreasuryLoader.js";
 
 export const FEDERATION_TREASURY_ID = "ecf-federation-treasury-000002";
