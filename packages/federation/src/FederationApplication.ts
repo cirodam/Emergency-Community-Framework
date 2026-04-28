@@ -13,6 +13,12 @@ export interface FederationApplication {
     communityHandle:    string;   // URL-safe, unique within this federation
     communityNodeId:    string;
     communityPublicKey: string;
+    /** Base URL of the community node, e.g. http://maplewood:3002 — used for payment routing. */
+    communityUrl:       string;
+    /** Stable org UUID self-reported by the community. */
+    communityEntityId:  string;
+    /** Routing priority for this node (1 = preferred). */
+    communityPriority:  number;
     status:             ApplicationStatus;
     submittedAt:        string;       // ISO 8601
     reviewedAt:         string | null;
@@ -31,7 +37,10 @@ export function createApplication(
     communityHandle:    string,
     communityNodeId:    string,
     communityPublicKey: string,
+    communityUrl:       string,
+    communityEntityId:  string,
     memberCount         = 0,
+    communityPriority   = 1,
 ): FederationApplication {
     return {
         id:                 randomUUID(),
@@ -39,6 +48,9 @@ export function createApplication(
         communityHandle,
         communityNodeId,
         communityPublicKey,
+        communityUrl,
+        communityEntityId,
+        communityPriority,
         status:             "submitted",
         submittedAt:        new Date().toISOString(),
         reviewedAt:         null,

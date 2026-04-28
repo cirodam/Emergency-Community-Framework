@@ -1,7 +1,8 @@
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
-import { NodeService, NodeSigner, ClusterService, DataManifest, networkRouter } from "@ecf/core";
+import { NodeService, NodeSigner, ClusterService, DataManifest, networkRouter, parseRoutableAddress } from "@ecf/core";
+import { PaymentTokenService } from "./PaymentTokenService.js";
 import { clusterRoutes } from "./routes/clusterRoutes.js";
 import { PersonLoader } from "./person/PersonLoader.js";
 import { PersonService } from "./person/PersonService.js";
@@ -94,11 +95,12 @@ app.use(express.json({
 async function main(): Promise<void> {
     // ── Node identity ──────────────────────────────────────────────────────
     await NodeService.getInstance().init({
-        type:    "community",
-        name:    process.env.NODE_NAME    ?? "community",
-        address: process.env.NODE_ADDRESS ?? `http://localhost:${PORT}`,
-        dataDir: resolve(DATA_DIR, "network"),
-        seeds:   (process.env.BOOTSTRAP_PEERS ?? "").split(",").filter(Boolean),
+        type:     "community",
+        name:     process.env.NODE_NAME     ?? "community",
+        address:  process.env.NODE_ADDRESS  ?? `http://localhost:${PORT}`,
+        entityId: process.env.NODE_ENTITY_ID,
+        dataDir:  resolve(DATA_DIR, "network"),
+        seeds:    (process.env.BOOTSTRAP_PEERS ?? "").split(",").filter(Boolean),
     });
 
     // ── Community signer ──────────────────────────────────────────────────
@@ -189,6 +191,28 @@ async function main(): Promise<void> {
     // ── Governance proposals ───────────────────────────────────────────────
     const proposalLoader = new ProposalLoader(resolve(DATA_DIR, "proposals"));
     ProposalService.getInstance().init(proposalLoader, constitutionLoader);
+
+    // ── Payment tokens ─────────────────────────────────────────────────────
+    // Auto-assemble RoutableAddress from federation membership record when approved,
+    // fall back to ROUTABLE_ADDRESS env var for dev/bootstrap.
+    const membership = FederationMembershipService.getInstance().getStatus();
+    let routableAddress: import("@ecf/core").RoutableAddress;
+    if (
+        membership?.status === "approved" &&
+        membership.communityHandle &&
+        membership.federationHandle &&
+        membership.commonwealthHandle
+    ) {
+        routableAddress = {
+            commonwealth: membership.commonwealthHandle,
+            federation:   membership.federationHandle,
+            community:    membership.communityHandle,
+        };
+    } else {
+        const raw = process.env.ROUTABLE_ADDRESS ?? "globe:local-federation:local-community";
+        routableAddress = parseRoutableAddress(raw);
+    }
+    PaymentTokenService.getInstance().init(resolve(DATA_DIR, "payment-tokens"), routableAddress);
 
     // When an application collects enough vouches, admit the applicant as a full Person.
     MemberApplicationService.getInstance().onAdmitted(async (app) => {
@@ -633,7 +657,7 @@ async function main(): Promise<void> {
     app.get("/api/identity", (_req, res) => {
         const identity = NodeService.getInstance().getIdentity();
         const handle   = Constitution.getInstance().communityHandle;
-        res.json({ id: identity.id, publicKey: communitySigner.publicKeyHex, name: identity.name, handle });
+        res.json({ id: identity.id, entityId: identity.entityId, publicKey: communitySigner.publicKeyHex, name: identity.name, handle });
     });
 
     app.get("/api/constitution", (_req, res) => {

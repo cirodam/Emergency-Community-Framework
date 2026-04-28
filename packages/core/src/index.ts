@@ -1,5 +1,6 @@
 // types
 export * from "./types/IEconomicActor.js";
+export * from "./types/Address.js";
 
 // network
 export * from "./network/NodeIdentity.js";

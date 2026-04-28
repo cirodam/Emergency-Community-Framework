@@ -85,6 +85,7 @@ export class NodeService {
         if (existing) return { ...existing, createdAt: new Date(existing.createdAt) };
         const identity: NodeIdentity = {
             id:        randomUUID(),
+            entityId:  config.entityId ?? randomUUID(),
             type:      config.type,
             name:      config.name,
             address:   config.address,

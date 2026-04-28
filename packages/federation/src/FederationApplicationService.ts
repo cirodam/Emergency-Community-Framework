@@ -59,7 +59,10 @@ export class FederationApplicationService {
         communityHandle:    string,
         communityNodeId:    string,
         communityPublicKey: string,
+        communityUrl:       string,
+        communityEntityId:  string,
         memberCount         = 0,
+        communityPriority   = 1,
     ): FederationApplication {
         const existing = this.getByNodeId(communityNodeId);
         if (existing && existing.status !== "rejected") {
@@ -68,13 +71,17 @@ export class FederationApplicationService {
             );
         }
 
-        // Handle uniqueness: check both pending applications and existing members
-        const handleConflict = this.getByHandle(communityHandle);
-        if (handleConflict && handleConflict.status !== "rejected") {
+        // Handle uniqueness: block if handle is taken by a different entity
+        const conflict = this.getAll().find(
+            a => a.communityHandle === communityHandle &&
+                 a.status !== "rejected" &&
+                 a.communityEntityId !== communityEntityId,
+        );
+        if (conflict) {
             throw new Error(`Handle "${communityHandle}" is already taken`);
         }
 
-        const app = createApplication(communityName, communityHandle, communityNodeId, communityPublicKey, memberCount);
+        const app = createApplication(communityName, communityHandle, communityNodeId, communityPublicKey, communityUrl, communityEntityId, memberCount, communityPriority);
         this.applications.set(app.id, app);
         this.loader.save(app);
         return app;

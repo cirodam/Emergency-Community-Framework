@@ -7,15 +7,23 @@ export type FederationApplicationStatus =
 
 export interface FederationMembershipRecord {
     /** URL of the federation node, e.g. http://federation:3010 */
-    federationUrl:       string;
+    federationUrl:         string;
     /** Application ID returned by the federation on submit */
-    applicationId:       string;
+    applicationId:         string;
     /** Set once the federation approves and creates the member record */
-    memberId:            string | null;
+    memberId:              string | null;
     /** The account ID at the federation bank (set on approval) */
-    federationAccountId: string | null;
-    status:              FederationApplicationStatus;
-    appliedAt:           string; // ISO 8601
+    federationAccountId:   string | null;
+    /** The handle this community chose — its segment in the routable address */
+    communityHandle:       string;
+    /** The federation's own handle — fetched from federation identity on approval */
+    federationHandle:      string | null;
+    /** The commonwealth the federation belongs to — forwarded from federation identity */
+    commonwealthHandle:    string | null;
+    /** The globe the commonwealth belongs to — forwarded from federation identity */
+    globeHandle:           string | null;
+    status:                FederationApplicationStatus;
+    appliedAt:             string; // ISO 8601
 }
 
 /**
@@ -66,12 +74,15 @@ export class FederationMembershipService {
             );
         }
 
-        const node = NodeService.getInstance();
+        const node      = NodeService.getInstance();
+        const selfUrl   = node.getIdentity().address;
         const body = JSON.stringify({
             communityName,
             communityHandle,
             communityNodeId:    node.getIdentity().id,
             communityPublicKey: node.getSigner().publicKeyHex,
+            communityUrl:       selfUrl,
+            communityEntityId:  node.getIdentity().entityId,
         });
         const signature = node.getSigner().signBody(body);
 
@@ -95,6 +106,10 @@ export class FederationMembershipService {
             applicationId:       data.id,
             memberId:            null,
             federationAccountId: null,
+            communityHandle,
+            federationHandle:    null,
+            commonwealthHandle:  null,
+            globeHandle:         null,
             status:              data.status as FederationApplicationStatus,
             appliedAt:           new Date().toISOString(),
         };
@@ -138,6 +153,23 @@ export class FederationMembershipService {
                         const members = await res.json() as { id: string; bankAccountId: string | null }[];
                         const member  = members.find(m => m.id === appData.memberId);
                         if (member?.bankAccountId) this.record.federationAccountId = member.bankAccountId;
+                    }
+                } catch { /* non-fatal */ }
+            }
+
+            // Fetch federation's handle chain from its identity endpoint
+            if (!this.record.federationHandle) {
+                try {
+                    const res = await fetch(`${base}/api/identity`);
+                    if (res.ok) {
+                        const id = await res.json() as {
+                            handle?: string;
+                            commonwealthHandle?: string;
+                            globeHandle?: string;
+                        };
+                        if (id.handle)             this.record.federationHandle     = id.handle;
+                        if (id.commonwealthHandle) this.record.commonwealthHandle   = id.commonwealthHandle;
+                        if (id.globeHandle)        this.record.globeHandle          = id.globeHandle;
                     }
                 } catch { /* non-fatal */ }
             }

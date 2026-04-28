@@ -32,3 +32,5 @@ export { SocialInsuranceBank } from "./domains/social_insurance/SocialInsuranceB
 export { SocialInsuranceBankLoader } from "./domains/social_insurance/SocialInsuranceBankLoader.js";
 export type { SocialInsuranceBankRecord } from "./domains/social_insurance/SocialInsuranceBankLoader.js";
 
+export { PaymentTokenService } from "./PaymentTokenService.js";
+

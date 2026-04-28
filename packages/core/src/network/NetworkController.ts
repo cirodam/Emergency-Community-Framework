@@ -52,6 +52,7 @@ export function announce(req: Request, res: Response): void {
 
     const identity: NodeIdentity = {
         id:        body.id,
+        entityId:  typeof body.entityId === "string" ? body.entityId : body.id,
         type:      body.type,
         name:      body.name,
         address:   body.address,

@@ -18,6 +18,7 @@ import {
     listDomains,
     submitCensus,
     getCensusSummary,
+    routePayment,
 } from "./FederationController.js";
 
 const router = Router();
@@ -51,5 +52,8 @@ router.post("/kithe/structural-aid", requireMember, structuralAidGrant);
 // Census — authenticated submit, public summary
 router.post("/census", requireMember, submitCensus);
 router.get( "/census", getCensusSummary);
+
+// Payment routing — directed payments forwarded from commonwealth
+router.post("/route-payment", routePayment);
 
 export default router;

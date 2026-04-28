@@ -1,11 +1,12 @@
-export type NodeType = "community" | "infrastructure" | "federation" | "forum";
+export type NodeType = "community" | "infrastructure" | "federation" | "forum" | "commonwealth" | "globe";
 
 /**
  * The stable identity of a node on the Fabric network.
  * Written to disk on first boot and never changed.
  */
 export interface NodeIdentity {
-    id: string;          // UUID, generated once
+    id:        string;          // UUID, unique to this node instance
+    entityId:  string;          // UUID, stable org ID shared across all nodes of this entity
     type: NodeType;
     name: string;        // Human-readable, e.g. "Maplewood Commons"
     address: string;     // Public base URL, e.g. "https://maplewood.example.org"
@@ -22,6 +23,7 @@ export interface NodeConfig {
     name: string;
     address: string;
     dataDir: string;           // e.g. "data/network"
+    entityId?: string;         // Stable org UUID; generated once if absent (set NODE_ENTITY_ID for secondary nodes)
     seeds: string[];           // Bootstrap peer addresses
     peerCap?: number;          // Max peers to retain in registry (default 10_000)
     pingIntervalMs?: number;   // How often to health-check peers (default 5 min)

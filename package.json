@@ -20,6 +20,8 @@
     "packages/community",
     "packages/federation",
     "packages/market",
-    "packages/mail"
+    "packages/mail",
+    "packages/commonwealth",
+    "packages/globe"
   ]
 }

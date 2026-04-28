@@ -58,7 +58,7 @@ export class FederationClearingHouse {
 
             // Back-compat: if an existing deployment has no solidarity pool yet, create one
             if (!this._solidarityPoolAccountId) {
-                const account = await bank.openAccount(this._ownerId, "Federation Solidarity Pool", "kin");
+                const account = await bank.openAccount(this._ownerId, "Federation Solidarity Pool", "kithe");
                 this._solidarityPoolAccountId = account.accountId;
                 loader.save({
                     ownerId:                 this._ownerId,
@@ -84,7 +84,7 @@ export class FederationClearingHouse {
         const aidAccount = await bank.openAccount(
             this._ownerId,
             "Federation Structural Aid",
-            "kin",
+            "kithe",
             null, // null → -Infinity overdraft
         );
         this._structuralAidAccountId = aidAccount.accountId;
@@ -94,7 +94,7 @@ export class FederationClearingHouse {
         const solidarityAccount = await bank.openAccount(
             this._ownerId,
             "Federation Solidarity Pool",
-            "kin",
+            "kithe",
         );
         this._solidarityPoolAccountId = solidarityAccount.accountId;
 

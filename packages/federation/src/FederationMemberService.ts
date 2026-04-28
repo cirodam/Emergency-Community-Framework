@@ -46,24 +46,31 @@ export class FederationMemberService {
     }
 
     getByHandle(handle: string): FederationMember | undefined {
-        for (const m of this.members.values()) {
-            if (m.handle === handle) return m;
-        }
-        return undefined;
+        // Return the lowest-priority (preferred) node for this handle
+        return this.getAllByHandle(handle)[0];
+    }
+
+    getAllByHandle(handle: string): FederationMember[] {
+        return [...this.members.values()]
+            .filter(m => m.handle === handle)
+            .sort((a, b) => a.priority - b.priority);
     }
 
     /**
      * Register a new member community. Does NOT open a bank account — that is
      * done by the caller after registration so the account ID can be set.
      */
-    add(name: string, handle: string, communityNodeId: string, communityPublicKey: string, isFounder = false): FederationMember {
+    add(name: string, handle: string, communityNodeId: string, communityPublicKey: string, url: string, entityId: string, isFounder = false, priority = 1): FederationMember {
         if (this.getByNodeId(communityNodeId)) {
             throw new Error(`Community node ${communityNodeId} is already a member`);
         }
-        if (this.getByHandle(handle)) {
-            throw new Error(`Handle "${handle}" is already taken by an existing member`);
+        // Same entity may register additional nodes with the same handle;
+        // block only if the handle is taken by a *different* entity.
+        const existing = this.getAllByHandle(handle);
+        if (existing.length > 0 && existing[0].entityId !== entityId) {
+            throw new Error(`Handle "${handle}" is already taken by a different entity`);
         }
-        const member = createFederationMember(name, handle, communityNodeId, communityPublicKey, isFounder);
+        const member = createFederationMember(name, handle, communityNodeId, communityPublicKey, url, entityId, isFounder, priority);
         this.members.set(member.id, member);
         this.loader.save(member);
         return member;

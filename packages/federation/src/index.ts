@@ -19,6 +19,7 @@ import { CensusRecordLoader } from "./census/CensusRecordLoader.js";
 import { FederationCensusService } from "./census/FederationCensusService.js";
 import federationRoutes from "./routes/federationRoutes.js";
 import { FederationDemurrageScheduler } from "./FederationDemurrageScheduler.js";
+import { CommonwealthMembershipService } from "./CommonwealthMembershipService.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -27,6 +28,7 @@ const DATA_DIR = process.env.DATA_DIR ?? join(__dirname, "../../data");
 const BANK_URL = process.env.BANK_URL  ?? "http://localhost:3011";
 
 const FOUNDING_COMMUNITY_URL = process.env.FOUNDING_COMMUNITY_URL ?? "";
+const FOUNDING_COMMONWEALTH_URL = process.env.FOUNDING_COMMONWEALTH_URL ?? "";
 
 const app = express();
 
@@ -55,14 +57,15 @@ async function bootstrapFoundingMember(bank: BankClient, attempt = 1): Promise<v
         const res  = await fetch(`${base}/api/identity`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        const identity = await res.json() as { id: string; publicKey: string; name: string; handle?: string };
+        const identity = await res.json() as { id: string; entityId?: string; publicKey: string; name: string; handle?: string };
 
         // Derive a handle from the community name if it hasn't set one yet
         const handle = identity.handle?.trim()
             || identity.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32)
             || "founding-community";
 
-        const member  = memberSvc.add(identity.name, handle, identity.id, identity.publicKey, true);
+        const entityId = identity.entityId ?? identity.id;
+        const member  = memberSvc.add(identity.name, handle, identity.id, identity.publicKey, base, entityId, true);
         const owner   = await bank.createOwner("institution", identity.name);
         const account = await bank.openAccount(owner.ownerId, `${identity.name} — kithe reserve`, "kithe");
         memberSvc.setBankAccount(member.id, account.accountId);
@@ -81,11 +84,12 @@ async function bootstrapFoundingMember(bank: BankClient, attempt = 1): Promise<v
 
 async function main(): Promise<void> {
     await NodeService.getInstance().init({
-        type:    "federation",
-        name:    process.env.NODE_NAME    ?? "federation",
-        address: process.env.NODE_ADDRESS ?? `http://localhost:${PORT}`,
-        dataDir: resolve(DATA_DIR, "network"),
-        seeds:   (process.env.BOOTSTRAP_PEERS ?? "").split(",").filter(Boolean),
+        type:     "federation",
+        name:     process.env.NODE_NAME     ?? "federation",
+        address:  process.env.NODE_ADDRESS  ?? `http://localhost:${PORT}`,
+        entityId: process.env.NODE_ENTITY_ID,
+        dataDir:  resolve(DATA_DIR, "network"),
+        seeds:    (process.env.BOOTSTRAP_PEERS ?? "").split(",").filter(Boolean),
     });
 
     DataManifest.getInstance().init(
@@ -123,7 +127,8 @@ async function main(): Promise<void> {
     const domainSvc = FederationDomainService.getInstance();
     domainSvc.registerDomain(InsuranceDomain.getInstance());
     domainSvc.registerDomain(LogisticsDomain.getInstance());
-
+    // ── Commonwealth membership ─────────────────────────────────────────────
+    CommonwealthMembershipService.getInstance(resolve(DATA_DIR, "network"));
     // ── Founding member bootstrap ──────────────────────────────────────────
     await bootstrapFoundingMember(bank);
 
@@ -141,11 +146,16 @@ async function main(): Promise<void> {
     app.get("/api/identity", (_req, res) => {
         const node = NodeService.getInstance();
         const identity = node.getIdentity();
+        const cwRecord = CommonwealthMembershipService.getInstance().getStatus();
         res.json({
-            id:        identity.id,
-            publicKey: node.getSigner().publicKeyHex,
-            type:      "federation",
-            name:      identity.name,
+            id:                identity.id,
+            entityId:          identity.entityId,
+            publicKey:         node.getSigner().publicKeyHex,
+            type:              "federation",
+            name:              identity.name,
+            handle:            cwRecord?.federationHandle    ?? null,
+            commonwealthHandle: cwRecord?.commonwealthHandle ?? null,
+            globeHandle:       cwRecord?.globeHandle         ?? null,
         });
     });
 

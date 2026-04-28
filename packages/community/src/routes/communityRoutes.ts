@@ -15,6 +15,7 @@ import * as calendar from "./CalendarController.js";
 import * as locations from "./LocationController.js";
 
 import * as proposals from "./ProposalController.js";
+import * as paymentTokens from "./PaymentTokenController.js";
 
 const requireAuth = requirePersonCredential(getCommunityIdentity);
 
@@ -154,5 +155,13 @@ router.get(   "/proposals/:id",      proposals.getProposal);
 router.post(  "/proposals",          requireAuth, proposals.createProposal);
 router.post(  "/proposals/:id/vote", requireAuth, proposals.voteOnProposal);
 router.delete("/proposals/:id",      requireAuth, proposals.withdrawProposal);
+
+// Payment tokens (privacy-preserving directed payments from external institutions)
+// Token management is steward-only; inbound clearing payment is federation-signed
+router.post(  "/payment-tokens",                          requireSteward, paymentTokens.issueToken);
+router.post(  "/payment-tokens/:token/rotate",            requireSteward, paymentTokens.rotateToken);
+router.delete("/payment-tokens/:token",                   requireSteward, paymentTokens.revokeToken);
+router.get(   "/payment-tokens/person/:personId",         requireSteward, paymentTokens.listTokensForPerson);
+router.post(  "/payment-tokens/receive",                  paymentTokens.receivePayment);  // federation-signed
 
 export default router;

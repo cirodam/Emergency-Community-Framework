@@ -32,7 +32,7 @@ function bank(): BankClient {
  * proving it controls the private key.
  */
 export async function submitApplication(req: Request, res: Response): Promise<void> {
-    const { communityName, communityHandle, communityNodeId, communityPublicKey, memberCount } = req.body ?? {};
+    const { communityName, communityHandle, communityNodeId, communityPublicKey, communityUrl, communityEntityId, communityPriority, memberCount } = req.body ?? {};
 
     if (typeof communityName      !== "string" || !communityName.trim()) {
         res.status(400).json({ error: "communityName is required" }); return;
@@ -50,6 +50,12 @@ export async function submitApplication(req: Request, res: Response): Promise<vo
     if (typeof communityPublicKey !== "string" || !communityPublicKey.trim()) {
         res.status(400).json({ error: "communityPublicKey is required" }); return;
     }
+    if (typeof communityUrl !== "string" || !communityUrl.trim()) {
+        res.status(400).json({ error: "communityUrl is required" }); return;
+    }
+    if (typeof communityEntityId !== "string" || !communityEntityId.trim()) {
+        res.status(400).json({ error: "communityEntityId is required" }); return;
+    }
 
     // Verify signature using the presented public key
     const signature = req.headers["x-node-signature"];
@@ -63,12 +69,16 @@ export async function submitApplication(req: Request, res: Response): Promise<vo
 
     try {
         const count = typeof memberCount === "number" && memberCount > 0 ? Math.floor(memberCount) : 0;
+        const priority = typeof communityPriority === "number" && communityPriority > 0 ? Math.floor(communityPriority) : 1;
         const app = FederationApplicationService.getInstance().submit(
             communityName.trim(),
             handle,
             communityNodeId.trim(),
             communityPublicKey.trim(),
+            communityUrl.trim(),
+            communityEntityId.trim(),
             count,
+            priority,
         );
         console.log(`[federation] application submitted: ${communityName} (${handle}, ${communityNodeId})`);
         res.status(201).json(appToDto(app));
@@ -122,7 +132,7 @@ export async function reviewApplication(req: Request, res: Response): Promise<vo
         const memberSvc = FederationMemberService.getInstance();
         let member;
         try {
-            member = memberSvc.add(app.communityName, app.communityHandle, app.communityNodeId, app.communityPublicKey);
+            member = memberSvc.add(app.communityName, app.communityHandle, app.communityNodeId, app.communityPublicKey, app.communityUrl, app.communityEntityId, false, app.communityPriority);
         } catch (err) {
             res.status(409).json({ error: (err as Error).message }); return;
         }
@@ -440,4 +450,88 @@ export function submitCensus(req: Request, res: Response): void {
 /** GET /api/census — public summary of unique members across all communities. */
 export function getCensusSummary(_req: Request, res: Response): void {
     res.json(FederationCensusService.getInstance().getSummary());
+}
+
+// ── Payment routing ───────────────────────────────────────────────────────────
+
+/**
+ * POST /api/route-payment
+ * Body: { address: { commonwealth, federation, community }, token, amount, fromAccountId }
+ *
+ * Called by the clearing layer (or directly by a commonwealth) when a directed
+ * payment arrives for a community in this federation. The federation:
+ *   1. Looks up the target community by handle.
+ *   2. Transfers `amount` from the sender's clearing account to the community's
+ *      clearing account (internal bank move — no fee).
+ *   3. Forwards the routing request to the community's /api/payment-tokens/receive
+ *      so the community can apply the payment to the correct person.
+ *
+ * Auth: requireMemberCommunity (or direct from upper layer) — for now open since
+ * this is an internal infrastructure call; production should add node-sig auth.
+ */
+export async function routePayment(req: Request, res: Response): Promise<void> {
+    const { address, token, amount, fromAccountId } = req.body ?? {};
+
+    if (typeof address?.community !== "string" || !address.community) {
+        res.status(400).json({ error: "address.community is required" }); return;
+    }
+    if (typeof token !== "string" || !token) {
+        res.status(400).json({ error: "token is required" }); return;
+    }
+    if (typeof amount !== "number" || amount <= 0) {
+        res.status(400).json({ error: "amount must be a positive number" }); return;
+    }
+    if (typeof fromAccountId !== "string" || !fromAccountId) {
+        res.status(400).json({ error: "fromAccountId is required" }); return;
+    }
+
+    const nodes = FederationMemberService.getInstance().getAllByHandle(address.community);
+    const member = nodes.find(n => n.bankAccountId != null) ?? nodes[0];
+    if (!member) {
+        res.status(404).json({ error: `No community with handle "${address.community}"` }); return;
+    }
+    if (!member.bankAccountId) {
+        res.status(422).json({ error: `Community "${address.community}" has no clearing account` }); return;
+    }
+
+    // Move kin inside the federation bank: sender's clearing account → community's clearing account
+    try {
+        const b = bank();
+        await b.transfer(
+            fromAccountId,
+            member.bankAccountId,
+            amount,
+            `directed payment → ${address.community} (token ${token.slice(0, 8)}…)`,
+        );
+    } catch (err) {
+        res.status(502).json({ error: `Bank transfer failed: ${(err as Error).message}` }); return;
+    }
+
+    // Forward to the community node to resolve the token and credit the person
+    try {
+        const body = JSON.stringify({ address, token, amount });
+        const node = NodeService.getInstance();
+        const sig  = node.getSigner().signBody(body);
+        const communityRes = await fetch(`${member.url.replace(/\/$/, "")}/api/payment-tokens/receive`, {
+            method:  "POST",
+            headers: {
+                "Content-Type":     "application/json",
+                "x-node-id":        node.getIdentity().id,
+                "x-node-signature": sig,
+            },
+            body,
+        });
+        if (!communityRes.ok) {
+            const err = await communityRes.json().catch(() => ({})) as { error?: string };
+            // Non-fatal for routing — the bank transfer succeeded; community can reconcile
+            console.warn(
+                `[federation/route-payment] community ${address.community} returned ${communityRes.status}: ` +
+                `${err.error ?? "unknown"}`,
+            );
+        }
+    } catch (err) {
+        console.warn(`[federation/route-payment] could not forward to community: ${(err as Error).message}`);
+    }
+
+    res.json({ ok: true, community: address.community, amount });
 }
