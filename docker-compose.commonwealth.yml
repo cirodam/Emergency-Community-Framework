@@ -1,0 +1,36 @@
+services:
+  commonwealth:
+    build:
+      context: .
+      dockerfile: packages/commonwealth/Dockerfile
+    ports:
+      - "3020:3020"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      BANK_URL: http://commonwealth-bank:3021
+      FOUNDING_FEDERATION_URL: ""
+      FOUNDING_GLOBE_URL: ""
+    volumes:
+      - commonwealth-data:/app/data
+    depends_on:
+      - commonwealth-bank
+
+  commonwealth-bank:
+    build:
+      context: .
+      dockerfile: packages/bank/Dockerfile
+    ports:
+      - "3021:3021"
+    environment:
+      NODE_ENV:     production
+      DATA_DIR:     /app/data
+      PORT:         3021
+      COMMUNITY_URL: http://commonwealth:3020
+      OWNER_TYPE:   commonwealth
+    volumes:
+      - commonwealth-bank-data:/app/data
+
+volumes:
+  commonwealth-data:
+  commonwealth-bank-data:

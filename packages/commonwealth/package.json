@@ -9,7 +9,7 @@
     "start": "node dist/index.js"
   },
   "devDependencies": {
-    "typescript": "^6.0.0",
+    "typescript": "^5.7.0",
     "@types/node": "^25.0.0",
     "@types/express": "^5.0.0"
   },
