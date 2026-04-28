@@ -12,7 +12,8 @@ import { FederationTreasury } from "./domains/treasury/FederationTreasury.js";
 import { FederationTreasuryLoader } from "./domains/treasury/FederationTreasuryLoader.js";
 import { FederationConstitution } from "./governance/FederationConstitution.js";
 import { FederationDomainService } from "./common/FederationDomainService.js";
-import { InsuranceDomain } from "./domains/insurance/InsuranceDomain.js";
+import { HealthcareDomain } from "./domains/healthcare/HealthcareDomain.js";
+import { MediationDomain } from "./domains/mediation/MediationDomain.js";
 import { LogisticsDomain } from "./domains/logistics/LogisticsDomain.js";
 import { BankClient } from "@ecf/core";
 import { CensusRecordLoader } from "./census/CensusRecordLoader.js";
@@ -127,8 +128,9 @@ async function main(): Promise<void> {
 
     // ── Federation functional domains ─────────────────────────────────────
     const domainSvc = FederationDomainService.getInstance();
-    domainSvc.registerDomain(InsuranceDomain.getInstance());
+    domainSvc.registerDomain(HealthcareDomain.getInstance());
     domainSvc.registerDomain(LogisticsDomain.getInstance());
+    domainSvc.registerDomain(MediationDomain.getInstance());
     // ── Commonwealth membership ─────────────────────────────────────────────
     CommonwealthMembershipService.getInstance(resolve(DATA_DIR, "network"));
     // ── Founding member bootstrap ──────────────────────────────────────────

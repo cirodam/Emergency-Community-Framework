@@ -14,6 +14,8 @@ import { CommonwealthConstitution } from "./governance/CommonwealthConstitution.
 import { BankClient } from "@ecf/core";
 import { CommonwealthDemurrageScheduler } from "./CommonwealthDemurrageScheduler.js";
 import { GlobeMembershipService } from "./GlobeMembershipService.js";
+import { CommonwealthDomainService } from "./common/CommonwealthDomainService.js";
+import { MediationDomain } from "./domains/mediation/MediationDomain.js";
 import commonwealthRoutes from "./routes/commonwealthRoutes.js";
 import { handleBankTransferRoute } from "./routes/CommonwealthController.js";
 
@@ -113,6 +115,10 @@ async function main(): Promise<void> {
 
     // ── Globe membership ─────────────────────────────────────────────────────────
     GlobeMembershipService.getInstance(resolve(DATA_DIR, "network"));
+
+    // ── Commonwealth functional domains ───────────────────────────────────────
+    const domainSvc = CommonwealthDomainService.getInstance();
+    domainSvc.registerDomain(MediationDomain.getInstance());
 
     // ── Founding member bootstrap ──────────────────────────────────────────
     await bootstrapFoundingMember(bankClient);

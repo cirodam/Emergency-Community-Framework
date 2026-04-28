@@ -11,7 +11,6 @@ export { CommunityRole } from "./common/CommunityRole.js";
 export { CommunityRoleLoader } from "./common/domain/CommunityRoleLoader.js";
 export { FunctionalUnit } from "./common/domain/FunctionalUnit.js";
 export { FunctionalDomain } from "./common/domain/FunctionalDomain.js";
-export type { BudgetLineItem, DomainBudget } from "./common/domain/FunctionalDomain.js";
 export { FunctionalUnitLoader } from "./common/domain/FunctionalUnitLoader.js";
 export { FunctionalDomainLoader } from "./common/domain/FunctionalDomainLoader.js";
 export { UnitTemplateRegistry } from "./common/domain/UnitTemplateRegistry.js";

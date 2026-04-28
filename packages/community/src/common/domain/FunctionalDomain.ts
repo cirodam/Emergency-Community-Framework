@@ -12,11 +12,6 @@ export interface BudgetItem {
     note: string;
 }
 
-/** @deprecated Use BudgetItem. Kept for index.ts re-exports. */
-export interface BudgetLineItem { label: string; amount: number; }
-/** @deprecated Use domain.budgetItems + DomainService.getDomainBudget. */
-export interface DomainBudget { lineItems: BudgetLineItem[]; total: number; }
-
 /**
  * Base class for all functional domains (Food, Healthcare, Childcare, etc.).
  *

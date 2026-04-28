@@ -13,6 +13,8 @@ import { GlobeTreasuryLoader } from "./domains/treasury/GlobeTreasuryLoader.js";
 import { GlobeConstitution } from "./governance/GlobeConstitution.js";
 import { BankClient } from "@ecf/core";
 import { GlobeDemurrageScheduler } from "./GlobeDemurrageScheduler.js";
+import { GlobeDomainService } from "./common/GlobeDomainService.js";
+import { MediationDomain } from "./domains/mediation/MediationDomain.js";
 import globeRoutes from "./routes/globeRoutes.js";
 import { handleBankTransferRoute } from "./routes/GlobeController.js";
 
@@ -108,6 +110,10 @@ async function main(): Promise<void> {
 
     // ── Constitution ───────────────────────────────────────────────────────
     GlobeConstitution.getInstance().load(resolve(DATA_DIR, "governance"));
+
+    // ── Globe functional domains ──────────────────────────────────────────────
+    const domainSvc = GlobeDomainService.getInstance();
+    domainSvc.registerDomain(MediationDomain.getInstance());
 
     // ── Founding member bootstrap ──────────────────────────────────────────
     await bootstrapFoundingMember(bankClient);
