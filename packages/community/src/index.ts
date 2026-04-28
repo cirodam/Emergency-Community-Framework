@@ -25,9 +25,6 @@ export { ConstitutionLoader } from "./governance/ConstitutionLoader.js";
 export { CentralBank } from "./domains/central_bank/CentralBank.js";
 export { CentralBankLoader } from "./domains/central_bank/CentralBankLoader.js";
 export type { CentralBankRecord } from "./domains/central_bank/CentralBankLoader.js";
-export { CurrencyBoard } from "./domains/currency_board/CurrencyBoard.js";
-export { CurrencyBoardLoader } from "./domains/currency_board/CurrencyBoardLoader.js";
-export type { CurrencyBoardRecord } from "./domains/currency_board/CurrencyBoardLoader.js";
 
 export { SocialInsuranceMember } from "./domains/social_insurance/SocialInsuranceMember.js";
 export { SocialInsuranceMemberLoader } from "./domains/social_insurance/SocialInsuranceMemberLoader.js";

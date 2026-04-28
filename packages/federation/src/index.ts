@@ -6,8 +6,8 @@ import { FederationMemberLoader } from "./FederationMemberLoader.js";
 import { FederationMemberService } from "./FederationMemberService.js";
 import { FederationApplicationLoader } from "./FederationApplicationLoader.js";
 import { FederationApplicationService } from "./FederationApplicationService.js";
-import { FederationCentralBank } from "./domains/central_bank/FederationCentralBank.js";
-import { FederationCentralBankLoader } from "./domains/central_bank/FederationCentralBankLoader.js";
+import { FederationClearingHouse } from "./domains/central_bank/FederationClearingHouse.js";
+import { FederationClearingHouseLoader } from "./domains/central_bank/FederationClearingHouseLoader.js";
 import { FederationTreasury } from "./domains/treasury/FederationTreasury.js";
 import { FederationTreasuryLoader } from "./domains/treasury/FederationTreasuryLoader.js";
 import { FederationConstitution } from "./governance/FederationConstitution.js";
@@ -18,6 +18,7 @@ import { BankClient } from "./BankClient.js";
 import { CensusRecordLoader } from "./census/CensusRecordLoader.js";
 import { FederationCensusService } from "./census/FederationCensusService.js";
 import federationRoutes from "./routes/federationRoutes.js";
+import { FederationDemurrageScheduler } from "./FederationDemurrageScheduler.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -99,13 +100,13 @@ async function main(): Promise<void> {
     const appLoader = new FederationApplicationLoader(resolve(DATA_DIR, "applications"));
     FederationApplicationService.getInstance().init(appLoader);
 
-    // ── Federation central bank (kithe issuer) ─────────────────────────────
+    // ── Federation clearing house ───────────────────────────────────────
     const bank = new BankClient(
         BANK_URL,
         body => NodeService.getInstance().getSigner().signBody(body),
     );
-    const cbLoader = new FederationCentralBankLoader(resolve(DATA_DIR, "domains"));
-    await FederationCentralBank.getInstance().init(bank, cbLoader);
+    const chLoader = new FederationClearingHouseLoader(resolve(DATA_DIR, "domains"));
+    await FederationClearingHouse.getInstance().init(bank, chLoader);
 
     // ── Federation treasury ────────────────────────────────────────────────
     const treasuryLoader = new FederationTreasuryLoader(resolve(DATA_DIR, "domains"));
@@ -125,6 +126,12 @@ async function main(): Promise<void> {
 
     // ── Founding member bootstrap ──────────────────────────────────────────
     await bootstrapFoundingMember(bank);
+
+    // ── Monthly demurrage sweep ────────────────────────────────────────────
+    // Runs on the 1st of each month (UTC). Charges communities whose federation
+    // account balance exceeds (creditLineKin × surplusThresholdMultiple) at
+    // surplusDemurrageRate, flowing the excess to the treasury.
+    new FederationDemurrageScheduler().start();
 
     // ── Routes ─────────────────────────────────────────────────────────────
     app.use("/api",      federationRoutes);

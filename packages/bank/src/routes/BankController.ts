@@ -226,6 +226,19 @@ export function createMyAccount(req: Request & { personId?: string }, res: Respo
     res.status(201).json(toAccountDto(account));
 }
 
+// DELETE /api/accounts/:ownerId/all
+// Closes all accounts for an owner. Requires all balances to be zero.
+// Node-auth only — used by the community node during member discharge.
+export function closeOwnerAccounts(req: Request, res: Response): void {
+    const { ownerId } = req.params as { ownerId: string };
+    try {
+        bank().closeAccounts(ownerId);
+        res.status(204).end();
+    } catch (err) {
+        res.status(422).json({ error: (err as Error).message });
+    }
+}
+
 // DELETE /api/me/accounts/:accountId
 // Closes the account. Requires zero balance. Requires at least one account to remain.
 export function deleteMyAccount(req: Request & { personId?: string }, res: Response): void {

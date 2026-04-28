@@ -77,27 +77,6 @@
             </div>
         </button>
 
-        <button class="inst-card" onclick={() => currentPage.go("currency-board")}>
-            <div class="inst-left">
-                <div class="inst-icon cur-icon">⊜</div>
-                <div class="inst-text">
-                    <h3>Currency Board</h3>
-                    <p>Issues kithe — the network settlement currency, 1:1 backed by kin.</p>
-                </div>
-            </div>
-            <div class="inst-right">
-                {#if data.currencyBoard}
-                    <div class="inst-metric">
-                        <span class="metric-num">{fmt(data.currencyBoard.kitheInCirculation)}</span>
-                        <span class="metric-unit">kithe</span>
-                    </div>
-                {:else}
-                    <span class="metric-na">—</span>
-                {/if}
-                <span class="chevron">›</span>
-            </div>
-        </button>
-
         <button class="inst-card" onclick={() => currentPage.go("social-insurance")}>
             <div class="inst-left">
                 <div class="inst-icon si-icon">⊞</div>

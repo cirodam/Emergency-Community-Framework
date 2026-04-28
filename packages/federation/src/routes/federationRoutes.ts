@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { requireMemberCommunity } from "./memberAuthMiddleware.js";
+import { requireFederationMemberPerson } from "./personCredentialMiddleware.js";
+import { verifyFederationCredential, getMe } from "./FederationAuthController.js";
 import {
     submitApplication,
     listApplications,
@@ -9,7 +11,7 @@ import {
     listMembers,
     getEconomics,
     transferKithe,
-    issueKithe,
+    structuralAidGrant,
     getTreasury,
     getConstitution,
     getBudget,
@@ -19,6 +21,10 @@ import {
 } from "./FederationController.js";
 
 const router = Router();
+
+// ── Person auth (any member community citizen) ─────────────────────────────
+router.post("/auth/verify", verifyFederationCredential);
+router.get( "/me",          requireFederationMemberPerson(), getMe);
 
 // Applications — open submit (self-signed), operator review
 router.post( "/applications",                 submitApplication);
@@ -37,10 +43,10 @@ router.get("/constitution",  getConstitution);
 router.get("/budget",        getBudget);
 router.get("/domains",       listDomains);
 
-// Authenticated: registered member community (Currency Board signing)
+// Authenticated: registered member community
 const requireMember = requireMemberCommunity();
-router.post("/transfers",   requireMember, transferKithe);
-router.post("/kithe/issue", requireMember, issueKithe);
+router.post("/transfers",          requireMember, transferKithe);
+router.post("/kithe/structural-aid", requireMember, structuralAidGrant);
 
 // Census — authenticated submit, public summary
 router.post("/census", requireMember, submitCensus);

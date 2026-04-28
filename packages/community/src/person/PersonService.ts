@@ -42,6 +42,7 @@ export class PersonService {
 
     private persons: Map<string, Person> = new Map();
     private loader: PersonLoader | null = null;
+    private communitySigner: NodeSigner | null = null;
 
     private joinHandlers: ((person: Person) => Promise<void>)[] = [];
     private dischargeHandlers: ((person: Person) => Promise<void>)[] = [];
@@ -55,6 +56,15 @@ export class PersonService {
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    /**
+     * Set the signer used for issuing credentials.
+     * In cluster mode, pass the shared communitySigner so all replicas
+     * produce credentials with the same public key.
+     */
+    setCommunitySigner(signer: NodeSigner): void {
+        this.communitySigner = signer;
+    }
 
     /**
      * Set the persistence layer and load all persons from disk.
@@ -132,19 +142,20 @@ export class PersonService {
      * of the six non-signature fields. Persists the updated person record.
      */
     issueCredential(person: Person, ttlMs: number = DEFAULT_CREDENTIAL_TTL_MS): PersonCredential {
-        const node = NodeService.getInstance();
+        const node     = NodeService.getInstance();
         const identity = node.getIdentity();
-        const signer = node.getSigner();
+        const signer   = this.communitySigner ?? node.getSigner();
+        const communityPublicKey = signer.publicKeyHex;
 
-        const issuedAt = new Date().toISOString();
+        const issuedAt  = new Date().toISOString();
         const expiresAt = new Date(Date.now() + ttlMs).toISOString();
 
         const payload = JSON.stringify({
-            personId:         person.id,
-            handle:           person.handle,
-            personPublicKey:  person.publicKeyHex,
-            communityNodeId:  identity.id,
-            communityPublicKey: identity.publicKey,
+            personId:           person.id,
+            handle:             person.handle,
+            personPublicKey:    person.publicKeyHex,
+            communityNodeId:    identity.id,
+            communityPublicKey,
             issuedAt,
             expiresAt,
         });
@@ -154,7 +165,7 @@ export class PersonService {
             handle:             person.handle,
             personPublicKey:    person.publicKeyHex,
             communityNodeId:    identity.id,
-            communityPublicKey: identity.publicKey,
+            communityPublicKey,
             issuedAt,
             expiresAt,
             signature:          signer.signBody(payload),
@@ -174,6 +185,8 @@ export class PersonService {
         if (credential.communityNodeId !== identity.id) return false;
         if (new Date(credential.expiresAt) < new Date()) return false;
 
+        const communityPublicKey = (this.communitySigner ?? NodeService.getInstance().getSigner()).publicKeyHex;
+
         const payload = JSON.stringify({
             personId:           credential.personId,
             handle:             credential.handle,
@@ -184,7 +197,7 @@ export class PersonService {
             expiresAt:          credential.expiresAt,
         });
 
-        return NodeSigner.verify(payload, credential.signature, identity.publicKey);
+        return NodeSigner.verify(payload, credential.signature, communityPublicKey);
     }
 
     // ── Queries ───────────────────────────────────────────────────────────────

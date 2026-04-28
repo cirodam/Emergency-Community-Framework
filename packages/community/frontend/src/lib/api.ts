@@ -65,9 +65,6 @@ export interface EconomicsDto {
     centralBank: {
         kinInCirculation: number;
     } | null;
-    currencyBoard: {
-        kitheInCirculation: number;
-    } | null;
     socialInsurance: {
         poolBalance: number;
         totalContributed: number;

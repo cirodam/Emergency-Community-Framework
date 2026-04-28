@@ -38,6 +38,13 @@ export class FederationMemberService {
         return undefined;
     }
 
+    getByPublicKey(communityPublicKey: string): FederationMember | undefined {
+        for (const m of this.members.values()) {
+            if (m.communityPublicKey === communityPublicKey) return m;
+        }
+        return undefined;
+    }
+
     getByHandle(handle: string): FederationMember | undefined {
         for (const m of this.members.values()) {
             if (m.handle === handle) return m;
@@ -67,6 +74,15 @@ export class FederationMemberService {
         const member = this.members.get(id);
         if (!member) throw new Error(`Member ${id} not found`);
         member.bankAccountId = bankAccountId;
+        this.loader.save(member);
+        return member;
+    }
+
+    /** Set the community's credit line (maximum kin deficit) on the federation ledger. */
+    setCreditLine(id: string, creditLineKin: number): FederationMember {
+        const member = this.members.get(id);
+        if (!member) throw new Error(`Member ${id} not found`);
+        member.creditLineKin = creditLineKin;
         this.loader.save(member);
         return member;
     }

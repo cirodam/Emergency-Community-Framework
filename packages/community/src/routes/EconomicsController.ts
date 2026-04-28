@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { CentralBank } from "../domains/central_bank/CentralBank.js";
-import { CurrencyBoard } from "../domains/currency_board/CurrencyBoard.js";
 import { SocialInsuranceBank } from "../domains/social_insurance/SocialInsuranceBank.js";
 import { CommunityTreasury } from "../domains/community_treasury/CommunityTreasury.js";
 import { BankClient } from "../BankClient.js";
@@ -23,21 +22,19 @@ function bankClient(): BankClient {
 // Returns live monetary data: kin/kithe in circulation and SI pool stats.
 // Returns { ready: false } when the bank is unreachable.
 export async function getEconomics(_req: Request, res: Response): Promise<void> {
-    const cb      = CentralBank.getInstance();
-    const curBoard = CurrencyBoard.getInstance();
-    const si       = SocialInsuranceBank.getInstance();
+    const cb = CentralBank.getInstance();
+    const si = SocialInsuranceBank.getInstance();
 
     if (!cb.isReady()) {
-        res.json({ ready: false, centralBank: null, currencyBoard: null, socialInsurance: null });
+        res.json({ ready: false, centralBank: null, socialInsurance: null });
         return;
     }
 
     const bank = bankClient();
 
-    const [cbAccount, curBoardAccount, siAccount] = await Promise.all([
+    const [cbAccount, siAccount] = await Promise.all([
         bank.getAccountById(cb.issuanceAccountId),
-        curBoard.isReady() ? bank.getAccountById(curBoard.issuanceAccountId) : Promise.resolve(null),
-        si.isReady()       ? bank.getAccountById(si.poolAccountId)           : Promise.resolve(null),
+        si.isReady() ? bank.getAccountById(si.poolAccountId) : Promise.resolve(null),
     ]);
 
     const constitution = Constitution.getInstance();
@@ -60,9 +57,6 @@ export async function getEconomics(_req: Request, res: Response): Promise<void> 
         centralBank: {
             kinInCirculation:  cbAccount ? Math.max(0, -cbAccount.amount) : 0,
         },
-        currencyBoard: curBoard.isReady() ? {
-            kitheInCirculation: curBoardAccount ? Math.max(0, -curBoardAccount.amount) : 0,
-        } : null,
         socialInsurance: si.isReady() ? {
             poolBalance:       siAccount?.amount ?? 0,
             totalContributed:  si.getTotalPoolContributed(),

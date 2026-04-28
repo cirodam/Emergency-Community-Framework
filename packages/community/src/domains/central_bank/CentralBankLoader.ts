@@ -5,6 +5,9 @@ export interface CentralBankRecord {
     ownerId: string;
     issuanceAccountId: string;
     registeredAt: string; // ISO 8601
+    /** Cumulative kin that could not be retired at discharge time and must be
+     *  recouped gradually via demurrage. */
+    dischargeShortfall?: number;
 }
 
 /**

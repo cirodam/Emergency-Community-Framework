@@ -47,6 +47,23 @@ export class NodeSigner {
         return new NodeSigner(privateKey, publicKeyHex, privateKeyDer);
     }
 
+    /**
+     * Load a signer from a hex-encoded PKCS8 DER private key only.
+     * The public key is derived automatically.
+     * Use this when the private key is supplied via environment variable
+     * (e.g. COMMUNITY_PRIVATE_KEY) rather than a stored keypair file.
+     */
+    static fromPrivateKeyHex(privateKeyDer: string): NodeSigner {
+        const privateKey = createPrivateKey({
+            key:    Buffer.from(privateKeyDer, "hex"),
+            format: "der",
+            type:   "pkcs8",
+        });
+        const publicKey = createPublicKey(privateKey);
+        const pubHex    = publicKey.export({ type: "spki", format: "der" }).toString("hex");
+        return new NodeSigner(privateKey, pubHex, privateKeyDer);
+    }
+
     // ── Signing ───────────────────────────────────────────────────────────────
 
     /**

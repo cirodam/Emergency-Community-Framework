@@ -2,7 +2,7 @@ import { type Request, type Response } from "express";
 import { NodeSigner } from "@ecf/core";
 import { FederationApplicationService } from "../FederationApplicationService.js";
 import { FederationMemberService } from "../FederationMemberService.js";
-import { FederationCentralBank } from "../domains/central_bank/FederationCentralBank.js";
+import { FederationClearingHouse } from "../domains/central_bank/FederationClearingHouse.js";
 import { FederationTreasury } from "../domains/treasury/FederationTreasury.js";
 import { FederationConstitution } from "../governance/FederationConstitution.js";
 import { FederationDomainService } from "../common/FederationDomainService.js";
@@ -32,7 +32,7 @@ function bank(): BankClient {
  * proving it controls the private key.
  */
 export async function submitApplication(req: Request, res: Response): Promise<void> {
-    const { communityName, communityHandle, communityNodeId, communityPublicKey } = req.body ?? {};
+    const { communityName, communityHandle, communityNodeId, communityPublicKey, memberCount } = req.body ?? {};
 
     if (typeof communityName      !== "string" || !communityName.trim()) {
         res.status(400).json({ error: "communityName is required" }); return;
@@ -62,11 +62,13 @@ export async function submitApplication(req: Request, res: Response): Promise<vo
     }
 
     try {
+        const count = typeof memberCount === "number" && memberCount > 0 ? Math.floor(memberCount) : 0;
         const app = FederationApplicationService.getInstance().submit(
             communityName.trim(),
             handle,
             communityNodeId.trim(),
             communityPublicKey.trim(),
+            count,
         );
         console.log(`[federation] application submitted: ${communityName} (${handle}, ${communityNodeId})`);
         res.status(201).json(appToDto(app));
@@ -100,7 +102,7 @@ export function getApplicationByNodeId(req: Request, res: Response): void {
  *
  * Federation operator action. On "approved":
  *   1. Creates a FederationMember record
- *   2. Opens a kithe account at the federation bank for the Currency Board
+     * 2. Opens a kin clearing account at the federation bank for the community
  *   3. Links the member ID back onto the application
  */
 export async function reviewApplication(req: Request, res: Response): Promise<void> {
@@ -125,11 +127,11 @@ export async function reviewApplication(req: Request, res: Response): Promise<vo
             res.status(409).json({ error: (err as Error).message }); return;
         }
 
-        // Open kithe account for the community's Currency Board at the federation bank
+        // Open kin clearing account for the community at the federation bank
         try {
             const b = bank();
             await b.createOwner("institution", app.communityName, { ownerId: member.id });
-            const account = await b.openAccount(member.id, `${app.communityName} Currency Board`, "kithe");
+            const account = await b.openAccount(member.id, `${app.communityName} Clearing Account`, "kithe");
             memberSvc.setBankAccount(member.id, account.accountId);
         } catch (err) {
             memberSvc.remove(member.id);
@@ -137,8 +139,13 @@ export async function reviewApplication(req: Request, res: Response): Promise<vo
             res.status(502).json({ error: "Failed to open federation bank account" }); return;
         }
 
+        // Set credit line based on member count and constitutional rate
+        const constitution = FederationConstitution.getInstance();
+        const creditLineKin = (app.memberCount ?? 0) * constitution.creditLineKinPerPerson;
+        memberSvc.setCreditLine(member.id, creditLineKin);
+
         const updated = appSvc.advance(id, "approved", reviewNote ?? null, member.id);
-        console.log(`[federation] approved: ${app.communityName}`);
+        console.log(`[federation] approved: ${app.communityName} — credit line: ${creditLineKin} kin`);
         res.json(appToDto(updated));
         return;
     }
@@ -160,12 +167,11 @@ export function listMembers(_req: Request, res: Response): void {
 // ── Economics ─────────────────────────────────────────────────────────────────
 
 export async function getEconomics(_req: Request, res: Response): Promise<void> {
-    const cb = FederationCentralBank.getInstance();
-    if (!cb.isReady()) {
-        res.status(503).json({ error: "Federation central bank not ready" }); return;
+    const ch = FederationClearingHouse.getInstance();
+    if (!ch.isReady()) {
+        res.status(503).json({ error: "Federation clearing house not ready" }); return;
     }
 
-    const kitheInCirculation = await cb.kitheInCirculation();
     const members = FederationMemberService.getInstance().getAll();
     const b = bank();
 
@@ -174,29 +180,45 @@ export async function getEconomics(_req: Request, res: Response): Promise<void> 
             .filter(m => m.bankAccountId)
             .map(async m => {
                 const account = await b.getAccountById(m.bankAccountId!);
-                return { name: m.name, balance: account?.amount ?? 0 };
+                return {
+                    name:          m.name,
+                    balance:       account?.amount ?? 0,
+                    creditLineKin: m.creditLineKin,
+                };
             }),
     );
 
+    const kinInClearing = await ch.kinInClearing();
+
     res.json({
-        kitheInCirculation,
+        kinInClearing,
         memberCount: members.length,
         members: memberBalances,
+        clearingFeeRate:        FederationConstitution.getInstance().clearingFeeRate,
+        creditLineKinPerPerson: FederationConstitution.getInstance().creditLineKinPerPerson,
     });
 }
 
-// ── Transfers (between member communities via their Currency Boards) ───────────
+// ── Transfers (between member communities) ───────────────────────────────────
 
 /**
  * POST /api/transfers
  * Auth: x-node-signature from a registered member community (verified via registry)
- * Body: { toMemberId, amount, memo? }
+ * Body: { toMemberId, amount, memo?, mutualAid?: boolean, solidarity?: boolean }
+ *
+ * mutualAid=true:  fee exempt, credit line on sender not checked.
+ *                  For emergency assistance — the receiver is in crisis.
+ *
+ * solidarity=true: fee exempt, credit line still checked (sender stays solvent).
+ *                  For intentional investment in a less-wealthy community.
+ *                  Wealthy communities use this to voluntarily move surplus kin
+ *                  rather than wait for demurrage to do it automatically.
  */
 export async function transferKithe(
     req: Request & { communityId?: string },
     res: Response,
 ): Promise<void> {
-    const { toMemberId, amount, memo } = req.body ?? {};
+    const { toMemberId, amount, memo, mutualAid, solidarity } = req.body ?? {};
     const fromMemberId = req.communityId;
 
     if (!fromMemberId) { res.status(401).json({ error: "Not authenticated" }); return; }
@@ -206,6 +228,9 @@ export async function transferKithe(
     if (typeof amount !== "number" || amount <= 0) {
         res.status(400).json({ error: "amount must be a positive number" }); return;
     }
+    if (mutualAid === true && solidarity === true) {
+        res.status(400).json({ error: "mutualAid and solidarity are mutually exclusive" }); return;
+    }
 
     const svc  = FederationMemberService.getInstance();
     const from = svc.getById(fromMemberId);
@@ -214,27 +239,64 @@ export async function transferKithe(
     if (!from?.bankAccountId) { res.status(422).json({ error: "Sender has no bank account" }); return; }
     if (!to?.bankAccountId)   { res.status(404).json({ error: "Recipient member not found" }); return; }
 
+    const treasury = FederationTreasury.getInstance();
+    if (!treasury.isReady()) {
+        res.status(503).json({ error: "Federation treasury not ready" }); return;
+    }
+
+    const ch = FederationClearingHouse.getInstance();
+    if (!ch.isReady()) {
+        res.status(503).json({ error: "Federation clearing house not ready" }); return;
+    }
+
     try {
-        await bank().transfer(
+        const b = bank();
+        const senderAccount = await b.getAccountById(from.bankAccountId);
+        if (!senderAccount) { res.status(422).json({ error: "Sender account not found" }); return; }
+
+        const constitution  = FederationConstitution.getInstance();
+        const isMutualAid   = mutualAid === true;
+        const isSolidarity  = solidarity === true;
+        // Both mutualAid and solidarity are fee-exempt; only mutualAid skips the credit line check
+        const feeExempt     = isMutualAid || isSolidarity;
+
+        const transferMemo = typeof memo === "string" ? memo
+            : isMutualAid
+                ? `mutual aid: ${from.name} → ${to.name}`
+                : isSolidarity
+                    ? `solidarity investment: ${from.name} → ${to.name}`
+                    : `kin transfer: ${from.name} → ${to.name}`;
+
+        const { fee } = await ch.transfer(
             from.bankAccountId,
             to.bankAccountId,
             amount,
-            typeof memo === "string" ? memo : `kithe transfer: ${from.name} → ${to.name}`,
+            transferMemo,
+            feeExempt ? 0 : constitution.clearingFeeRate,
+            treasury.accountId,
+            from.creditLineKin,
+            senderAccount.amount,
+            isMutualAid, // only mutualAid bypasses credit line check
         );
-        res.status(204).end();
+
+        res.json({ transferred: amount - fee, fee, mutualAid: isMutualAid, solidarity: isSolidarity });
     } catch (err) {
         res.status(422).json({ error: (err as Error).message });
     }
 }
 
-// ── Issue kithe (federation operator) ────────────────────────────────────────
+// ── Structural aid grant (federation assembly only) ───────────────────────────
 
 /**
- * POST /api/kithe/issue
+ * POST /api/kithe/structural-aid
  * Auth: requireMemberCommunity (federation operator self-sign)
  * Body: { memberId, amount, memo? }
+ *
+ * Issues kin from the clearing house structural-aid account (overdraft = -Infinity)
+ * to a member community. Requires explicit assembly authorisation in practice;
+ * this route enforces node-level auth only — governance enforcement is out-of-band.
  */
-export async function issueKithe(req: Request, res: Response): Promise<void> {
+export async function structuralAidGrant(req: Request, res: Response): Promise<void> {
     const { memberId, amount, memo } = req.body ?? {};
 
     if (typeof memberId !== "string") {
@@ -249,11 +311,16 @@ export async function issueKithe(req: Request, res: Response): Promise<void> {
         res.status(404).json({ error: "Member not found or has no bank account" }); return;
     }
 
+    const ch = FederationClearingHouse.getInstance();
+    if (!ch.isReady()) {
+        res.status(503).json({ error: "Federation clearing house not ready" }); return;
+    }
+
     try {
-        await FederationCentralBank.getInstance().issue(
-            amount,
+        await ch.structuralAidGrant(
             member.bankAccountId,
-            typeof memo === "string" ? memo : `kithe issuance to ${member.name}`,
+            amount,
+            typeof memo === "string" ? memo : `structural aid grant to ${member.name}`,
         );
         res.status(204).end();
     } catch (err) {
@@ -274,6 +341,7 @@ function appToDto(app: ReturnType<typeof FederationApplicationService.prototype.
         reviewedAt:      app.reviewedAt,
         reviewNote:      app.reviewNote,
         memberId:        app.memberId,
+        memberCount:     app.memberCount,
     };
 }
 
@@ -285,6 +353,7 @@ function memberToDto(m: ReturnType<typeof FederationMemberService.prototype.getB
         communityNodeId: m.communityNodeId,
         joinedAt:        m.joinedAt,
         bankAccountId:   m.bankAccountId,
+        creditLineKin:   m.creditLineKin,
     };
 }
 

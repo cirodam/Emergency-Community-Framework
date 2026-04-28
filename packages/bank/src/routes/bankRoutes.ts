@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { requirePersonCredential, verifyNodeSignature } from "@ecf/core";
 import { getCommunityIdentity } from "../communityIdentity.js";
-import { createAccount, getAllAccounts, getAccounts, getAccountById, getTransactions, createTransfer, applyDemurrage, getMyAccounts, createMyAccount, deleteMyAccount, renameMyAccount } from "./BankController.js";
+import { createAccount, getAllAccounts, getAccounts, getAccountById, getTransactions, createTransfer, applyDemurrage, getMyAccounts, createMyAccount, deleteMyAccount, renameMyAccount, closeOwnerAccounts } from "./BankController.js";
 
 const router = Router();
 
@@ -23,9 +23,10 @@ function requireAuthOrNodeSignature(req: Request, res: Response, next: NextFunct
 }
 
 // Admin / infrastructure routes — node signature required
-router.get( "/accounts",                         requireNodeAuth, getAllAccounts);
-router.post("/accounts",                         requireNodeAuth, createAccount);
-router.get( "/account/:accountId",               requireAuthOrNodeSignature, getAccountById);
+router.get(   "/accounts",                         requireNodeAuth, getAllAccounts);
+router.post(  "/accounts",                         requireNodeAuth, createAccount);
+router.delete("/accounts/:ownerId/all",            requireNodeAuth, closeOwnerAccounts);
+router.get(   "/account/:accountId",               requireAuthOrNodeSignature, getAccountById);
 router.post("/demurrage",                        requireAuthOrNodeSignature, applyDemurrage);
 
 // Member routes — require a valid community-issued credential or node signature

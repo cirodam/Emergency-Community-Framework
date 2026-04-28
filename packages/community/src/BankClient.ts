@@ -126,4 +126,15 @@ export class BankClient {
             throw new Error(`[BankClient] transfer failed: ${res.status} ${text}`);
         }
     }
+
+    async closeAccounts(ownerId: string): Promise<void> {
+        const res = await fetch(`${this.baseUrl}/api/accounts/${encodeURIComponent(ownerId)}/all`, {
+            method: "DELETE",
+            headers: this.signedGetHeaders(),
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`[BankClient] closeAccounts(${ownerId}) failed: ${res.status} ${text}`);
+        }
+    }
 }

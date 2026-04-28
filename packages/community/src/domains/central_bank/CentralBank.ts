@@ -31,7 +31,10 @@ export class CentralBank extends FunctionalDomain {
     private _ownerId!: string;
     private _issuanceAccountId!: string;
     private _bank!: BankClient;
+    private _loader!: CentralBankLoader;
     private _ready = false;
+    /** Cumulative kin that could not be retired at discharge time. */
+    private _dischargeShortfall = 0;
 
     private constructor() {
         super("Central Bank", "Sole issuer of kin. Issues one person-year of kin per person per year.", CENTRAL_BANK_DOMAIN_ID);
@@ -45,14 +48,18 @@ export class CentralBank extends FunctionalDomain {
     isReady(): boolean              { return this._ready; }
     get ownerId(): string           { if (!this._ready) throw new Error("CentralBank not ready"); return this._ownerId; }
     get issuanceAccountId(): string { if (!this._ready) throw new Error("CentralBank not ready"); return this._issuanceAccountId; }
+    /** Accumulated kin still owed to retirement, to be recouped via demurrage. */
+    get dischargeShortfall(): number { return this._dischargeShortfall; }
 
     async init(bank: BankClient, loader: CentralBankLoader): Promise<void> {
-        this._bank = bank;
+        this._bank   = bank;
+        this._loader = loader;
 
         if (loader.exists()) {
             const record = loader.load();
             this._ownerId           = record.ownerId;
             this._issuanceAccountId = record.issuanceAccountId;
+            this._dischargeShortfall = record.dischargeShortfall ?? 0;
             this._ready = true;
             return;
         }
@@ -73,6 +80,7 @@ export class CentralBank extends FunctionalDomain {
             ownerId:           this._ownerId,
             issuanceAccountId: this._issuanceAccountId,
             registeredAt:      new Date().toISOString(),
+            dischargeShortfall: 0,
         });
         this._ready = true;
     }
@@ -92,6 +100,29 @@ export class CentralBank extends FunctionalDomain {
      */
     async retire(amount: number, sourceAccountId: string, memo = "kin retirement"): Promise<void> {
         await this._bank.transfer(sourceAccountId, this._issuanceAccountId, amount, memo);
+    }
+
+    /**
+     * Record a discharge shortfall — kin that should have been retired when a
+     * member left but wasn't available in their account. The shortfall is
+     * persisted and gradually recouped via the regular demurrage cycle.
+     */
+    recordDischargeShortfall(amount: number): void {
+        if (amount <= 0) return;
+        this._dischargeShortfall += amount;
+        const record = this._loader.load();
+        this._loader.save({ ...record, dischargeShortfall: this._dischargeShortfall });
+        console.log(`[central-bank] discharge shortfall +${amount} kin (total: ${this._dischargeShortfall})`);
+    }
+
+    /**
+     * Reduce the tracked shortfall (called after demurrage has retired some of
+     * the outstanding amount).
+     */
+    clearDischargeShortfall(amount: number): void {
+        this._dischargeShortfall = Math.max(0, this._dischargeShortfall - amount);
+        const record = this._loader.load();
+        this._loader.save({ ...record, dischargeShortfall: this._dischargeShortfall });
     }
 
     /**

@@ -59,6 +59,7 @@ export class FederationApplicationService {
         communityHandle:    string,
         communityNodeId:    string,
         communityPublicKey: string,
+        memberCount         = 0,
     ): FederationApplication {
         const existing = this.getByNodeId(communityNodeId);
         if (existing && existing.status !== "rejected") {
@@ -73,7 +74,7 @@ export class FederationApplicationService {
             throw new Error(`Handle "${communityHandle}" is already taken`);
         }
 
-        const app = createApplication(communityName, communityHandle, communityNodeId, communityPublicKey);
+        const app = createApplication(communityName, communityHandle, communityNodeId, communityPublicKey, memberCount);
         this.applications.set(app.id, app);
         this.loader.save(app);
         return app;

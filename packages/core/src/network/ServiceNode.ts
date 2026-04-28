@@ -45,34 +45,48 @@ export interface CommunityIdentity {
 /**
  * Resolve the governing community node's ID and public key.
  *
- * Polls `${communityUrl}/api/identity` with exponential backoff (5 s → 30 s).
- * Resolves as soon as the endpoint returns a valid response.
+ * Polls each URL in `communityUrls` with exponential backoff (5 s → 30 s),
+ * cycling through all URLs on each attempt so that any healthy replica
+ * unblocks startup.
  *
- * @param communityUrl  Base URL of the community node (no trailing slash).
- * @param label         Log prefix, e.g. "[bank]".
+ * @param communityUrls  Base URL(s) of community nodes — a string (single URL
+ *                       or comma-separated list) or a pre-split array.
+ * @param label          Log prefix, e.g. "[bank]".
  */
 export async function resolveCommunityIdentity(
-    communityUrl: string,
+    communityUrls: string | string[],
     label: string,
 ): Promise<CommunityIdentity> {
-    const url = `${communityUrl.replace(/\/$/, "")}/api/identity`;
+    const urls: string[] = (
+        Array.isArray(communityUrls)
+            ? communityUrls
+            : communityUrls.split(",")
+    )
+        .map(u => u.trim())
+        .filter(Boolean);
+
+    if (urls.length === 0) throw new Error(`${label} no community URL(s) provided`);
+
     for (let attempt = 1; ; attempt++) {
-        try {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const body = await res.json() as { id?: string; publicKey?: string };
-            if (!body.id)        throw new Error("identity response missing id");
-            if (!body.publicKey) throw new Error("identity response missing publicKey");
-            console.log(`${label} resolved community identity: ${body.id}`);
-            return { nodeId: body.id, publicKey: body.publicKey };
-        } catch (err) {
-            const wait = Math.min(30_000, attempt * 5_000);
-            console.warn(
-                `${label} community not reachable (attempt ${attempt}), ` +
-                `retrying in ${wait / 1000}s — ${(err as Error).message}`,
-            );
-            await new Promise(r => setTimeout(r, wait));
+        for (const base of urls) {
+            const url = `${base.replace(/\/$/, "")}/api/identity`;
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const body = await res.json() as { id?: string; publicKey?: string };
+                if (!body.id)        throw new Error("identity response missing id");
+                if (!body.publicKey) throw new Error("identity response missing publicKey");
+                console.log(`${label} resolved community identity: ${body.id} (${base})`);
+                return { nodeId: body.id, publicKey: body.publicKey };
+            } catch (err) {
+                console.warn(
+                    `${label} community not reachable at ${base} (attempt ${attempt}) — ${(err as Error).message}`,
+                );
+            }
         }
+        const wait = Math.min(30_000, attempt * 5_000);
+        console.warn(`${label} all community URLs unreachable, retrying in ${wait / 1000}s`);
+        await new Promise(r => setTimeout(r, wait));
     }
 }
 

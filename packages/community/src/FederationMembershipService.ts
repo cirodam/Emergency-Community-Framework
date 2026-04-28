@@ -20,11 +20,10 @@ export interface FederationMembershipRecord {
 
 /**
  * Community-level service that manages the community's relationship with
- * a federation. The community node itself (not the Currency Board) owns
- * the application process — it signs with the node key and tracks state.
+ * a federation. The community node signs with the node key and tracks state.
  *
- * The Currency Board is responsible for kithe/kin interactions once the
- * community is an approved member and holds a federation bank account.
+ * Once approved, the community holds a clearing account at the federation bank
+ * used for inter-community kin transfers.
  */
 export class FederationMembershipService {
     private static instance: FederationMembershipService;
@@ -107,7 +106,7 @@ export class FederationMembershipService {
     /**
      * Poll the federation for the current application status and persist any
      * changes. On approval, resolves the memberId and federationAccountId so
-     * the CurrencyBoard can use the account for kithe operations.
+     * the community can use the clearing account for inter-community transfers.
      */
     async sync(): Promise<FederationMembershipRecord | null> {
         if (!this.record) return null;

@@ -19,6 +19,11 @@ export interface FederationApplication {
     reviewNote:         string | null;
     /** Set when status transitions to "approved". */
     memberId:           string | null;
+    /**
+     * Number of residents the community reported at application time.
+     * Used to compute the initial credit line on approval.
+     */
+    memberCount:        number;
 }
 
 export function createApplication(
@@ -26,6 +31,7 @@ export function createApplication(
     communityHandle:    string,
     communityNodeId:    string,
     communityPublicKey: string,
+    memberCount         = 0,
 ): FederationApplication {
     return {
         id:                 randomUUID(),
@@ -38,5 +44,6 @@ export function createApplication(
         reviewedAt:         null,
         reviewNote:         null,
         memberId:           null,
+        memberCount,
     };
 }

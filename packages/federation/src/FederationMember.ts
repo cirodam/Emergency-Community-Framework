@@ -31,6 +31,12 @@ export interface FederationMember {
      * Populated immediately after joining.
      */
     bankAccountId: string | null;
+    /**
+     * Maximum kin deficit this community may carry in its federation account.
+     * Computed on approval as: memberCount × constitution.creditLineKinPerPerson.
+     * Zero until the credit line is explicitly set.
+     */
+    creditLineKin: number;
 }
 
 export function createFederationMember(
@@ -49,5 +55,6 @@ export function createFederationMember(
         joinedAt:           new Date().toISOString(),
         isFounder,
         bankAccountId:      null,
+        creditLineKin:      0,
     };
 }

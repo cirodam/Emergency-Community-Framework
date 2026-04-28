@@ -9,7 +9,6 @@
     import ConstitutionPage from "./pages/ConstitutionPage.svelte";
     import EconomicsPage       from "./pages/EconomicsPage.svelte";
     import CentralBankPage     from "./pages/CentralBankPage.svelte";
-    import CurrencyBoardPage   from "./pages/CurrencyBoardPage.svelte";
     import SocialInsurancePage from "./pages/SocialInsurancePage.svelte";
     import SettingsPage        from "./pages/SettingsPage.svelte";
     import DomainsPage      from "./pages/DomainsPage.svelte";
@@ -76,8 +75,6 @@
             <EconomicsPage />
         {:else if $currentPage === "central-bank"}
             <CentralBankPage />
-        {:else if $currentPage === "currency-board"}
-            <CurrencyBoardPage />
         {:else if $currentPage === "social-insurance"}
             <SocialInsurancePage />
         {:else if $currentPage === "settings"}

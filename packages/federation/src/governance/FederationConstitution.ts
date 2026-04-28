@@ -39,22 +39,67 @@ export const DEFAULT_FEDERATION_CONSTITUTION: FederationConstitutionDocument = {
             description: "Any community meeting the federation charter criteria may apply for membership.",
         },
 
-        // ── Levy ─────────────────────────────────────────────────────────────
+        // ── Clearing ──────────────────────────────────────────────────────────
         /**
-         * Kithe collected from each member community's federation account per period.
-         * Flows into the Federation Treasury to fund federation operations.
+         * Fraction of each inter-community transfer deducted as a clearing fee
+         * and deposited into the Federation Treasury.
+         * Fee = floor(amount × clearingFeeRate). Mutual-aid transfers are exempt.
          */
-        memberLevyAmount: {
+        clearingFeeRate: {
+            value:       0.002,
+            authority:   "assembly",
+            description: "Fraction of each transfer taken as a clearing fee (0.002 = 0.2%). Mutual-aid transfers are exempt.",
+            constraints: { min: 0, max: 0.05 },
+        },
+        /**
+         * Maximum negative balance (deficit) allowed per community account, expressed
+         * as kin per resident.  Actual credit line = creditLineKinPerPerson × memberCount.
+         * Communities that need to go beyond this must apply for a structural-aid grant.
+         */
+        creditLineKinPerPerson: {
             value:       500,
             authority:   "assembly",
-            description: "Kithe levied from each member community per levy period.",
+            description: "Maximum kin deficit per community resident, used to compute each community's credit line.",
             constraints: { min: 0, max: 100_000 },
         },
-        memberLevyPeriodDays: {
-            value:       30,
+        /**
+         * A community whose balance exceeds (creditLineKin × surplusThresholdMultiple)
+         * is considered to be hoarding. The excess above that threshold is subject to
+         * the demurrage charge each sweep period.
+         *
+         * Example: creditLineKin = 5,000, threshold = 2 → balances above 10,000
+         * incur demurrage on the portion above 10,000.
+         */
+        surplusThresholdMultiple: {
+            value:       2,
             authority:   "assembly",
-            description: "Number of days between member levy collections.",
-            constraints: { min: 1, max: 365 },
+            description: "Multiple of a community's credit line above which its balance is subject to demurrage.",
+            constraints: { min: 1, max: 100 },
+        },
+        /**
+         * Monthly rate applied to the surplus portion of a community's balance.
+         * 0.005 = 0.5 % per sweep. Flows to the federation treasury.
+         * Keeps kin circulating; discourages indefinite accumulation.
+         */
+        surplusDemurrageRate: {
+            value:       0.005,
+            authority:   "assembly",
+            description: "Monthly demurrage rate on balances above the surplus threshold (0.005 = 0.5%).",
+            constraints: { min: 0, max: 0.05 },
+        },
+        /**
+         * Fraction of each demurrage charge that flows to the solidarity pool
+         * rather than the general treasury.  The solidarity pool is redistributed
+         * monthly to communities running deficits, proportional to their need.
+         *
+         * 0.5 = half of demurrage becomes solidarity redistribution.
+         * The remaining fraction goes to the general treasury as normal.
+         */
+        solidarityPoolFraction: {
+            value:       0.5,
+            authority:   "assembly",
+            description: "Fraction of demurrage charges routed to the solidarity pool for redistribution to deficit communities (0.5 = 50%).",
+            constraints: { min: 0, max: 1 },
         },
 
         // ── Budget allocations (as fractions of treasury balance per period) ──
@@ -109,6 +154,8 @@ export const DEFAULT_FEDERATION_CONSTITUTION: FederationConstitutionDocument = {
             description: "Insurance pool balance floor, expressed as a multiple of maxAutoApprovedClaim. Below this, a reinsurance drawdown is requested.",
             constraints: { min: 1, max: 100 },
         },
+
+
     },
 };
 
@@ -161,8 +208,11 @@ export class FederationConstitution {
 
     get memberSovereigntyProtected(): boolean { return this.get<boolean>("memberSovereigntyProtected"); }
     get openMembership(): boolean             { return this.get<boolean>("openMembership"); }
-    get memberLevyAmount(): number            { return this.get<number>("memberLevyAmount"); }
-    get memberLevyPeriodDays(): number        { return this.get<number>("memberLevyPeriodDays"); }
+    get clearingFeeRate(): number             { return this.get<number>("clearingFeeRate"); }
+    get creditLineKinPerPerson(): number      { return this.get<number>("creditLineKinPerPerson"); }
+    get surplusThresholdMultiple(): number    { return this.get<number>("surplusThresholdMultiple"); }
+    get surplusDemurrageRate(): number        { return this.get<number>("surplusDemurrageRate"); }
+    get solidarityPoolFraction(): number      { return this.get<number>("solidarityPoolFraction"); }
     get reinsurancePoolRatio(): number        { return this.get<number>("reinsurancePoolRatio"); }
     get operationsRatio(): number             { return this.get<number>("operationsRatio"); }
     get mutualAidRatio(): number              { return this.get<number>("mutualAidRatio"); }
