@@ -6,8 +6,9 @@ export const HEALTHCARE_DOMAIN_ID = "ecf-domain-healthcare-000000008";
  * Healthcare Domain — coordinates community health services.
  *
  * Functional units in this domain (instantiated from templates):
- *   - primary-care-clinic   General medical care and preventive health
- *   - dental-clinic         Dental examination, treatment, and hygiene
+ *   - medicine-supply-office  Procurement, storage, and distribution of medicines (default)
+ *   - primary-care-clinic     General medical care and preventive health (default)
+ *   - dental-clinic           Dental examination, treatment, and hygiene
  */
 export class HealthcareDomain extends FunctionalDomain {
     private static instance: HealthcareDomain;

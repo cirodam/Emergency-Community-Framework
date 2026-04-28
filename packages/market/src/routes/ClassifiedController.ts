@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { ClassifiedService } from "../ClassifiedService.js";
 import { BankClient } from "../BankClient.js";
-import { NodeService } from "@ecf/core";
+import { NodeService, type PersonCredential } from "@ecf/core";
 import { ClassifiedCategory } from "../Classified.js";
 
 const BANK_URL = process.env.BANK_URL ?? "http://localhost:3001";
@@ -44,7 +44,7 @@ export function getClassified(req: Request, res: Response): void {
 
 // POST /api/classifieds
 // Body: { category, title, description, price? }
-export function createClassified(req: Request & { personId?: string }, res: Response): void {
+export function createClassified(req: Request & { personId?: string; credential?: PersonCredential }, res: Response): void {
     const { category, title, description, price } = req.body ?? {};
     const posterId = req.personId;
 
@@ -55,16 +55,22 @@ export function createClassified(req: Request & { personId?: string }, res: Resp
     if (typeof title !== "string" || !title.trim()) {
         res.status(400).json({ error: "title is required" }); return;
     }
+    if (title.length > 200) {
+        res.status(400).json({ error: "title must be 200 characters or fewer" }); return;
+    }
     if (typeof description !== "string") {
         res.status(400).json({ error: "description is required" }); return;
     }
+    if (description.length > 4000) {
+        res.status(400).json({ error: "description must be 4000 characters or fewer" }); return;
+    }
     const resolvedPrice = (category === "free" || category === "job" || category === "notice")
         ? 0
-        : (typeof price === "number" && price >= 0 ? price : 0);
+        : (typeof price === "number" && Number.isFinite(price) && price >= 0 ? price : 0);
 
     const c = svc().add(
         posterId,
-        (req as Request & { personId?: string; credential?: { personId: string } }).credential?.personId ?? posterId,
+        req.credential?.handle ?? "",
         category,
         title.trim(),
         description,
@@ -73,9 +79,9 @@ export function createClassified(req: Request & { personId?: string }, res: Resp
     res.status(201).json(c);
 }
 
-// POST /api/classifieds (uses posterHandle from body)
-export function createClassifiedWithHandle(req: Request & { personId?: string }, res: Response): void {
-    const { category, title, description, price, posterHandle } = req.body ?? {};
+// POST /api/classifieds (uses posterHandle from credential)
+export function createClassifiedWithHandle(req: Request & { personId?: string; credential?: PersonCredential }, res: Response): void {
+    const { category, title, description, price } = req.body ?? {};
     const posterId = req.personId;
 
     if (!posterId) { res.status(401).json({ error: "Not authenticated" }); return; }
@@ -85,16 +91,22 @@ export function createClassifiedWithHandle(req: Request & { personId?: string },
     if (typeof title !== "string" || !title.trim()) {
         res.status(400).json({ error: "title is required" }); return;
     }
+    if (title.length > 200) {
+        res.status(400).json({ error: "title must be 200 characters or fewer" }); return;
+    }
     if (typeof description !== "string") {
         res.status(400).json({ error: "description is required" }); return;
     }
+    if (description.length > 4000) {
+        res.status(400).json({ error: "description must be 4000 characters or fewer" }); return;
+    }
     const resolvedPrice = (category === "free" || category === "job" || category === "notice")
         ? 0
-        : (typeof price === "number" && price >= 0 ? price : 0);
+        : (typeof price === "number" && Number.isFinite(price) && price >= 0 ? price : 0);
 
     const c = svc().add(
         posterId,
-        typeof posterHandle === "string" ? posterHandle : "",
+        req.credential?.handle ?? "",
         category,
         title.trim(),
         description,
@@ -112,7 +124,12 @@ export function updateClassified(req: Request & { personId?: string }, res: Resp
     const patch: { title?: string; description?: string; price?: number } = {};
     if (title       !== undefined) patch.title       = title;
     if (description !== undefined) patch.description = description;
-    if (price       !== undefined) patch.price       = price;
+    if (price !== undefined) {
+        if (typeof price !== "number" || !Number.isFinite(price) || price < 0) {
+            res.status(400).json({ error: "price must be a non-negative finite number" }); return;
+        }
+        patch.price = price;
+    }
 
     try {
         res.json(svc().update(req.params.id as string, callerId, patch));

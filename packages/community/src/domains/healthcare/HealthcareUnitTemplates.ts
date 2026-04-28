@@ -4,6 +4,17 @@ import { UnitTemplateRegistry } from "../../common/domain/UnitTemplateRegistry.j
 export class HealthcareUnitTemplates {
     static register(): void {
         UnitTemplateRegistry.register({
+            type:        "medicine-supply-office",
+            label:       "Medicine Supply Office",
+            description: "Manages procurement, storage, and distribution of medicines and medical supplies for the community.",
+            factory: () => new FunctionalUnit(
+                "Medicine Supply Office",
+                "Manages procurement, storage, and distribution of medicines and medical supplies for the community.",
+                "medicine-supply-office",
+            ),
+        });
+
+        UnitTemplateRegistry.register({
             type:        "primary-care-clinic",
             label:       "Primary Care Clinic",
             description: "General medical care, preventive health, chronic disease management, and triage for the community.",

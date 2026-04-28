@@ -6,7 +6,8 @@ export const AGRICULTURE_DOMAIN_ID = "ecf-domain-agriculture-000000007";
  * Agriculture Domain — coordinates land use, cultivation, and seed stewardship.
  *
  * Functional units in this domain (instantiated from templates):
- *   - seed-library   Community-managed seed saving, cataloguing, and lending
+ *   - farm-coordination-office  Coordinates land, planting schedules, equipment, and harvest logistics (default)
+ *   - seed-library               Community-managed seed saving, cataloguing, and lending
  */
 export class AgricultureDomain extends FunctionalDomain {
     private static instance: AgricultureDomain;

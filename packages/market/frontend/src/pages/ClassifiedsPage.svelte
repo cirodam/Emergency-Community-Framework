@@ -125,86 +125,102 @@
 
 <div class="page">
     <div class="page-header">
-        <h2>Classifieds</h2>
+        <div>
+            <h2 class="page-title">Classifieds</h2>
+            <p class="page-sub">Community board for buying, selling, and notices.</p>
+        </div>
         {#if myId}
-            <button class="btn-primary" onclick={() => { showForm = !showForm; formError = ""; }}>
+            <button class="btn-add" onclick={() => { showForm = !showForm; formError = ""; }}>
                 {showForm ? "✕ Close" : "+ Post"}
             </button>
         {/if}
     </div>
 
     {#if showForm}
-        <div class="card form-card">
-            <h3>Post a Classified</h3>
-            <div class="field">
-                <label>Category</label>
-                <select bind:value={newCategory}>
+        <form class="cl-form" onsubmit={(e) => { e.preventDefault(); handleCreate(); }}>
+            <h3 class="form-title">Post a Classified</h3>
+            {#if formError}<p class="form-error">{formError}</p>{/if}
+
+            <label class="field">
+                <span class="field-label">Category</span>
+                <select class="input" bind:value={newCategory}>
                     {#each CATEGORIES as cat}
                         <option value={cat}>{CATEGORY_LABELS[cat]}</option>
                     {/each}
                 </select>
-            </div>
-            <div class="field">
-                <label>Title *</label>
-                <input bind:value={newTitle} placeholder="Brief title" />
-            </div>
-            <div class="field">
-                <label>Description</label>
-                <textarea bind:value={newDesc} rows="3" placeholder="Details..."></textarea>
-            </div>
+            </label>
+
+            <label class="field">
+                <span class="field-label">Title *</span>
+                <input class="input" type="text" bind:value={newTitle} placeholder="Brief title" />
+            </label>
+
+            <label class="field">
+                <span class="field-label">Description</span>
+                <textarea class="input" bind:value={newDesc} rows="3" placeholder="Details..."></textarea>
+            </label>
+
             {#if newCategory === "for-sale" || newCategory === "wanted"}
-                <div class="field">
-                    <label>Price (leave blank for free / negotiable)</label>
-                    <input type="number" min="0" step="0.01" bind:value={newPrice} placeholder="0.00" />
-                </div>
+                <label class="field">
+                    <span class="field-label">Price (leave blank for free / negotiable)</span>
+                    <input class="input" type="number" min="0" step="0.01" bind:value={newPrice} placeholder="0.00" />
+                </label>
             {/if}
-            {#if formError}<p class="error">{formError}</p>{/if}
+
             <div class="form-actions">
-                <button class="btn-primary" onclick={handleCreate} disabled={saving}>Post</button>
-                <button onclick={() => { showForm = false; formError = ""; }}>Cancel</button>
+                <button class="btn-secondary" type="button" onclick={() => { showForm = false; formError = ""; }}>Cancel</button>
+                <button class="btn-primary" type="submit" disabled={saving}>{saving ? "Posting…" : "Post"}</button>
             </div>
-        </div>
+        </form>
     {/if}
 
-    <!-- Category filter -->
     <div class="filter-bar">
-        <button class:active={filter === "all"}    onclick={() => filter = "all"}>All</button>
+        <button class="pill" class:active={filter === "all"} onclick={() => filter = "all"}>All</button>
         {#each CATEGORIES as cat}
-            <button class:active={filter === cat} onclick={() => filter = cat}>{CATEGORY_LABELS[cat]}</button>
+            <button class="pill" class:active={filter === cat} onclick={() => filter = cat}>{CATEGORY_LABELS[cat]}</button>
         {/each}
     </div>
 
     {#if loading}
-        <div class="skeleton-list">
-            {#each [1,2,3] as _}<div class="skeleton-card"></div>{/each}
-        </div>
+        <div class="skeleton"></div>
+        <div class="skeleton short"></div>
+        <div class="skeleton"></div>
     {:else if error}
-        <p class="error">{error}</p>
+        <p class="error-msg">{error}</p>
     {:else if filtered.length === 0}
-        <p class="empty">No classifieds in this category.</p>
+        <p class="empty-msg">No classifieds in this category.</p>
     {:else}
-        <div class="card-list">
+        <div class="cl-list">
             {#each filtered as c (c.id)}
-                <div class="card classified-card">
+                <div class="cl-card">
                     {#if editId === c.id}
-                        <div class="field"><label>Title *</label><input bind:value={editTitle} /></div>
-                        <div class="field"><label>Description</label><textarea bind:value={editDesc} rows="3"></textarea></div>
+                        <label class="field">
+                            <span class="field-label">Title *</span>
+                            <input class="input" bind:value={editTitle} />
+                        </label>
+                        <label class="field">
+                            <span class="field-label">Description</span>
+                            <textarea class="input" bind:value={editDesc} rows="3"></textarea>
+                        </label>
                         {#if c.category === "for-sale" || c.category === "wanted"}
-                            <div class="field"><label>Price</label><input type="number" min="0" step="0.01" bind:value={editPrice} /></div>
+                            <label class="field">
+                                <span class="field-label">Price</span>
+                                <input class="input" type="number" min="0" step="0.01" bind:value={editPrice} />
+                            </label>
                         {/if}
-                        {#if formError}<p class="error">{formError}</p>{/if}
+                        {#if formError}<p class="form-error">{formError}</p>{/if}
                         <div class="form-actions">
+                            <button class="btn-secondary" onclick={() => editId = null}>Cancel</button>
                             <button class="btn-primary" onclick={() => handleUpdate(c.id)} disabled={saving}>Save</button>
-                            <button onclick={() => editId = null}>Cancel</button>
                         </div>
                     {:else}
-                        <div class="classified-header">
-                            <span class="badge category-badge {c.category}">{CATEGORY_LABELS[c.category]}</span>
-                            {#if c.price > 0}<span class="badge price-badge">${c.price.toFixed(2)}</span>{/if}
+                        <div class="cl-badges">
+                            <span class="badge cat-{c.category}">{CATEGORY_LABELS[c.category]}</span>
+                            {#if c.price > 0}<span class="badge price">${c.price.toFixed(2)}</span>{/if}
                         </div>
-                        <h3 class="classified-title">{c.title}</h3>
-                        {#if c.description}<p class="classified-desc">{c.description}</p>{/if}
-                        <p class="classified-meta">Posted by {c.posterHandle || c.posterId}</p>
+                        <div class="cl-title">{c.title}</div>
+                        {#if c.description}<p class="cl-desc">{c.description}</p>{/if}
+                        <p class="cl-meta">Posted by {c.posterHandle || c.posterId}</p>
                         <div class="card-actions">
                             {#if myId && myId !== c.posterId}
                                 <button class="btn-primary" onclick={() => handleClaim(c.id)}>
@@ -212,8 +228,8 @@
                                 </button>
                             {/if}
                             {#if myId === c.posterId}
-                                <button onclick={() => startEdit(c)}>Edit</button>
-                                <button class="btn-danger" onclick={() => handleCancel(c.id)}>Cancel</button>
+                                <button class="action-btn" onclick={() => startEdit(c)}>Edit</button>
+                                <button class="action-btn danger" onclick={() => handleCancel(c.id)}>Cancel listing</button>
                             {/if}
                         </div>
                     {/if}
@@ -224,40 +240,154 @@
 </div>
 
 <style>
-.page { padding: 1rem; max-width: 700px; margin: 0 auto; }
-.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-.page-header h2 { margin: 0; }
-.filter-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
-.filter-bar button { padding: 0.3rem 0.8rem; border: 1px solid #ccc; border-radius: 999px; background: #f5f5f5; color: #333; cursor: pointer; font-size: 0.85rem; }
-.filter-bar button.active { background: #333 !important; color: #fff !important; border-color: #333; }
-.card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; }
-.form-card { margin-bottom: 1rem; }
-.card-list { display: flex; flex-direction: column; gap: 0.75rem; }
-.classified-card { }
-.classified-header { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
-.classified-title { margin: 0 0 0.25rem; font-size: 1rem; }
-.classified-desc { margin: 0.25rem 0 0.5rem; font-size: 0.9rem; color: #555; }
-.classified-meta { margin: 0; font-size: 0.8rem; color: #888; }
-.badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
-.category-badge.for-sale  { background: #e8f5e9; color: #2e7d32; }
-.category-badge.wanted    { background: #e3f2fd; color: #1565c0; }
-.category-badge.free      { background: #f3e5f5; color: #6a1b9a; }
-.category-badge.job       { background: #fff8e1; color: #f57f17; }
-.category-badge.notice    { background: #fce4ec; color: #880e4f; }
-.price-badge { background: #f5f5f5; color: #333; border: 1px solid #ddd; }
-.card-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
-.form-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
-.field { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.75rem; }
-.field label { font-size: 0.85rem; font-weight: 600; }
-.field input, .field select, .field textarea { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
-.field textarea { resize: vertical; }
-.btn-primary { background: #333; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-danger { background: #c62828; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
-button:not(.btn-primary):not(.btn-danger) { background: transparent; border: 1px solid #ccc; padding: 0.4rem 0.9rem; border-radius: 4px; cursor: pointer; }
-.skeleton-list { display: flex; flex-direction: column; gap: 0.75rem; }
-.skeleton-card { height: 100px; background: #eee; border-radius: 8px; animation: pulse 1.4s ease-in-out infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-.empty { color: #888; text-align: center; margin-top: 2rem; }
-.error { color: #c62828; }
+    .page {
+        padding: 1.5rem 1.5rem 6rem;
+        max-width: 640px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .page-title { font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0 0 0.2rem; }
+    .page-sub   { font-size: 0.85rem; color: #64748b; margin: 0; }
+
+    .btn-add {
+        font-size: 0.85rem; font-weight: 600;
+        color: #fff; background: #16a34a;
+        border: none; border-radius: 0.5rem;
+        padding: 0.45rem 0.9rem; cursor: pointer;
+        white-space: nowrap; flex-shrink: 0;
+    }
+    .btn-add:hover { background: #15803d; }
+
+    /* ── Form ── */
+    .cl-form {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.875rem;
+        padding: 1.25rem;
+        margin-bottom: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .form-title { font-size: 0.95rem; font-weight: 600; color: #0f172a; margin: 0; }
+    .form-error { font-size: 0.82rem; color: #ef4444; margin: 0; }
+
+    .field       { display: flex; flex-direction: column; gap: 0.3rem; }
+    .field-label { font-size: 0.78rem; font-weight: 500; color: #475569; }
+
+    .input {
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+        color: #0f172a;
+        background: #fff;
+        outline: none;
+        font-family: inherit;
+        width: 100%;
+        box-sizing: border-box;
+        transition: border-color 0.15s;
+    }
+    .input:focus     { border-color: #3b82f6; }
+    textarea.input   { resize: vertical; }
+
+    .form-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+
+    .btn-primary {
+        font-size: 0.85rem; font-weight: 600;
+        color: #fff; background: #16a34a;
+        border: none; border-radius: 0.5rem;
+        padding: 0.45rem 1rem; cursor: pointer;
+    }
+    .btn-primary:hover:not(:disabled) { background: #15803d; }
+    .btn-primary:disabled { background: #86efac; cursor: not-allowed; }
+
+    .btn-secondary {
+        font-size: 0.85rem; font-weight: 500;
+        color: #475569; background: #f1f5f9;
+        border: 1px solid #e2e8f0; border-radius: 0.5rem;
+        padding: 0.45rem 0.9rem; cursor: pointer;
+    }
+    .btn-secondary:hover { background: #e2e8f0; }
+
+    /* ── Filter pills ── */
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
+
+    .pill {
+        font-size: 0.78rem; font-weight: 500;
+        padding: 0.3rem 0.75rem;
+        border: 1px solid #e2e8f0; border-radius: 999px;
+        background: #f8fafc; color: #64748b;
+        cursor: pointer; transition: all 0.15s;
+    }
+    .pill:hover  { background: #f1f5f9; color: #334155; }
+    .pill.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+
+    /* ── Cards ── */
+    .cl-list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+    .cl-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.875rem;
+        padding: 1rem 1.1rem;
+    }
+
+    .cl-badges { display: flex; gap: 0.4rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+
+    .badge {
+        display: inline-block;
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 600;
+    }
+
+    .cat-for-sale { background: #dcfce7; color: #15803d; }
+    .cat-wanted   { background: #dbeafe; color: #1d4ed8; }
+    .cat-free     { background: #f3e8ff; color: #7e22ce; }
+    .cat-job      { background: #fef9c3; color: #a16207; }
+    .cat-notice   { background: #fee2e2; color: #b91c1c; }
+    .price        { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+
+    .cl-title { font-size: 0.95rem; font-weight: 600; color: #0f172a; margin-bottom: 0.2rem; }
+    .cl-desc  { font-size: 0.875rem; color: #475569; margin: 0.2rem 0 0.3rem; line-height: 1.5; }
+    .cl-meta  { font-size: 0.78rem; color: #94a3b8; margin: 0 0 0.4rem; }
+
+    .card-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; }
+
+    .action-btn {
+        font-size: 0.72rem; font-weight: 500;
+        color: #64748b; background: none;
+        border: 1px solid #e2e8f0; border-radius: 0.375rem;
+        padding: 0.2rem 0.6rem; cursor: pointer;
+    }
+    .action-btn:hover        { background: #f8fafc; }
+    .action-btn.danger       { color: #ef4444; border-color: #fecaca; }
+    .action-btn.danger:hover { background: #fef2f2; }
+
+    /* ── Misc ── */
+    .empty-msg { font-size: 0.875rem; color: #94a3b8; }
+    .error-msg { font-size: 0.875rem; color: #ef4444; }
+
+    .skeleton {
+        height: 5rem; border-radius: 0.875rem; margin-bottom: 0.75rem;
+        background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.2s infinite;
+    }
+    .skeleton.short { height: 3rem; width: 60%; }
+    @keyframes shimmer {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
 </style>

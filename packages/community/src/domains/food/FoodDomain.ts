@@ -6,7 +6,8 @@ export const FOOD_DOMAIN_ID = "ecf-domain-food-000000006";
  * Food Domain — coordinates community food processing and preparation.
  *
  * Functional units in this domain (instantiated from templates):
- *   - community-kitchen   Raw and cooked food preparation for the community
+ *   - food-supply-office  Central office for food procurement, storage, and distribution (default)
+ *   - community-kitchen   Raw and cooked food preparation for the community (default)
  *   - grain-mill          Grain processing: milling, hulling, and storage
  *
  * The domain has no monetary operations of its own — payroll and budget

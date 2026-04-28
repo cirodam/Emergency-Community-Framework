@@ -218,10 +218,42 @@ async function main(): Promise<void> {
         );
     }
     domainSvc.registerDomain(FoodDomain.getInstance());
+    if (FoodDomain.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Food Supply Office", "Central office coordinating food procurement, storage, and distribution for the community.", "food-supply-office"),
+            FoodDomain.getInstance().id,
+        );
+        domainSvc.createUnit(
+            new FunctionalUnit("Community Kitchen", "Shared kitchen space for food preparation and cooking. Handles raw ingredient processing, meal preparation, and food preservation for the community.", "community-kitchen"),
+            FoodDomain.getInstance().id,
+        );
+    }
     domainSvc.registerDomain(AgricultureDomain.getInstance());
+    if (AgricultureDomain.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Farm Coordination Office", "Coordinates land allocation, planting schedules, shared equipment, and harvest logistics across community farms and individual growers.", "farm-coordination-office"),
+            AgricultureDomain.getInstance().id,
+        );
+    }
     domainSvc.registerDomain(HealthcareDomain.getInstance());
+    if (HealthcareDomain.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Medicine Supply Office", "Manages procurement, storage, and distribution of medicines and medical supplies for the community.", "medicine-supply-office"),
+            HealthcareDomain.getInstance().id,
+        );
+        domainSvc.createUnit(
+            new FunctionalUnit("Primary Care Clinic", "General medical care, preventive health, chronic disease management, and triage for the community.", "primary-care-clinic"),
+            HealthcareDomain.getInstance().id,
+        );
+    }
     domainSvc.registerDomain(HousingDomain.getInstance());
     domainSvc.registerDomain(EnergyDomain.getInstance());
+    if (EnergyDomain.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Liquid Fuels Office", "Manages production or procurement, storage, and rationing of liquid fuels including biodiesel and petrol.", "liquid-fuel-office"),
+            EnergyDomain.getInstance().id,
+        );
+    }
     domainSvc.registerDomain(CommunicationsDomain.getInstance());
     domainSvc.registerDomain(DeathcareDomain.getInstance());
     domainSvc.registerDomain(SanitationDomain.getInstance());
@@ -229,6 +261,12 @@ async function main(): Promise<void> {
     domainSvc.registerDomain(FireDomain.getInstance());
     domainSvc.registerDomain(ChildcareDomain.getInstance());
     domainSvc.registerDomain(DependencyCareDomain.getInstance());
+    if (DependencyCareDomain.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Community Outreach Team", "Identifies at-risk, isolated, or vulnerable community members — including elderly, disabled, and food-insecure individuals — and coordinates delivery of food, medicine, and care services to them.", "community-outreach-team"),
+            DependencyCareDomain.getInstance().id,
+        );
+    }
     domainSvc.registerDomain(EducationDomain.getInstance());
     domainSvc.registerDomain(EnrichmentDomain.getInstance());
     domainSvc.registerDomain(TransitDomain.getInstance());

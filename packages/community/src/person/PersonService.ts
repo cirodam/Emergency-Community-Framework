@@ -141,6 +141,7 @@ export class PersonService {
 
         const payload = JSON.stringify({
             personId:         person.id,
+            handle:           person.handle,
             personPublicKey:  person.publicKeyHex,
             communityNodeId:  identity.id,
             communityPublicKey: identity.publicKey,
@@ -150,6 +151,7 @@ export class PersonService {
 
         const credential: PersonCredential = {
             personId:           person.id,
+            handle:             person.handle,
             personPublicKey:    person.publicKeyHex,
             communityNodeId:    identity.id,
             communityPublicKey: identity.publicKey,
@@ -174,6 +176,7 @@ export class PersonService {
 
         const payload = JSON.stringify({
             personId:           credential.personId,
+            handle:             credential.handle,
             personPublicKey:    credential.personPublicKey,
             communityNodeId:    credential.communityNodeId,
             communityPublicKey: credential.communityPublicKey,

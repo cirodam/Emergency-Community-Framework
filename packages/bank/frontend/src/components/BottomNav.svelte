@@ -8,6 +8,10 @@
         { id: "accounts", label: "Accounts", icon: "◈" },
         { id: "settings", label: "Settings", icon: "⚙" },
     ];
+
+    const initials = $derived(
+        $session ? $session.displayName.split(" ").map(w => w[0]).slice(0, 2).join("") : ""
+    );
 </script>
 
 <nav class="bottom-nav">
@@ -31,7 +35,7 @@
     <div class="sidebar-footer">
         {#if $session}
             <div class="user-info">
-                <div class="user-avatar">{$session.displayName.split(" ").map((w: string) => w[0]).slice(0, 2).join("")}</div>
+                <div class="user-avatar">{initials}</div>
                 <div class="user-meta">
                     <span class="user-name">{$session.displayName}</span>
                     <span class="user-handle">@{$session.handle}</span>

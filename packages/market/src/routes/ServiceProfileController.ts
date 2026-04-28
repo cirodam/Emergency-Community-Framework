@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { ServiceProfileService } from "../ServiceProfileService.js";
 import { SERVICE_CATEGORIES, ServiceCategory, ServiceRateUnit, ServiceAvailability } from "../ServiceProfile.js";
+import { type PersonCredential } from "@ecf/core";
 
 const VALID_RATE_UNITS: ServiceRateUnit[]     = ["per-hour", "per-job", "negotiable"];
 const VALID_AVAILABILITY: ServiceAvailability[] = ["available", "busy", "by-appointment"];
@@ -25,24 +26,30 @@ export function getService(req: Request, res: Response): void {
 
 // POST /api/services
 // Body: { name, category, description?, rate?, rateUnit?, availability? }
-export function createService(req: Request & { personId?: string }, res: Response): void {
-    const { name, category, description, rate, rateUnit, availability, providerHandle } = req.body ?? {};
+export function createService(req: Request & { personId?: string; credential?: PersonCredential }, res: Response): void {
+    const { name, category, description, rate, rateUnit, availability } = req.body ?? {};
     const providerId = req.personId;
 
     if (!providerId) { res.status(401).json({ error: "Not authenticated" }); return; }
     if (typeof name !== "string" || !name.trim()) {
         res.status(400).json({ error: "name is required" }); return;
     }
+    if (name.length > 200) {
+        res.status(400).json({ error: "name must be 200 characters or fewer" }); return;
+    }
     if (!SERVICE_CATEGORIES.includes(category)) {
         res.status(400).json({ error: `category must be one of: ${SERVICE_CATEGORIES.join(", ")}` }); return;
     }
+    if (description !== undefined && typeof description === "string" && description.length > 4000) {
+        res.status(400).json({ error: "description must be 4000 characters or fewer" }); return;
+    }
     const resolvedRateUnit: ServiceRateUnit = VALID_RATE_UNITS.includes(rateUnit) ? rateUnit : "negotiable";
     const resolvedAvailability: ServiceAvailability = VALID_AVAILABILITY.includes(availability) ? availability : "available";
-    const resolvedRate = typeof rate === "number" && rate >= 0 ? rate : null;
+    const resolvedRate = typeof rate === "number" && Number.isFinite(rate) && rate >= 0 ? rate : null;
 
     const p = svc().add(
         providerId,
-        typeof providerHandle === "string" ? providerHandle : "",
+        req.credential?.handle ?? "",
         name.trim(),
         category as ServiceCategory,
         typeof description === "string" ? description.trim() : "",
@@ -68,7 +75,12 @@ export function updateService(req: Request & { personId?: string }, res: Respons
         patch.category = category;
     }
     if (description  !== undefined) patch.description  = description;
-    if (rate         !== undefined) patch.rate         = rate;
+    if (rate !== undefined) {
+        if (typeof rate !== "number" || !Number.isFinite(rate) || rate < 0) {
+            res.status(400).json({ error: "rate must be a non-negative finite number" }); return;
+        }
+        patch.rate = rate;
+    }
     if (rateUnit     !== undefined) {
         if (!VALID_RATE_UNITS.includes(rateUnit)) {
             res.status(400).json({ error: `rateUnit must be one of: ${VALID_RATE_UNITS.join(", ")}` }); return;

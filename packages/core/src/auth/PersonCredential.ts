@@ -13,6 +13,7 @@ import { NodeSigner } from "../network/NodeSigner.js";
  */
 export interface PersonCredential {
     personId: string;
+    handle: string;             // community handle, cryptographically bound
     personPublicKey: string;    // hex SPKI DER — person's own Ed25519 key
     communityNodeId: string;
     communityPublicKey: string; // hex SPKI DER — used by verifiers
@@ -25,6 +26,7 @@ export interface PersonCredential {
 function credentialPayload(c: PersonCredential): string {
     return JSON.stringify({
         personId:           c.personId,
+        handle:             c.handle,
         personPublicKey:    c.personPublicKey,
         communityNodeId:    c.communityNodeId,
         communityPublicKey: c.communityPublicKey,

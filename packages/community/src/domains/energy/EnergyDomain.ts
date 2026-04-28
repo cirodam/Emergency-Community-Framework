@@ -6,8 +6,8 @@ export const ENERGY_DOMAIN_ID = "ecf-domain-energy-000000010";
  * Energy Domain — coordinates community energy production and distribution.
  *
  * Functional units in this domain (instantiated from templates):
+ *   - liquid-fuel-office    Manages fuel production, storage, and rationing (default)
  *   - electricity-office    Manages generation, storage, and grid distribution
- *   - liquid-fuel-office    Manages fuel production, storage, and rationing
  */
 export class EnergyDomain extends FunctionalDomain {
     private static instance: EnergyDomain;

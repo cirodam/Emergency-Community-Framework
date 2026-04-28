@@ -12,6 +12,17 @@ import { UnitTemplateRegistry } from "../../common/domain/UnitTemplateRegistry.j
 export class FoodUnitTemplates {
     static register(): void {
         UnitTemplateRegistry.register({
+            type:        "food-supply-office",
+            label:       "Food Supply Office",
+            description: "Central office coordinating food procurement, storage, and distribution for the community.",
+            factory: () => new FunctionalUnit(
+                "Food Supply Office",
+                "Central office coordinating food procurement, storage, and distribution for the community.",
+                "food-supply-office",
+            ),
+        });
+
+        UnitTemplateRegistry.register({
             type:        "community-kitchen",
             label:       "Community Kitchen",
             description: "Shared kitchen space for food preparation and cooking. Handles raw ingredient processing, meal preparation, and food preservation for the community.",

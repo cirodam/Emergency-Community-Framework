@@ -16,12 +16,15 @@
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
+    const FILTER_OPTIONS = ["open", "passed", "rejected", "expired", "withdrawn", "all"] as const;
+    type FilterOption = typeof FILTER_OPTIONS[number];
+
     let proposals: ProposalDto[]        = $state([]);
     let pools:     PoolDto[]            = $state([]);
     let mutableParams: ConstitutionParam[] = $state([]); // for amendment form
     let loading    = $state(true);
     let error      = $state("");
-    let filter     = $state<"open" | "passed" | "rejected" | "expired" | "withdrawn" | "all">("open");
+    let filter     = $state<FilterOption>("open");
     let expanded   = $state<string | null>(null); // proposal id detail view
 
     // Create form
@@ -292,7 +295,7 @@
 
     <!-- Status filter tabs -->
     <div class="filter-bar">
-        {#each (["open", "passed", "rejected", "expired", "withdrawn", "all"] as const) as s}
+        {#each FILTER_OPTIONS as s}
             <button class:active={filter === s} onclick={() => { filter = s; expanded = null; }}>
                 {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
             </button>

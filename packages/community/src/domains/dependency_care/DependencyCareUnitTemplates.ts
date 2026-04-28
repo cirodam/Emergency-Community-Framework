@@ -4,6 +4,17 @@ import { UnitTemplateRegistry } from "../../common/domain/UnitTemplateRegistry.j
 export class DependencyCareUnitTemplates {
     static register(): void {
         UnitTemplateRegistry.register({
+            type:        "community-outreach-team",
+            label:       "Community Outreach Team",
+            description: "Identifies at-risk, isolated, or vulnerable community members — including elderly, disabled, and food-insecure individuals — and coordinates delivery of food, medicine, and care services to them.",
+            factory: () => new FunctionalUnit(
+                "Community Outreach Team",
+                "Identifies at-risk, isolated, or vulnerable community members — including elderly, disabled, and food-insecure individuals — and coordinates delivery of food, medicine, and care services to them.",
+                "community-outreach-team",
+            ),
+        });
+
+        UnitTemplateRegistry.register({
             type:        "elder-care-home",
             label:       "Elder Care Home",
             description: "Provides residential and day care for older adults, including meals, mobility support, social activities, and health monitoring.",
