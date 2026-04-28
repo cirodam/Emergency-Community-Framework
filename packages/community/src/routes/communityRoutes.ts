@@ -1,6 +1,7 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { requirePersonCredential } from "@ecf/core";
 import { getCommunityIdentity } from "../communityIdentity.js";
+import { PersonService } from "../person/PersonService.js";
 import * as persons from "./PersonController.js";
 import * as auth from "./AuthController.js";
 import * as domains from "./DomainController.js";
@@ -17,6 +18,19 @@ import * as proposals from "./ProposalController.js";
 
 const requireAuth = requirePersonCredential(getCommunityIdentity);
 
+const requireSteward = [
+    requireAuth,
+    (req: Request, res: Response, next: NextFunction) => {
+        const personId = (req as unknown as Record<string, unknown>).personId as string | undefined;
+        if (!personId) return res.status(403).json({ error: "Steward access required" });
+        const person = PersonService.getInstance().get(personId);
+        if (!person || !PersonService.getInstance().isSteward(person)) {
+            return res.status(403).json({ error: "Steward access required" });
+        }
+        next();
+    },
+];
+
 const router = Router();
 
 // Setup (first-boot only)
@@ -31,14 +45,16 @@ router.get("/budget",    economics.getCommunityBudget);
 router.get( "/federation",       economics.getFederationStatus);
 router.post("/federation/apply", economics.applyToFederation);
 router.get( "/federation/sync",  economics.syncFederationStatus);
-// Persons (all require auth — member data is not public)
-router.get(   "/persons",                requireAuth, persons.listPersons);
-router.get(   "/persons/:id",            requireAuth, persons.getPerson);
-router.post(  "/persons",                requireAuth, persons.addPerson);
-router.patch( "/persons/:id",            requireAuth, persons.updatePerson);
-router.delete("/persons/:id",            requireAuth, persons.dischargePerson);
-router.post(  "/persons/:id/credential", requireAuth, persons.issueCredential);
-router.post(  "/persons/:id/password",   requireAuth, auth.setPassword);
+// Persons (reads require auth; steward-only for sensitive writes)
+router.get(   "/persons",                requireAuth,    persons.listPersons);
+router.get(   "/persons/:id",            requireAuth,    persons.getPerson);
+router.post(  "/persons",                requireAuth,    persons.addPerson);
+router.patch( "/persons/:id",            requireSteward, persons.updatePerson);
+router.delete("/persons/:id",            requireSteward, persons.dischargePerson);
+router.post(  "/persons/:id/credential", requireSteward, persons.issueCredential);
+router.post(  "/persons/:id/password",   requireSteward, auth.setPassword);
+router.post(  "/persons/:id/steward",    requireSteward, persons.grantSteward);
+router.delete("/persons/:id/steward",    requireSteward, persons.revokeSteward);
 
 // Auth
 router.post("/auth/login",  auth.login);

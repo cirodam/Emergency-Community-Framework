@@ -15,7 +15,7 @@ export interface AccountRecord {
 export class BankAccount {
     readonly accountId: string;
     readonly ownerId: string;
-    readonly label: string;
+    label: string;
     readonly currency: Currency;
     /**
      * The minimum balance allowed (inclusive). Debits that would push the balance below

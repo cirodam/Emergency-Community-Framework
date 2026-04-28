@@ -3,6 +3,7 @@ import { promisify } from "util";
 import { NodeService, NodeSigner } from "@ecf/core";
 import { Person, PersonCredential, LanguageProficiency } from "./Person.js";
 import { PersonLoader } from "./PersonLoader.js";
+import { Constitution } from "../governance/Constitution.js";
 
 export interface PersonPatch {
     firstName?: string;
@@ -10,6 +11,7 @@ export interface PersonPatch {
     phone?: string | null;
     disabled?: boolean;
     retired?: boolean;
+    steward?: boolean;
     languages?: LanguageProficiency[];
 }
 
@@ -105,6 +107,7 @@ export class PersonService {
         if (patch.phone     !== undefined) person.phone     = patch.phone;
         if (patch.disabled  !== undefined) person.disabled  = patch.disabled;
         if (patch.retired   !== undefined) person.retired   = patch.retired;
+        if (patch.steward   !== undefined) person.steward   = patch.steward;
         if (patch.languages !== undefined) person.languages = patch.languages;
         this.save(person);
         return person;
@@ -202,6 +205,37 @@ export class PersonService {
 
     count(): number {
         return this.persons.size;
+    }
+
+    /**
+     * Returns true when the person holds steward privileges.
+     * Two paths: explicit flag set by an existing steward, OR membership
+     * duration has reached the constitutional threshold.
+     */
+    isSteward(person: Person): boolean {
+        if (person.steward) return true;
+        const threshold = (() => {
+            try { return Constitution.getInstance().stewardshipThresholdYears; }
+            catch { return 3; }
+        })();
+        const yearsAsMember = (Date.now() - person.joinDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+        return yearsAsMember >= threshold;
+    }
+
+    grantSteward(personId: string): Person {
+        const person = this.persons.get(personId);
+        if (!person) throw new Error(`Person ${personId} not found`);
+        person.steward = true;
+        this.save(person);
+        return person;
+    }
+
+    revokeSteward(personId: string): Person {
+        const person = this.persons.get(personId);
+        if (!person) throw new Error(`Person ${personId} not found`);
+        person.steward = false;
+        this.save(person);
+        return person;
     }
 
     // ── Auth ──────────────────────────────────────────────────────────────────

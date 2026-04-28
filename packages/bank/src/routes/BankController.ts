@@ -196,3 +196,77 @@ function toTxDto(t: { id: string; fromAccountId: string; toAccountId: string; cu
         timestamp:     t.timestamp,
     };
 }
+
+const MAX_ACCOUNTS_PER_MEMBER = 10;
+
+// POST /api/me/accounts
+// Body: { label, currency? }
+// Creates a new personal account (up to MAX_ACCOUNTS_PER_MEMBER).
+export function createMyAccount(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+    const { label, currency } = req.body ?? {};
+    if (typeof label !== "string" || !label.trim()) {
+        res.status(400).json({ error: "label is required" }); return;
+    }
+    const cur: Currency = CURRENCIES.includes(currency) ? currency as Currency : "kin";
+
+    const existing = bank().getAccounts(personId);
+    if (existing.length >= MAX_ACCOUNTS_PER_MEMBER) {
+        res.status(422).json({ error: `Maximum of ${MAX_ACCOUNTS_PER_MEMBER} accounts per member` }); return;
+    }
+
+    const owner: IEconomicActor = {
+        getId:          () => personId,
+        getDisplayName: () => personId,
+        getHandle:      () => personId,
+    };
+    const account = bank().openAccount(owner, label.trim(), cur, 0);
+    res.status(201).json(toAccountDto(account));
+}
+
+// DELETE /api/me/accounts/:accountId
+// Closes the account. Requires zero balance. Requires at least one account to remain.
+export function deleteMyAccount(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+    const { accountId } = req.params as { accountId: string };
+    const account = bank().getAccount(accountId);
+    if (!account) { res.status(404).json({ error: "Account not found" }); return; }
+    if (account.ownerId !== personId) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    const ownerAccounts = bank().getAccounts(personId);
+    if (ownerAccounts.length <= 1) {
+        res.status(422).json({ error: "Cannot delete your only account" }); return;
+    }
+
+    try {
+        bank().closeAccount(accountId);
+        res.status(204).end();
+    } catch (err) {
+        res.status(422).json({ error: (err as Error).message });
+    }
+}
+
+// PATCH /api/me/accounts/:accountId
+// Body: { label }
+// Renames the account.
+export function renameMyAccount(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+    const { accountId } = req.params as { accountId: string };
+    const account = bank().getAccount(accountId);
+    if (!account) { res.status(404).json({ error: "Account not found" }); return; }
+    if (account.ownerId !== personId) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    const { label } = req.body ?? {};
+    if (typeof label !== "string" || !label.trim()) {
+        res.status(400).json({ error: "label is required" }); return;
+    }
+
+    const updated = bank().renameAccount(accountId, label.trim());
+    res.json(toAccountDto(updated));
+}

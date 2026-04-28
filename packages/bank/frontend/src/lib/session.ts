@@ -63,10 +63,10 @@ function createSessionStore() {
 export const session = createSessionStore();
 
 /** Derived: which page to show — simple string-based router */
-export type Page = "login" | "account" | "send" | "history" | "settings";
+export type Page = "login" | "accounts" | "account" | "send" | "history" | "settings";
 
 function createPageStore() {
-    const { subscribe, set } = writable<Page>("account");
+    const { subscribe, set } = writable<Page>("accounts");
     return {
         subscribe,
         go: (page: Page) => set(page),
@@ -74,3 +74,6 @@ function createPageStore() {
 }
 
 export const currentPage = createPageStore();
+
+/** The account currently being viewed in the detail page (not persisted). */
+export const selectedAccountId = writable<string>("");

@@ -8,7 +8,7 @@
     import ServicesPage      from "./pages/ServicesPage.svelte";
     import MarketplacesPage  from "./pages/MarketplacesPage.svelte";
     import MarketplacePage   from "./pages/MarketplacePage.svelte";
-    import AppSwitcher       from "./components/AppSwitcher.svelte";
+    import Sidebar           from "./components/Sidebar.svelte";
 
     let ready = $state(false);
 
@@ -63,21 +63,10 @@
 </script>
 
 {#if ready && $session}
-    <nav class="tab-bar">
-        <button class="tab" class:active={$currentPage === "classifieds"} onclick={() => currentPage.set("classifieds")}>
-            Classifieds
-        </button>
-        <button class="tab" class:active={$currentPage === "services"} onclick={() => currentPage.set("services")}>
-            Services
-        </button>
-        <button class="tab" class:active={$currentPage === "marketplaces" || $currentPage === "marketplace" || $currentPage === "stalls" || $currentPage === "stall"} onclick={() => currentPage.set("marketplaces")}>
-            Marketplaces
-        </button>
-        <div class="switcher-slot"><AppSwitcher /></div>
-    </nav>
-
-    <main>
-        {#if $currentPage === "classifieds"}
+    <div class="shell">
+        <Sidebar />
+        <main>
+            {#if $currentPage === "classifieds"}
             <ClassifiedsPage />
         {:else if $currentPage === "services"}
             <ServicesPage />
@@ -88,7 +77,8 @@
         {:else}
             <MarketplacesPage />
         {/if}
-    </main>
+        </main>
+    </div>
 {/if}
 
 <style>
@@ -103,33 +93,11 @@
         color: #111827;
     }
 
-    .tab-bar {
-        position: sticky;
-        top: 0;
-        z-index: 50;
+    .shell {
         display: flex;
-        align-items: center;
-        background: #fff;
-        border-bottom: 1px solid #e2e8f0;
-        padding: 0 1rem;
+        flex-direction: row;
+        min-height: 100dvh;
     }
 
-    .switcher-slot { margin-left: auto; display: flex; align-items: center; }
-
-    .tab {
-        padding: 0.75rem 1.25rem;
-        font-size: 0.875rem;
-        font-weight: 500;
-        color: #64748b;
-        background: none;
-        border: none;
-        border-bottom: 2px solid transparent;
-        cursor: pointer;
-        transition: color 0.15s, border-color 0.15s;
-        margin-bottom: -1px;
-    }
-    .tab:hover   { color: #0f172a; }
-    .tab.active  { color: #16a34a; border-bottom-color: #16a34a; }
-
-    main { min-height: calc(100dvh - 45px); }
+    main { flex: 1; min-width: 0; min-height: 100dvh; }
 </style>

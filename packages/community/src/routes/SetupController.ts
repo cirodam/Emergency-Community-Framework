@@ -58,6 +58,9 @@ export async function setup(req: Request, res: Response): Promise<void> {
     await svc().add(person);
     await svc().setPassword(person.id, password);
 
+    // Grant the founder explicit stewardship
+    svc().grantSteward(person.id);
+
     // Set the community name in the constitution
     const constitution = Constitution.getInstance();
     constitution.setCommunityName(communityName.trim());

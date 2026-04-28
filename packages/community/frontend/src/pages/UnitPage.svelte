@@ -1,0 +1,582 @@
+<script lang="ts">
+    import { getUnit, listRoles, listRoleTypes, createRole, updateRole, deleteRole } from "../lib/api.js";
+    import type { UnitDto, RoleDto, RoleTypeDto } from "../lib/api.js";
+    import { currentPage, selectedUnitId, selectedDomainId } from "../lib/session.js";
+
+    let unit: UnitDto | null = $state(null);
+    let roles: RoleDto[] = $state([]);
+    let roleTypes: RoleTypeDto[] = $state([]);
+    let loading = $state(true);
+    let error = $state("");
+
+    // Add-role form
+    let showAddRole = $state(false);
+    let addMode: "type" | "custom" = $state("custom");
+    let newRoleTitle = $state("");
+    let newRoleDescription = $state("");
+    let newRoleKin = $state("");
+    let newRoleTypeId = $state("");
+    let addError = $state("");
+    let adding = $state(false);
+
+    // Inline kin editing
+    let editingKinId: string | null = $state(null);
+    let editKinValue = $state("");
+    let savingKin = $state(false);
+
+    // Delete
+    let deletingId: string | null = $state(null);
+
+    async function load(id: string) {
+        loading = true;
+        error = "";
+        try {
+            const [u, allRoles, rts] = await Promise.all([
+                getUnit(id),
+                listRoles(),
+                listRoleTypes(),
+            ]);
+            unit = u;
+            roles = allRoles.filter(r => u.roleIds.includes(r.id));
+            roleTypes = rts;
+        } catch (e) {
+            error = e instanceof Error ? e.message : "Failed to load unit";
+        } finally {
+            loading = false;
+        }
+    }
+
+    $effect(() => {
+        const id = $selectedUnitId;
+        if (id) load(id);
+    });
+
+    function back() {
+        currentPage.go("domain");
+    }
+
+    async function doAddRole() {
+        if (!unit) return;
+        addError = "";
+
+        if (addMode === "type") {
+            if (!newRoleTypeId) { addError = "Select a role type"; return; }
+        } else {
+            if (!newRoleTitle.trim()) { addError = "Title is required"; return; }
+        }
+
+        adding = true;
+        try {
+            const payload =
+                addMode === "type"
+                    ? { unitId: unit.id, roleTypeId: newRoleTypeId }
+                    : {
+                          unitId:      unit.id,
+                          title:       newRoleTitle.trim(),
+                          description: newRoleDescription.trim(),
+                          kinPerMonth: parseFloat(newRoleKin) || 0,
+                      };
+            await createRole(payload);
+            await load(unit.id);
+            showAddRole = false;
+            newRoleTitle = ""; newRoleDescription = ""; newRoleKin = ""; newRoleTypeId = "";
+        } catch (e) {
+            addError = e instanceof Error ? e.message : "Failed to add role";
+        } finally {
+            adding = false;
+        }
+    }
+
+    function startEditKin(role: RoleDto) {
+        editingKinId = role.id;
+        editKinValue = String(role.kinPerMonth);
+    }
+
+    async function saveKin(role: RoleDto) {
+        const val = parseFloat(editKinValue);
+        if (isNaN(val) || val < 0) { editingKinId = null; return; }
+        savingKin = true;
+        try {
+            const updated = await updateRole(role.id, { kinPerMonth: val, funded: val > 0 });
+            roles = roles.map(r => r.id === updated.id ? updated : r);
+        } catch {
+            // silently revert
+        } finally {
+            savingKin = false;
+            editingKinId = null;
+        }
+    }
+
+    async function doDelete(roleId: string) {
+        if (!unit) return;
+        deletingId = roleId;
+        try {
+            await deleteRole(roleId);
+            await load(unit.id);
+        } catch {
+            // silently ignore
+        } finally {
+            deletingId = null;
+        }
+    }
+
+    function fmt(n: number): string {
+        return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    }
+</script>
+
+<div class="unit-page">
+    <div class="page-header">
+        <button class="back-btn" onclick={back}>‹ Domain</button>
+    </div>
+
+    {#if loading}
+        <div class="skeleton wide"></div>
+        <div class="skeleton short"></div>
+        <div class="skeleton"></div>
+    {:else if error}
+        <div class="error-msg">{error}</div>
+    {:else if unit}
+        <div class="unit-header">
+            <div class="unit-type-badge">{unit.type}</div>
+            <h2 class="unit-name">{unit.name}</h2>
+            {#if unit.description}
+                <p class="unit-desc">{unit.description}</p>
+            {/if}
+        </div>
+
+        <section class="roles-section">
+            <div class="section-row">
+                <h3 class="section-title">Roles</h3>
+                <button class="add-btn" onclick={() => { showAddRole = !showAddRole; addError = ""; }}>
+                    {showAddRole ? "Cancel" : "+ Add role"}
+                </button>
+            </div>
+
+            {#if roles.length === 0 && !showAddRole}
+                <p class="empty-msg">No roles defined yet.</p>
+            {:else}
+                <div class="role-list">
+                    {#each roles as role (role.id)}
+                        <div class="role-card">
+                            <div class="role-card-top">
+                                <div class="role-title-row">
+                                    <span class="role-title">{role.title}</span>
+                                    {#if !role.memberId}
+                                        <span class="vacant-badge">vacant</span>
+                                    {/if}
+                                    {#if !role.funded}
+                                        <span class="unfunded-badge">unfunded</span>
+                                    {/if}
+                                </div>
+                                <button
+                                    class="delete-btn"
+                                    onclick={() => doDelete(role.id)}
+                                    disabled={deletingId === role.id}
+                                    aria-label="Remove role"
+                                >✕</button>
+                            </div>
+
+                            {#if role.description}
+                                <p class="role-desc">{role.description}</p>
+                            {/if}
+
+                            <div class="role-footer">
+                                {#if editingKinId === role.id}
+                                    <div class="kin-edit-row">
+                                        <input
+                                            class="kin-input"
+                                            type="number"
+                                            min="0"
+                                            bind:value={editKinValue}
+                                            onkeydown={(e) => { if (e.key === "Enter") saveKin(role); if (e.key === "Escape") editingKinId = null; }}
+
+                                        />
+                                        <button class="kin-save-btn" onclick={() => saveKin(role)} disabled={savingKin}>
+                                            {savingKin ? "…" : "Save"}
+                                        </button>
+                                        <button class="kin-cancel-btn" onclick={() => editingKinId = null}>Cancel</button>
+                                    </div>
+                                {:else}
+                                    <button class="kin-display" onclick={() => startEditKin(role)} title="Click to edit">
+                                        {fmt(role.kinPerMonth)} kin/mo
+                                    </button>
+                                {/if}
+                            </div>
+                        </div>
+                    {/each}
+                </div>
+            {/if}
+
+            {#if showAddRole}
+                <div class="add-role-form">
+                    {#if addError}<p class="form-error">{addError}</p>{/if}
+
+                    {#if roleTypes.length > 0}
+                        <div class="mode-tabs">
+                            <button
+                                class="mode-tab"
+                                class:active={addMode === "custom"}
+                                onclick={() => addMode = "custom"}
+                            >Custom role</button>
+                            <button
+                                class="mode-tab"
+                                class:active={addMode === "type"}
+                                onclick={() => addMode = "type"}
+                            >From role type</button>
+                        </div>
+                    {/if}
+
+                    {#if addMode === "type"}
+                        <select class="form-input" bind:value={newRoleTypeId}>
+                            <option value="">Select role type…</option>
+                            {#each roleTypes as rt (rt.id)}
+                                <option value={rt.id}>{rt.title} ({fmt(rt.defaultKinPerMonth)} kin/mo)</option>
+                            {/each}
+                        </select>
+                    {:else}
+                        <input
+                            class="form-input"
+                            type="text"
+                            bind:value={newRoleTitle}
+                            placeholder="Role title (e.g. Coordinator)"
+                        />
+                        <input
+                            class="form-input"
+                            type="text"
+                            bind:value={newRoleDescription}
+                            placeholder="Description (optional)"
+                        />
+                        <input
+                            class="form-input"
+                            type="number"
+                            min="0"
+                            bind:value={newRoleKin}
+                            placeholder="kin/month (0 = unfunded)"
+                        />
+                    {/if}
+
+                    <button class="save-btn" onclick={doAddRole} disabled={adding}>
+                        {adding ? "Adding…" : "Add role"}
+                    </button>
+                </div>
+            {/if}
+        </section>
+    {/if}
+</div>
+
+<style>
+    .unit-page {
+        padding: 1rem 1.5rem 6rem;
+        max-width: 480px;
+        margin: 0 auto;
+    }
+
+    @media (min-width: 768px) {
+        .unit-page { padding-bottom: 2rem; max-width: 680px; }
+    }
+
+    .page-header { margin-bottom: 1.25rem; }
+
+    .back-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+        color: #3b82f6;
+        padding: 0;
+    }
+
+    .unit-header { margin-bottom: 1.75rem; }
+
+    .unit-type-badge {
+        display: inline-block;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: #64748b;
+        background: #e2e8f0;
+        border-radius: 9999px;
+        padding: 0.2rem 0.6rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .unit-name {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0 0 0.4rem;
+    }
+
+    .unit-desc {
+        font-size: 0.9rem;
+        color: #475569;
+        margin: 0;
+        line-height: 1.55;
+    }
+
+    .roles-section { margin-top: 0; }
+
+    .section-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+    }
+
+    .section-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #94a3b8;
+        margin: 0;
+    }
+
+    .add-btn {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #3b82f6;
+        background: none;
+        border: 1px solid #bfdbfe;
+        border-radius: 0.375rem;
+        padding: 0.25rem 0.65rem;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .add-btn:hover { background: #eff6ff; }
+
+    .role-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+    }
+
+    .role-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        padding: 0.85rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+
+    .role-card-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+
+    .role-title-row {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .role-title {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #0f172a;
+    }
+
+    .vacant-badge {
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #d97706;
+        background: #fef3c7;
+        border-radius: 9999px;
+        padding: 0.1rem 0.4rem;
+    }
+
+    .unfunded-badge {
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #94a3b8;
+        background: #f1f5f9;
+        border-radius: 9999px;
+        padding: 0.1rem 0.4rem;
+    }
+
+    .role-desc {
+        font-size: 0.82rem;
+        color: #64748b;
+        margin: 0;
+        line-height: 1.45;
+    }
+
+    .role-footer {
+        display: flex;
+        align-items: center;
+        margin-top: 0.2rem;
+    }
+
+    .kin-display {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #334155;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.375rem;
+        padding: 0.2rem 0.55rem;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+    }
+    .kin-display:hover { background: #f1f5f9; border-color: #94a3b8; }
+
+    .kin-edit-row {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .kin-input {
+        width: 7rem;
+        font-size: 0.85rem;
+        font-family: inherit;
+        padding: 0.2rem 0.5rem;
+        border: 1px solid #3b82f6;
+        border-radius: 0.375rem;
+        outline: none;
+    }
+
+    .kin-save-btn {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #fff;
+        background: #3b82f6;
+        border: none;
+        border-radius: 0.375rem;
+        padding: 0.2rem 0.6rem;
+        cursor: pointer;
+    }
+    .kin-save-btn:disabled { opacity: 0.5; }
+
+    .kin-cancel-btn {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.2rem 0.4rem;
+    }
+
+    .delete-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 0.75rem;
+        color: #cbd5e1;
+        padding: 0;
+        line-height: 1;
+        flex-shrink: 0;
+        transition: color 0.15s;
+    }
+    .delete-btn:hover:not(:disabled) { color: #ef4444; }
+    .delete-btn:disabled { opacity: 0.4; }
+
+    /* ── Add role form ── */
+    .add-role-form {
+        margin-top: 0.75rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        padding: 0.85rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .mode-tabs {
+        display: flex;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        margin-bottom: 0.25rem;
+    }
+
+    .mode-tab {
+        flex: 1;
+        font-size: 0.8rem;
+        font-weight: 500;
+        padding: 0.4rem 0;
+        background: #fff;
+        border: none;
+        cursor: pointer;
+        color: #64748b;
+        transition: background 0.15s, color 0.15s;
+    }
+    .mode-tab.active {
+        background: #3b82f6;
+        color: #fff;
+        font-weight: 600;
+    }
+
+    .form-input {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 0.875rem;
+        font-family: inherit;
+        padding: 0.45rem 0.7rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        outline: none;
+        background: #fff;
+        transition: border-color 0.15s;
+    }
+    .form-input:focus { border-color: #3b82f6; }
+
+    .form-error {
+        font-size: 0.8rem;
+        color: #ef4444;
+        margin: 0;
+    }
+
+    .save-btn {
+        align-self: flex-start;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #fff;
+        background: #3b82f6;
+        border: none;
+        border-radius: 0.5rem;
+        padding: 0.45rem 1rem;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .save-btn:hover:not(:disabled) { background: #2563eb; }
+    .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .empty-msg {
+        font-size: 0.875rem;
+        color: #94a3b8;
+        padding: 0.5rem 0;
+    }
+
+    .error-msg {
+        font-size: 0.9rem;
+        color: #ef4444;
+        padding: 1rem 0;
+    }
+
+    .skeleton {
+        height: 2.5rem;
+        border-radius: 0.5rem;
+        background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.2s infinite;
+        margin-bottom: 0.5rem;
+    }
+    .skeleton.wide { height: 2rem; width: 70%; }
+    .skeleton.short { width: 40%; height: 1.2rem; }
+
+    @keyframes shimmer {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+</style>

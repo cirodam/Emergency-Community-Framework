@@ -328,14 +328,28 @@ export async function deleteMarketplace(id: string): Promise<void> {
 /** Fetch the community's location list for the marketplace location picker. */
 export async function listCommunityLocations(): Promise<CommunityLocationDto[]> {
     try {
-        const cfg = await fetch("/api/config").then(r => r.json()).catch(() => ({})) as { communityUrl?: string };
-        const communityUrl = cfg.communityUrl?.replace(/\/$/, "") ?? "";
-        if (!communityUrl) return [];
-        const res = await apiFetch(`${communityUrl}/api/locations`);
+        const res = await apiFetch("/api/community/locations");
         if (!res.ok) return [];
         return res.json() as Promise<CommunityLocationDto[]>;
     } catch {
         return [];
     }
+}
+
+/** Create a new location in the community app and return the new record. */
+export async function createCommunityLocation(data: {
+    name: string;
+    address: string;
+    description?: string;
+}): Promise<CommunityLocationDto> {
+    const res = await apiFetch("/api/community/locations", {
+        method: "POST",
+        body:   JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to create location");
+    }
+    return res.json() as Promise<CommunityLocationDto>;
 }
 

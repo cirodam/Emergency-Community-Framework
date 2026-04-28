@@ -32,6 +32,8 @@ function toPersonDto(p: Person) {
         phone:     p.phone,
         disabled:  p.disabled,
         retired:   p.retired,
+        steward:   p.steward,
+        isSteward: svc().isSteward(p),
         joinDate:  p.joinDate,
         hasPassword: p.hasPassword(),
     };

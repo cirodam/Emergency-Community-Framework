@@ -27,6 +27,8 @@ export interface PersonDto {
     phone: string | null;
     disabled: boolean;
     retired: boolean;
+    steward: boolean;
+    isSteward: boolean;
     joinDate: string;
     hasPassword: boolean;
 }
@@ -229,6 +231,24 @@ export async function setPassword(personId: string, password: string): Promise<v
     }
 }
 
+export async function grantSteward(personId: string): Promise<PersonDto> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(personId)}/steward`, { method: "POST" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to grant stewardship");
+    }
+    return res.json() as Promise<PersonDto>;
+}
+
+export async function revokeSteward(personId: string): Promise<PersonDto> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(personId)}/steward`, { method: "DELETE" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to revoke stewardship");
+    }
+    return res.json() as Promise<PersonDto>;
+}
+
 // ── Constitution ──────────────────────────────────────────────────────────────
 
 export async function getConstitution(): Promise<ConstitutionDocument> {
@@ -379,6 +399,44 @@ export async function updateDomain(id: string, patch: { poolId?: string | null }
     return res.json() as Promise<DomainDto>;
 }
 
+export interface DomainBudgetDto {
+    payroll: BudgetPayrollRow[];
+    items:   BudgetItem[];
+    totals:  { payroll: number; items: number; total: number };
+}
+
+export async function getDomainBudget(id: string): Promise<DomainBudgetDto> {
+    const res = await fetch(`/api/domains/${encodeURIComponent(id)}/budget`);
+    if (!res.ok) throw new Error("Domain not found");
+    return res.json() as Promise<DomainBudgetDto>;
+}
+
+export async function addBudgetItem(
+    domainId: string,
+    item: { label: string; amount: number; category?: string; note?: string },
+): Promise<BudgetItem> {
+    const res = await apiFetch(`/api/domains/${encodeURIComponent(domainId)}/budget/items`, {
+        method: "POST",
+        body:   JSON.stringify(item),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to add budget item");
+    }
+    return res.json() as Promise<BudgetItem>;
+}
+
+export async function removeBudgetItem(domainId: string, itemId: string): Promise<void> {
+    const res = await apiFetch(
+        `/api/domains/${encodeURIComponent(domainId)}/budget/items/${encodeURIComponent(itemId)}`,
+        { method: "DELETE" },
+    );
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to remove budget item");
+    }
+}
+
 export async function listUnits(): Promise<UnitDto[]> {
     const res = await fetch("/api/units");
     if (!res.ok) throw new Error("Failed to load units");
@@ -407,6 +465,90 @@ export async function createUnit(type: string, domainId: string): Promise<UnitDt
         throw new Error(body.error ?? "Failed to create unit");
     }
     return res.json() as Promise<UnitDto>;
+}
+
+export async function getUnit(id: string): Promise<UnitDto> {
+    const res = await fetch(`/api/units/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error("Unit not found");
+    return res.json() as Promise<UnitDto>;
+}
+
+// ── Roles ──────────────────────────────────────────────────────────────────────
+
+export interface RoleDto {
+    id:            string;
+    roleTypeId:    string | null;
+    title:         string;
+    description:   string;
+    memberId:      string | null;
+    kinPerMonth:   number;
+    funded:        boolean;
+    termStartDate: string | null;
+    termEndDate:   string | null;
+    isActive:      boolean;
+}
+
+export interface RoleTypeDto {
+    id:                 string;
+    title:              string;
+    description:        string;
+    defaultKinPerMonth: number;
+}
+
+export async function listRoles(): Promise<RoleDto[]> {
+    const res = await fetch("/api/roles");
+    if (!res.ok) throw new Error("Failed to load roles");
+    return res.json() as Promise<RoleDto[]>;
+}
+
+export async function listRoleTypes(): Promise<RoleTypeDto[]> {
+    const res = await fetch("/api/role-types");
+    if (!res.ok) throw new Error("Failed to load role types");
+    return res.json() as Promise<RoleTypeDto[]>;
+}
+
+export async function createRole(payload: {
+    unitId: string;
+    title?: string;
+    description?: string;
+    kinPerMonth?: number;
+    roleTypeId?: string;
+}): Promise<RoleDto> {
+    const res = await apiFetch("/api/roles", {
+        method: "POST",
+        body:   JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to create role");
+    }
+    return res.json() as Promise<RoleDto>;
+}
+
+export async function updateRole(id: string, patch: {
+    title?: string;
+    description?: string;
+    kinPerMonth?: number;
+    funded?: boolean;
+    memberId?: string | null;
+}): Promise<RoleDto> {
+    const res = await apiFetch(`/api/roles/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body:   JSON.stringify(patch),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to update role");
+    }
+    return res.json() as Promise<RoleDto>;
+}
+
+export async function deleteRole(id: string): Promise<void> {
+    const res = await apiFetch(`/api/roles/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to delete role");
+    }
 }
 
 // ── Pools ─────────────────────────────────────────────────────────────────────
@@ -753,4 +895,42 @@ export async function withdrawProposal(id: string): Promise<ProposalDto> {
         throw new Error(body.error ?? "Failed to withdraw proposal");
     }
     return res.json() as Promise<ProposalDto>;
+}
+
+// ── Network / Nodes ───────────────────────────────────────────────────────────
+
+export type NodeType = "community" | "infrastructure" | "federation" | "forum";
+
+export interface NodeIdentityDto {
+    id: string;
+    type: NodeType;
+    name: string;
+    address: string;
+    publicKey: string;
+    createdAt: string;
+}
+
+export interface PeerRecordDto {
+    id: string;
+    type: NodeType;
+    name: string;
+    address: string;
+    publicKey: string;
+    firstSeenAt: string;
+    lastSeenAt: string;
+    lastLatencyMs: number | null;
+    consecutiveFailures: number;
+    healthy: boolean;
+}
+
+export async function getNodeIdentity(): Promise<NodeIdentityDto> {
+    const res = await apiFetch("/api/node/identity");
+    if (!res.ok) throw new Error("Failed to load node identity");
+    return res.json() as Promise<NodeIdentityDto>;
+}
+
+export async function getNodePeers(): Promise<PeerRecordDto[]> {
+    const res = await apiFetch("/api/node/peers");
+    if (!res.ok) throw new Error("Failed to load peers");
+    return res.json() as Promise<PeerRecordDto[]>;
 }

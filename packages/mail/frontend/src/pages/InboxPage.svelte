@@ -24,10 +24,18 @@
         if (d.toDateString() === now.toDateString()) {
             return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         }
-        return d.toLocaleDateString([], { month: "short", day: "numeric" });
+        if (d.getFullYear() === now.getFullYear()) {
+            return d.toLocaleDateString([], { month: "short", day: "numeric" });
+        }
+        return d.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
     }
 
-    async function openThread(msg: MessageDto) {
+    function senderLabel(msg: MessageDto): string {
+        if (msg.fromPersonId === s.personId) return "me";
+        return `@${msg.fromPersonId.slice(0, 10)}`;
+    }
+
+    async function open(msg: MessageDto) {
         if (!msg.readAt) {
             try {
                 const updated = await markRead(msg.id);
@@ -45,43 +53,47 @@
             messages = messages.filter(m => m.id !== msg.id);
         } catch { /* ignore */ }
     }
-
-    function isSelf(msg: MessageDto): boolean {
-        return msg.fromPersonId === s.personId;
-    }
 </script>
 
 <div class="page">
     <div class="page-header">
-        <h2 class="page-title">Inbox</h2>
-        <button class="btn-compose" onclick={() => currentPage.go("compose")}>+ Compose</button>
+        <h1 class="folder-title">Inbox</h1>
+        {#if messages.length > 0}
+            <span class="count">{messages.filter(m => !m.readAt).length} unread</span>
+        {/if}
     </div>
 
     {#if loading}
-        {#each [1,2,3] as _}
-            <div class="skeleton"></div>
-        {/each}
+        <div class="list">
+            {#each [1,2,3,4,5] as _}
+                <div class="skeleton-row"></div>
+            {/each}
+        </div>
     {:else if error}
-        <p class="error-msg">{error}</p>
+        <div class="error-msg">{error}</div>
     {:else if messages.length === 0}
         <div class="empty">
-            <span class="empty-icon">✉</span>
+            <div class="empty-icon">✉</div>
             <p>Your inbox is empty.</p>
         </div>
     {:else}
-        <ul class="message-list">
+        <ul class="list">
             {#each messages as msg (msg.id)}
-                <li class="message-row" class:unread={!msg.readAt} onclick={() => openThread(msg)}>
-                    <div class="from-avatar">{msg.fromPersonId.slice(0, 2).toUpperCase()}</div>
-                    <div class="message-body">
-                        <div class="message-top">
-                            <span class="from-id">{isSelf(msg) ? "me → " : ""}{msg.fromPersonId.slice(0, 8)}…</span>
-                            <span class="date">{formatDate(msg.sentAt)}</span>
-                        </div>
-                        <div class="subject">{msg.subject || "(no subject)"}</div>
-                        <div class="preview">{msg.body.slice(0, 80)}{msg.body.length > 80 ? "…" : ""}</div>
+                <li
+                    class="row"
+                    class:unread={!msg.readAt}
+                    onclick={() => open(msg)}
+                >
+                    <div class="row-sender">{senderLabel(msg)}</div>
+                    <div class="row-content">
+                        <span class="row-subject">{msg.subject || "(no subject)"}</span>
+                        <span class="row-sep"> — </span>
+                        <span class="row-preview">{msg.body.replace(/\n/g, " ")}</span>
                     </div>
-                    <button class="delete-btn" onclick={(e) => remove(msg, e)} aria-label="Delete">✕</button>
+                    <div class="row-right">
+                        <span class="row-date">{formatDate(msg.sentAt)}</span>
+                        <button class="delete-btn" onclick={(e) => remove(msg, e)} aria-label="Delete">✕</button>
+                    </div>
                 </li>
             {/each}
         </ul>
@@ -89,93 +101,148 @@
 </div>
 
 <style>
-    .page { padding: 1.5rem; max-width: 720px; margin: 0 auto; }
+    .page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 0;
+    }
 
     .page-header {
         display: flex;
+        align-items: baseline;
+        gap: 0.75rem;
+        padding: 1.25rem 1.5rem 0.5rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .folder-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+    }
+
+    .count {
+        font-size: 0.8rem;
+        color: #94a3b8;
+    }
+
+    /* ── Message list ───────────────────────────────────────────────────────── */
+
+    .list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .row {
+        display: grid;
+        grid-template-columns: 11rem 1fr auto;
         align-items: center;
-        justify-content: space-between;
-        margin-bottom: 1.25rem;
-    }
-
-    .page-title { font-size: 1.25rem; font-weight: 700; color: #0f172a; margin: 0; }
-
-    .btn-compose {
-        padding: 0.45rem 1rem;
-        background: #16a34a;
-        color: #fff;
-        border: none;
-        border-radius: 0.5rem;
-        font-size: 0.875rem;
-        font-weight: 600;
-        cursor: pointer;
-    }
-
-    .message-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.25rem; }
-
-    .message-row {
-        display: flex;
-        align-items: flex-start;
-        gap: 0.875rem;
-        padding: 0.875rem 1rem;
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
+        gap: 0;
+        padding: 0.7rem 1.5rem;
+        border-bottom: 1px solid #f1f5f9;
         cursor: pointer;
         transition: background 0.1s;
-        position: relative;
+        background: #fff;
     }
 
-    .message-row:hover  { background: #f8fafc; }
-    .message-row.unread { border-left: 3px solid #16a34a; background: #f0fdf4; }
-    .message-row.unread .subject { font-weight: 700; }
+    .row:hover { background: #f8fafc; }
 
-    .from-avatar {
-        width: 2.25rem;
-        height: 2.25rem;
-        border-radius: 50%;
-        background: #dcfce7;
-        color: #15803d;
-        font-size: 0.75rem;
-        font-weight: 700;
+    .row.unread {
+        background: #f0fdf4;
+        font-weight: 600;
+    }
+    .row.unread .row-sender { color: #0f172a; }
+    .row.unread .row-subject { color: #0f172a; }
+
+    .row-sender {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #374151;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding-right: 1rem;
+    }
+
+    .row-content {
+        font-size: 0.875rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #94a3b8;
+    }
+
+    .row-subject {
+        color: #374151;
+        font-weight: 500;
+    }
+
+    .row.unread .row-preview { color: #64748b; }
+
+    .row-sep { color: #cbd5e1; }
+
+    .row-right {
         display: flex;
         align-items: center;
-        justify-content: center;
+        gap: 0.5rem;
         flex-shrink: 0;
+        padding-left: 1rem;
     }
 
-    .message-body { flex: 1; min-width: 0; }
-    .message-top  { display: flex; justify-content: space-between; margin-bottom: 0.15rem; }
-    .from-id { font-size: 0.8rem; color: #64748b; }
-    .date    { font-size: 0.75rem; color: #94a3b8; flex-shrink: 0; }
-    .subject { font-size: 0.9rem; font-weight: 500; color: #0f172a; margin-bottom: 0.1rem; }
-    .preview { font-size: 0.8rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row-date {
+        font-size: 0.78rem;
+        color: #94a3b8;
+        white-space: nowrap;
+    }
+
+    .row.unread .row-date { color: #64748b; font-weight: 600; }
 
     .delete-btn {
         background: none;
         border: none;
-        color: #cbd5e1;
+        font-size: 0.75rem;
+        color: transparent;
         cursor: pointer;
-        font-size: 0.8rem;
-        padding: 0.25rem;
+        padding: 0.2rem;
+        line-height: 1;
+        transition: color 0.1s;
         flex-shrink: 0;
-        align-self: center;
     }
-    .delete-btn:hover { color: #dc2626; }
+    .row:hover .delete-btn { color: #cbd5e1; }
+    .delete-btn:hover { color: #dc2626 !important; }
 
-    .skeleton {
-        height: 4.5rem;
-        background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    /* ── States ─────────────────────────────────────────────────────────────── */
+
+    .skeleton-row {
+        height: 2.8rem;
+        border-bottom: 1px solid #f1f5f9;
+        background: linear-gradient(90deg, #f8fafc 25%, #f1f5f9 50%, #f8fafc 75%);
         background-size: 200% 100%;
         animation: shimmer 1.3s infinite;
-        border-radius: 0.75rem;
-        margin-bottom: 0.25rem;
     }
-    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    @keyframes shimmer {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
 
-    .empty { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 4rem 0; color: #94a3b8; }
+    .empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 6rem 0;
+        color: #94a3b8;
+    }
     .empty-icon { font-size: 2.5rem; }
     .empty p { margin: 0; font-size: 0.95rem; }
 
-    .error-msg { color: #dc2626; font-size: 0.875rem; padding: 1rem; background: #fef2f2; border-radius: 0.5rem; }
+    .error-msg {
+        color: #dc2626;
+        font-size: 0.875rem;
+        padding: 1rem 1.5rem;
+        background: #fef2f2;
+    }
 </style>
+

@@ -1,10 +1,11 @@
 <script lang="ts">
-    import { getDomain, listUnits, listTemplates, createUnit, getPool, listPools, updateDomain } from "../lib/api.js";
-    import type { DomainDto, UnitDto, TemplateDto, PoolDto } from "../lib/api.js";
-    import { currentPage, selectedDomainId } from "../lib/session.js";
+    import { getDomain, listUnits, listTemplates, createUnit, getPool, listPools, updateDomain, getDomainBudget, addBudgetItem, removeBudgetItem } from "../lib/api.js";
+    import type { DomainDto, UnitDto, TemplateDto, PoolDto, DomainBudgetDto, BudgetItem } from "../lib/api.js";
+    import { currentPage, selectedDomainId, selectedUnitId } from "../lib/session.js";
 
     let domain: DomainDto | null = $state(null);
     let units: UnitDto[] = $state([]);
+    let budget: DomainBudgetDto | null = $state(null);
     let loading = $state(true);
     let error = $state("");
 
@@ -22,13 +23,24 @@
     let assigningPool = $state(false);
     let poolError = $state("");
 
+    // Budget state
+    let showAddItem = $state(false);
+    let newItemLabel = $state("");
+    let newItemAmount = $state("");
+    let newItemCategory = $state("other");
+    let newItemNote = $state("");
+    let addItemError = $state("");
+    let addingItem = $state(false);
+    let removingItemId = $state<string | null>(null);
+
     async function load(id: string) {
         loading = true;
         error = "";
         try {
-            const [d, allUnits] = await Promise.all([getDomain(id), listUnits()]);
+            const [d, allUnits, bud] = await Promise.all([getDomain(id), listUnits(), getDomainBudget(id)]);
             domain = d;
             units = allUnits.filter(u => d.unitIds.includes(u.id));
+            budget = bud;
             pool = d.poolId ? await getPool(d.poolId) : null;
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to load domain";
@@ -108,6 +120,51 @@
         currentPage.go("domains");
     }
 
+    function openUnit(id: string) {
+        selectedUnitId.set(id);
+        currentPage.go("unit");
+    }
+
+    async function doAddItem() {
+        if (!domain) return;
+        const amount = parseFloat(newItemAmount);
+        if (!newItemLabel.trim()) { addItemError = "Label is required"; return; }
+        if (isNaN(amount) || amount < 0) { addItemError = "Amount must be a positive number"; return; }
+        addingItem = true; addItemError = "";
+        try {
+            await addBudgetItem(domain.id, {
+                label:    newItemLabel.trim(),
+                amount,
+                category: newItemCategory,
+                note:     newItemNote.trim(),
+            });
+            budget = await getDomainBudget(domain.id);
+            showAddItem = false;
+            newItemLabel = ""; newItemAmount = ""; newItemCategory = "other"; newItemNote = "";
+        } catch (e) {
+            addItemError = e instanceof Error ? e.message : "Failed to add item";
+        } finally {
+            addingItem = false;
+        }
+    }
+
+    async function doRemoveItem(itemId: string) {
+        if (!domain) return;
+        removingItemId = itemId;
+        try {
+            await removeBudgetItem(domain.id, itemId);
+            budget = await getDomainBudget(domain.id);
+        } catch {
+            // silently ignore
+        } finally {
+            removingItemId = null;
+        }
+    }
+
+    function fmtKin(n: number): string {
+        return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    }
+
     function fmt(date: string): string {
         return new Date(date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
     }
@@ -148,8 +205,8 @@
             {:else}
                 <div class="unit-list">
                     {#each units as unit (unit.id)}
-                        <div class="unit-card">
-                            <div class="unit-header">
+                        <button class="unit-card" onclick={() => openUnit(unit.id)}>
+                            <div class="unit-header-row">
                                 <span class="unit-name">{unit.name}</span>
                                 <span class="unit-type">{unit.type}</span>
                             </div>
@@ -161,7 +218,7 @@
                                 <span class="unit-stat">{unit.roleIds.length} role{unit.roleIds.length !== 1 ? "s" : ""}</span>
                                 <span class="unit-date">Since {fmt(unit.createdAt)}</span>
                             </div>
-                        </div>
+                        </button>
                     {/each}
                 </div>
             {/if}
@@ -261,6 +318,105 @@
                 </div>
             {/if}
         </section>
+
+        <!-- ── Budget ─────────────────────────────────────────────────────── -->
+        <section class="budget-section">
+            <div class="section-row">
+                <h3 class="section-title">Budget</h3>
+                <button class="add-btn" onclick={() => { showAddItem = !showAddItem; addItemError = ""; }}>
+                    {showAddItem ? "Cancel" : "+ Add item"}
+                </button>
+            </div>
+
+            {#if budget}
+                {#if budget.payroll.length > 0}
+                    <div class="budget-group">
+                        <div class="budget-group-label">Payroll</div>
+                        {#each budget.payroll as row (row.roleId)}
+                            <div class="budget-row">
+                                <span class="budget-label">
+                                    {row.title}
+                                    {#if !row.memberId}<span class="vacant-tag">vacant</span>{/if}
+                                </span>
+                                <span class="budget-amount">{fmtKin(row.kinPerMonth)} kin/mo</span>
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+
+                {#if budget.items.length > 0}
+                    <div class="budget-group">
+                        <div class="budget-group-label">Line items</div>
+                        {#each budget.items as item (item.id)}
+                            <div class="budget-row">
+                                <span class="budget-label">
+                                    {item.label}
+                                    <span class="category-tag">{item.category}</span>
+                                </span>
+                                <span class="budget-amount-row">
+                                    <span class="budget-amount">{fmtKin(item.amount)} kin/mo</span>
+                                    <button
+                                        class="remove-item-btn"
+                                        onclick={() => doRemoveItem(item.id)}
+                                        disabled={removingItemId === item.id}
+                                        aria-label="Remove"
+                                    >✕</button>
+                                </span>
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+
+                {#if budget.payroll.length === 0 && budget.items.length === 0}
+                    <p class="empty-msg">No budget items yet.</p>
+                {:else}
+                    <div class="budget-total-row">
+                        <span class="budget-total-label">Total</span>
+                        <span class="budget-total-amount">{fmtKin(budget.totals.total)} kin/mo</span>
+                    </div>
+                {/if}
+
+                {#if showAddItem}
+                    <div class="add-item-form">
+                        {#if addItemError}<p class="form-error">{addItemError}</p>{/if}
+                        <div class="form-row">
+                            <input
+                                class="form-input"
+                                type="text"
+                                bind:value={newItemLabel}
+                                placeholder="Label (e.g. Compost supplies)"
+                            />
+                            <input
+                                class="form-input amount-input"
+                                type="number"
+                                min="0"
+                                bind:value={newItemAmount}
+                                placeholder="kin/mo"
+                            />
+                        </div>
+                        <div class="form-row">
+                            <select class="form-input" bind:value={newItemCategory}>
+                                <option value="supplies">Supplies</option>
+                                <option value="equipment">Equipment</option>
+                                <option value="services">Services</option>
+                                <option value="other">Other</option>
+                            </select>
+                            <input
+                                class="form-input"
+                                type="text"
+                                bind:value={newItemNote}
+                                placeholder="Note (optional)"
+                            />
+                        </div>
+                        <button class="save-item-btn" onclick={doAddItem} disabled={addingItem}>
+                            {addingItem ? "Adding…" : "Add item"}
+                        </button>
+                    </div>
+                {/if}
+            {:else}
+                <p class="empty-msg">Loading budget…</p>
+            {/if}
+        </section>
     {/if}
 </div>
 
@@ -353,10 +509,18 @@
         padding: 1rem 1.1rem;
         display: flex;
         flex-direction: column;
-        gap: 0.4rem;
+        gap: 0.4rem;        cursor: pointer;
+        text-align: left;
+        width: 100%;
+        font-family: inherit;
+        transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
     }
+    .unit-card:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px #eff6ff;
+        background: #f8fafc;    }
 
-    .unit-header {
+    .unit-header-row {
         display: flex;
         align-items: baseline;
         justify-content: space-between;
@@ -602,4 +766,170 @@
     }
     .unassign-btn:hover:not(:disabled) { background: #f1f5f9; }
     .unassign-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Budget ──────────────────────────────────────────────────────────────── */
+
+    .budget-section { margin-top: 2rem; }
+
+    .budget-group {
+        margin-bottom: 0.5rem;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        overflow: hidden;
+    }
+
+    .budget-group-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: #94a3b8;
+        padding: 0.5rem 1rem 0.25rem;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .budget-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.55rem 1rem;
+        border-bottom: 1px solid #f8fafc;
+        gap: 0.75rem;
+    }
+    .budget-row:last-child { border-bottom: none; }
+
+    .budget-label {
+        font-size: 0.875rem;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .vacant-tag {
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #d97706;
+        background: #fef3c7;
+        border-radius: 9999px;
+        padding: 0.1rem 0.4rem;
+        flex-shrink: 0;
+    }
+
+    .category-tag {
+        font-size: 0.68rem;
+        font-weight: 500;
+        color: #64748b;
+        background: #f1f5f9;
+        border-radius: 9999px;
+        padding: 0.1rem 0.4rem;
+        flex-shrink: 0;
+        text-transform: capitalize;
+    }
+
+    .budget-amount {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #0f172a;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .budget-amount-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .remove-item-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 0.75rem;
+        color: #cbd5e1;
+        padding: 0;
+        line-height: 1;
+        transition: color 0.15s;
+    }
+    .remove-item-btn:hover:not(:disabled) { color: #ef4444; }
+    .remove-item-btn:disabled { opacity: 0.4; }
+
+    .budget-total-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.65rem 0 0;
+        border-top: 1px solid #f1f5f9;
+        margin-top: 0.25rem;
+    }
+
+    .budget-total-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .budget-total-amount {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .add-item-form {
+        margin-top: 0.75rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        padding: 0.85rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .form-row {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .form-input {
+        flex: 1;
+        font-size: 0.875rem;
+        font-family: inherit;
+        padding: 0.45rem 0.7rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        outline: none;
+        background: #fff;
+        min-width: 0;
+        transition: border-color 0.15s;
+    }
+    .form-input:focus { border-color: #3b82f6; }
+    .amount-input { max-width: 8rem; flex: 0 0 8rem; }
+
+    .form-error {
+        font-size: 0.8rem;
+        color: #ef4444;
+        margin: 0;
+    }
+
+    .save-item-btn {
+        align-self: flex-start;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #fff;
+        background: #3b82f6;
+        border: none;
+        border-radius: 0.5rem;
+        padding: 0.45rem 1rem;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .save-item-btn:hover:not(:disabled) { background: #2563eb; }
+    .save-item-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

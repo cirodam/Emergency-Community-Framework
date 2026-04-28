@@ -19,6 +19,7 @@ import { LocationService } from "./location/LocationService.js";
 import { RoleTypeLoader } from "./common/RoleTypeLoader.js";
 import { RoleType, DEFAULT_ROLE_TYPES } from "./common/RoleType.js";
 import { CommunityRoleLoader } from "./common/domain/CommunityRoleLoader.js";
+import { FunctionalUnit } from "./common/domain/FunctionalUnit.js";
 import { FunctionalUnitLoader } from "./common/domain/FunctionalUnitLoader.js";
 import { FunctionalDomainLoader } from "./common/domain/FunctionalDomainLoader.js";
 import { LeaderPoolLoader } from "./governance/LeaderPoolLoader.js";
@@ -184,10 +185,38 @@ async function main(): Promise<void> {
     // governance — they get leader pools, roles, and appear in the domain API.
     // Monetary init (async bank connection) happens separately below.
     domainSvc.registerDomain(CentralBank.getInstance());
+    if (CentralBank.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Central Bank Office", "The central administrative office of the central bank.", "office"),
+            CentralBank.getInstance().id,
+        );
+    }
+
     domainSvc.registerDomain(CurrencyBoard.getInstance());
+    if (CurrencyBoard.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Currency Board Office", "The central administrative office of the currency board.", "office"),
+            CurrencyBoard.getInstance().id,
+        );
+    }
+
     domainSvc.registerDomain(SocialInsuranceBank.getInstance());
+    if (SocialInsuranceBank.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Social Insurance Office", "The central administrative office of the social insurance bank.", "office"),
+            SocialInsuranceBank.getInstance().id,
+        );
+    }
+
     domainSvc.registerDomain(CommunityTreasury.getInstance());
+
     domainSvc.registerDomain(CommunityBankDomain.getInstance());
+    if (CommunityBankDomain.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Main Branch", "The primary branch of the community bank.", "branch"),
+            CommunityBankDomain.getInstance().id,
+        );
+    }
     domainSvc.registerDomain(FoodDomain.getInstance());
     domainSvc.registerDomain(AgricultureDomain.getInstance());
     domainSvc.registerDomain(HealthcareDomain.getInstance());

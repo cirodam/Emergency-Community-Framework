@@ -18,7 +18,7 @@ export interface MessageDto {
     id:                  string;
     threadId:            string;
     fromPersonId:        string;
-    toPersonId:          string;
+    toPersonIds:         string[];
     subject:             string;
     body:                string;
     sentAt:              string;

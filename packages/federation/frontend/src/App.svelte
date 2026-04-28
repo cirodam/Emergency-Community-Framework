@@ -44,56 +44,70 @@
     }
 </script>
 
-<div class="app">
-    <header>
-        <h1>⬡ Federation</h1>
-        <button class="refresh" onclick={load}>↻ Refresh</button>
-    </header>
-
-    {#if loadError}
-        <div class="error-banner">{loadError}</div>
-    {/if}
-
-    <section class="cards">
-        <div class="stat-card">
-            <span class="label">Kithe in circulation</span>
-            <span class="value">{economics ? formatKithe(economics.kitheInCirculation) : "—"}</span>
+<div class="shell">
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <span class="brand-icon">⬡</span>
+            <span class="brand-name">Federation</span>
         </div>
-        <div class="stat-card">
-            <span class="label">Member communities</span>
-            <span class="value">{economics?.memberCount ?? members.length}</span>
+        <div class="sidebar-nav">
+            <button class="nav-item active">
+                <span>⊞</span> Members
+            </button>
         </div>
-    </section>
+        <div class="sidebar-footer">
+            <button class="refresh" onclick={load}>↻ Refresh</button>
+        </div>
+    </aside>
 
-    <section class="member-section">
-        <h2>Members</h2>
-        {#if members.length === 0}
-            <p class="empty">No communities have joined yet.</p>
-        {:else}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Community</th>
-                        <th>Joined</th>
-                        <th class="right">Kithe balance</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {#each members as member (member.id)}
-                        {@const bal = economics?.members.find(m => m.name === member.name)?.balance}
-                        <tr>
-                            <td>
-                                <span class="name">{member.name}</span>
-                                <span class="node-id">{member.communityNodeId.slice(0, 12)}…</span>
-                            </td>
-                            <td>{formatDate(member.joinedAt)}</td>
-                            <td class="right mono">{bal !== undefined ? formatKithe(bal) : "—"}</td>
-                        </tr>
-                    {/each}
-                </tbody>
-            </table>
+    <main class="main">
+        {#if loadError}
+            <div class="error-banner">{loadError}</div>
         {/if}
-    </section>
+
+        <h1 class="page-title">Overview</h1>
+
+        <section class="cards">
+            <div class="stat-card">
+                <span class="label">Kithe in circulation</span>
+                <span class="value">{economics ? formatKithe(economics.kitheInCirculation) : "—"}</span>
+            </div>
+            <div class="stat-card">
+                <span class="label">Member communities</span>
+                <span class="value">{economics?.memberCount ?? members.length}</span>
+            </div>
+        </section>
+
+        <section class="member-section">
+            <h2>Members</h2>
+            {#if members.length === 0}
+                <p class="empty">No communities have joined yet.</p>
+            {:else}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Community</th>
+                            <th>Joined</th>
+                            <th class="right">Kithe balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {#each members as member (member.id)}
+                            {@const bal = economics?.members.find(m => m.name === member.name)?.balance}
+                            <tr>
+                                <td>
+                                    <span class="name">{member.name}</span>
+                                    <span class="node-id">{member.communityNodeId.slice(0, 12)}…</span>
+                                </td>
+                                <td>{formatDate(member.joinedAt)}</td>
+                                <td class="right mono">{bal !== undefined ? formatKithe(bal) : "—"}</td>
+                            </tr>
+                        {/each}
+                    </tbody>
+                </table>
+            {/if}
+        </section>
+    </main>
 </div>
 
 <style>
@@ -105,26 +119,90 @@
         color: #0f172a;
     }
 
-    .app {
-        max-width: 860px;
-        margin: 0 auto;
-        padding: 1.5rem;
-    }
+    /* ── Shell ─────────────────────────────────────────────────────────────── */
 
-    header {
+    .shell {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding-bottom: 1.25rem;
-        border-bottom: 1px solid #e2e8f0;
-        margin-bottom: 1.5rem;
+        flex-direction: row;
+        min-height: 100dvh;
     }
 
-    h1 {
-        font-size: 1.5rem;
+    /* ── Sidebar ───────────────────────────────────────────────────────────── */
+
+    .sidebar {
+        width: 14rem;
+        min-height: 100dvh;
+        height: 100dvh;
+        position: sticky;
+        top: 0;
+        flex-shrink: 0;
+        background: #fff;
+        border-right: 1px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        padding: 1rem 0.75rem;
+        gap: 0.25rem;
+    }
+
+    .sidebar-brand {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.25rem 0.5rem 0.875rem;
+        border-bottom: 1px solid #f1f5f9;
+        margin-bottom: 0.5rem;
         font-weight: 700;
-        margin: 0;
+        font-size: 1rem;
+        color: #0f172a;
+    }
+
+    .brand-icon { font-size: 1.25rem; color: #2563eb; }
+
+    .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+        flex: 1;
+    }
+
+    .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        width: 100%;
+        padding: 0.65rem 0.875rem;
+        background: none;
+        border: none;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #374151;
+        cursor: pointer;
+        font-family: inherit;
+        text-align: left;
+    }
+    .nav-item.active { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+
+    .sidebar-footer {
+        margin-top: auto;
+        padding-top: 0.75rem;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    /* ── Main ──────────────────────────────────────────────────────────────── */
+
+    .main {
+        flex: 1;
+        min-width: 0;
+        padding: 1.5rem 2rem 3rem;
+        max-width: 800px;
+    }
+
+    .page-title {
+        font-size: 1.4rem;
+        font-weight: 700;
         color: #1e293b;
+        margin: 0 0 1.5rem;
     }
 
     h2 {
@@ -135,15 +213,16 @@
     }
 
     .refresh {
+        width: 100%;
+        padding: 0.375rem 0.75rem;
         background: none;
         border: 1px solid #cbd5e1;
-        padding: 0.375rem 0.75rem;
         border-radius: 0.5rem;
         font-size: 0.875rem;
         cursor: pointer;
         color: #475569;
+        font-family: inherit;
     }
-
     .refresh:hover { background: #f1f5f9; }
 
     .error-banner {

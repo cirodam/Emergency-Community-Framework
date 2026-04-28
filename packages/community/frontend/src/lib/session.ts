@@ -8,6 +8,7 @@ export interface SessionData {
     handle: string;
     phone: string | null;
     hasPassword: boolean;
+    isSteward: boolean;
     /** base64url-encoded PersonCredential — attached as Bearer token on every API call. */
     token: string;
 }
@@ -43,6 +44,7 @@ function createSessionStore() {
                 handle:      person.handle,
                 phone:       person.phone,
                 hasPassword: person.hasPassword,
+                isSteward:   person.isSteward,
                 token:       person.token,
             };
             sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
@@ -68,7 +70,7 @@ function createSessionStore() {
 
 export const session = createSessionStore();
 
-export type Page = "profile" | "directory" | "constitution" | "economy" | "settings" | "domains" | "domain" | "governance" | "central-bank" | "currency-board" | "social-insurance" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations" | "proposals" | "proposal";
+export type Page = "profile" | "directory" | "constitution" | "economy" | "settings" | "domains" | "domain" | "unit" | "governance" | "central-bank" | "currency-board" | "social-insurance" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations" | "proposals" | "proposal" | "nodes";
 
 function createPageStore() {
     const { subscribe, set } = writable<Page>("profile");
@@ -79,6 +81,9 @@ export const currentPage = createPageStore();
 
 /** ID of the domain currently being viewed in the domain detail page. */
 export const selectedDomainId = writable<string | null>(null);
+
+/** ID of the unit currently being viewed in the unit detail page. */
+export const selectedUnitId = writable<string | null>(null);
 
 /** ID of the association currently being viewed in the association detail page. */
 export const selectedAssociationId = writable<string | null>(null);

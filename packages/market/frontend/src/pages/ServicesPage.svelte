@@ -52,7 +52,7 @@
     let editRateUnit = $state<ServiceRateUnit>("per-hour");
     let editAvail   = $state<ServiceAvailability>("available");
 
-    const myId = $derived(session.personId);
+    const myId = $derived($session?.personId);
     const filtered = $derived(
         filter === "all" ? profiles : profiles.filter(p => p.category === filter)
     );

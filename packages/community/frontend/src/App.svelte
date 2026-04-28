@@ -14,6 +14,7 @@
     import SettingsPage        from "./pages/SettingsPage.svelte";
     import DomainsPage      from "./pages/DomainsPage.svelte";
     import DomainPage      from "./pages/DomainPage.svelte";
+    import UnitPage        from "./pages/UnitPage.svelte";
     import GovernancePage     from "./pages/GovernancePage.svelte";
     import ApplicationsPage   from "./pages/ApplicationsPage.svelte";
     import HowItWorksPage      from "./pages/HowItWorksPage.svelte";
@@ -24,6 +25,7 @@
     import LocationsPage       from "./pages/LocationsPage.svelte";
     import ProposalsPage       from "./pages/ProposalsPage.svelte";
     import ApplyPage           from "./pages/ApplyPage.svelte";
+    import NodesPage           from "./pages/NodesPage.svelte";
     import BottomNav           from "./components/BottomNav.svelte";
 
     type AppState = "loading" | "setup" | "login" | "apply" | "app";
@@ -84,6 +86,8 @@
             <DomainsPage />
         {:else if $currentPage === "domain"}
             <DomainPage />
+        {:else if $currentPage === "unit"}
+            <UnitPage />
         {:else if $currentPage === "governance"}
             <GovernancePage />
         {:else if $currentPage === "applications"}
@@ -102,6 +106,8 @@
             <LocationsPage />
         {:else if $currentPage === "proposals"}
             <ProposalsPage />
+        {:else if $currentPage === "nodes"}
+            <NodesPage />
         {/if}
     </main>
     <BottomNav />

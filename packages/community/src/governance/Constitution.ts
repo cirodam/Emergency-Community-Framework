@@ -219,6 +219,15 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
                 "Number of existing member vouches required to automatically admit a membership applicant. Once this many distinct members vouch for an application it is admitted without further action.",
             constraints: { min: 1, max: 10 },
         },
+
+        // ── Stewardship ──────────────────────────────────────────────────────
+        stewardshipThresholdYears: {
+            value: 3,
+            authority: "assembly",
+            description:
+                "Years of continuous membership after which a person automatically becomes a steward, gaining access to administrative actions (password resets, disabling members, etc.). Stewardship can also be granted explicitly by an existing steward at any time.",
+            constraints: { min: 1, max: 20 },
+        },
     },
     amendments: [],
     authorityMap: [
@@ -366,6 +375,7 @@ export class Constitution {
     get endowmentSeedBalance(): number         { return this.get<number>("endowmentSeedBalance"); }
     get birthGrant(): number                   { return this.get<number>("birthGrant"); }
     get memberAdmissionVouchesRequired(): number { return this.get<number>("memberAdmissionVouchesRequired"); }
+    get stewardshipThresholdYears(): number       { return this.get<number>("stewardshipThresholdYears"); }
 
     /** Which governance body must authorize the given action. Returns null if not in the map. */
     getRequiredBody(action: string): GovernanceBody | null {

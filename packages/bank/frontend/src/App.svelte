@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
     import { session, currentPage } from "./lib/session.js";
     import type { SessionData } from "./lib/session.js";
+    import AccountsPage from "./pages/AccountsPage.svelte";
     import AccountPage  from "./pages/AccountPage.svelte";
     import SendPage     from "./pages/SendPage.svelte";
     import HistoryPage  from "./pages/HistoryPage.svelte";
@@ -87,7 +88,9 @@
 
 {#if ready && $session}
     <main>
-        {#if $currentPage === "account"}
+        {#if $currentPage === "accounts"}
+            <AccountsPage />
+        {:else if $currentPage === "account"}
             <AccountPage />
         {:else if $currentPage === "send"}
             <SendPage />

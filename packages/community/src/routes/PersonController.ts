@@ -33,11 +33,20 @@ export async function addPerson(req: Request, res: Response): Promise<void> {
     if (isNaN(parsedBirthDate.getTime())) {
         res.status(400).json({ error: "birthDate must be a valid date" }); return;
     }
+
+    // Derive a unique handle from firstName_lastName
+    const base = `${firstName.trim()}_${lastName.trim()}`.toLowerCase().replace(/[^a-z0-9_]/g, "");
+    let handle = base;
+    let suffix = 2;
+    while (svc().getByHandle(handle)) {
+        handle = `${base}_${suffix++}`;
+    }
+
     const person = new Person(
         firstName.trim(),
         lastName.trim(),
         parsedBirthDate,
-        "",
+        handle,
         false,
         null,
         null,
@@ -76,6 +85,26 @@ export function issueCredential(req: Request, res: Response): void {
     res.json(credential);
 }
 
+// POST /api/persons/:id/steward
+export function grantSteward(req: Request, res: Response): void {
+    try {
+        const person = svc().grantSteward(req.params.id as string);
+        res.json(toDto(person));
+    } catch (err) {
+        res.status(404).json({ error: (err as Error).message });
+    }
+}
+
+// DELETE /api/persons/:id/steward
+export function revokeSteward(req: Request, res: Response): void {
+    try {
+        const person = svc().revokeSteward(req.params.id as string);
+        res.json(toDto(person));
+    } catch (err) {
+        res.status(404).json({ error: (err as Error).message });
+    }
+}
+
 /** Full DTO — includes phone; only used for the individual GET. */
 function toDto(p: Person) {
     return {
@@ -86,6 +115,8 @@ function toDto(p: Person) {
         phone:           p.phone,
         disabled:        p.disabled,
         retired:         p.retired,
+        steward:         p.steward,
+        isSteward:       svc().isSteward(p),
         bornInCommunity: p.bornInCommunity,
         languages:       p.languages,
         joinDate:        p.joinDate,
@@ -102,6 +133,8 @@ function toListDto(p: Person) {
         handle:          p.handle,
         disabled:        p.disabled,
         retired:         p.retired,
+        steward:         p.steward,
+        isSteward:       svc().isSteward(p),
         bornInCommunity: p.bornInCommunity,
         languages:       p.languages,
         joinDate:        p.joinDate,

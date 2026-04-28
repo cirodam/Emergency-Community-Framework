@@ -96,6 +96,30 @@ export class Bank {
         this.ownerIndex.delete(ownerId);
     }
 
+    /** Close a single account. Throws if the balance is non-zero. */
+    closeAccount(accountId: string): void {
+        const account = this.accounts.get(accountId);
+        if (!account) throw new Error(`Account ${accountId} not found`);
+        if (account.amount !== 0) {
+            throw new Error(
+                `Cannot close account "${account.label}" (${accountId}): balance is ${account.amount}. Transfer funds away first.`
+            );
+        }
+        this.accounts.delete(accountId);
+        const ids = this.ownerIndex.get(account.ownerId) ?? [];
+        this.ownerIndex.set(account.ownerId, ids.filter(id => id !== accountId));
+        this.accountLoader?.delete(accountId);
+    }
+
+    /** Rename an account. Returns the updated account. */
+    renameAccount(accountId: string, newLabel: string): BankAccount {
+        const account = this.accounts.get(accountId);
+        if (!account) throw new Error(`Account ${accountId} not found`);
+        account.label = newLabel;
+        this.accountLoader?.save(account);
+        return account;
+    }
+
     // ── Transfers ─────────────────────────────────────────────────────────────
 
     /**

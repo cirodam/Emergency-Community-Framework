@@ -1,17 +1,26 @@
 <script lang="ts">
     import AmountDisplay from "../components/AmountDisplay.svelte";
     import ErrorBanner from "../components/ErrorBanner.svelte";
-    import { session, currentPage } from "../lib/session.js";
+    import { session, currentPage, selectedAccountId } from "../lib/session.js";
     import { sendTransfer, getAccountById } from "../lib/api.js";
+    import type { AccountDto } from "../lib/api.js";
 
     const s = $derived($session!);
+    const fromId = $derived($selectedAccountId || s.primaryAccountId);
 
+    let fromAccount: AccountDto | null = $state(null);
     let toAccountId = $state("");
     let amount      = $state("");
     let memo        = $state("");
     let error       = $state("");
     let success     = $state(false);
     let loading     = $state(false);
+
+    $effect(() => {
+        if (fromId) {
+            getAccountById(fromId).then(a => { fromAccount = a; }).catch(() => {});
+        }
+    });
 
     async function submit() {
         error = "";
@@ -21,7 +30,7 @@
 
         loading = true;
         try {
-            await sendTransfer(s.primaryAccountId, toAccountId.trim(), amt, memo.trim());
+            await sendTransfer(fromId, toAccountId.trim(), amt, memo.trim());
             success = true;
             toAccountId = "";
             amount = "";
@@ -35,7 +44,19 @@
 </script>
 
 <div class="send-page">
+    <div class="top-bar">
+        <button class="back-btn" onclick={() => currentPage.go("account")}>‹ Back</button>
+    </div>
+
     <h2 class="page-title">Send</h2>
+
+    {#if fromAccount}
+        <div class="from-banner">
+            <span class="from-label">From</span>
+            <span class="from-name">{fromAccount.label}</span>
+            <span class="from-bal">{fromAccount.amount.toLocaleString()} {fromAccount.currency}</span>
+        </div>
+    {/if}
 
     {#if success}
         <div class="success-card">
@@ -63,7 +84,7 @@
             </label>
 
             <label class="field">
-                <span>Amount (kin)</span>
+                <span>Amount ({fromAccount?.currency ?? "kin"})</span>
                 <input
                     type="number"
                     bind:value={amount}
@@ -180,4 +201,44 @@
         cursor: pointer;
         text-decoration: underline;
     }
+
+    .top-bar {
+        margin-bottom: 1rem;
+    }
+
+    .back-btn {
+        background: none;
+        border: none;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #2563eb;
+        cursor: pointer;
+        padding: 0;
+        font-family: inherit;
+    }
+    .back-btn:hover { text-decoration: underline; }
+
+    .from-banner {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 10px;
+        padding: 0.65rem 1rem;
+        margin-bottom: 1.25rem;
+        font-size: 0.875rem;
+    }
+
+    .from-label {
+        font-weight: 700;
+        color: #1d4ed8;
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        letter-spacing: 0.05em;
+    }
+
+    .from-name { font-weight: 600; color: #1e40af; }
+
+    .from-bal { color: #3b82f6; margin-left: auto; font-variant-numeric: tabular-nums; }
 </style>

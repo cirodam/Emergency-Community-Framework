@@ -1,9 +1,10 @@
 <script lang="ts">
-    import { listDomains } from "../lib/api.js";
-    import type { DomainDto } from "../lib/api.js";
+    import { listDomains, getCommunityBudget } from "../lib/api.js";
+    import type { DomainDto, BudgetDomainRow } from "../lib/api.js";
     import { currentPage, selectedDomainId } from "../lib/session.js";
 
     let domains: DomainDto[] = $state([]);
+    let budgetMap: Map<string, BudgetDomainRow> = $state(new Map());
     let loading = $state(true);
     let error = $state("");
 
@@ -11,7 +12,9 @@
         loading = true;
         error = "";
         try {
-            domains = await listDomains();
+            const [ds, budget] = await Promise.all([listDomains(), getCommunityBudget()]);
+            domains = ds;
+            budgetMap = new Map(budget.outflow.domains.map(r => [r.domainId, r]));
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to load domains";
         } finally {
@@ -25,6 +28,10 @@
         selectedDomainId.set(id);
         currentPage.go("domain");
     }
+
+    function fmt(n: number): string {
+        return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    }
 </script>
 
 <div class="domains-page">
@@ -32,27 +39,41 @@
     <p class="page-subtitle">Functional domains that organise community life.</p>
 
     {#if loading}
-        <div class="skeleton"></div>
-        <div class="skeleton short"></div>
-        <div class="skeleton"></div>
+        <div class="card-grid">
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+        </div>
     {:else if error}
         <div class="error-msg">{error}</div>
     {:else if domains.length === 0}
         <div class="empty-msg">No domains registered.</div>
     {:else}
-        <div class="domain-list">
+        <div class="card-grid">
             {#each domains as d (d.id)}
+                {@const bud = budgetMap.get(d.id)}
                 <button class="domain-card" onclick={() => openDomain(d.id)}>
-                    <div class="domain-card-body">
+                    <div class="card-top">
                         <span class="domain-name">{d.name}</span>
-                        {#if d.description}
-                            <span class="domain-desc">{d.description}</span>
-                        {/if}
+                        <span class="unit-pill">{d.unitIds.length} unit{d.unitIds.length !== 1 ? "s" : ""}</span>
                     </div>
-                    <div class="domain-meta">
-                        <span class="unit-count">{d.unitIds.length} unit{d.unitIds.length !== 1 ? "s" : ""}</span>
-                        <span class="chevron">›</span>
-                    </div>
+                    {#if d.description}
+                        <p class="domain-desc">{d.description}</p>
+                    {/if}
+                    {#if bud && bud.payroll.length > 0}
+                        <div class="payroll-block">
+                            {#each bud.payroll as row (row.roleId)}
+                                <div class="payroll-row">
+                                    <span class="payroll-title">{row.title}</span>
+                                    <span class="payroll-amount">{fmt(row.kinPerMonth)} kin/mo</span>
+                                </div>
+                            {/each}
+                            <div class="payroll-total-row">
+                                <span class="payroll-total">{fmt(bud.totals.payroll)} kin/mo total</span>
+                            </div>
+                        </div>
+                    {/if}
                 </button>
             {/each}
         </div>
@@ -62,19 +83,13 @@
 
 <style>
     .domains-page {
-        padding: 1.5rem 1.5rem 6rem;
-        max-width: 480px;
+        padding: 1.5rem 1rem 6rem;
+        max-width: 960px;
         margin: 0 auto;
     }
 
     @media (min-width: 768px) {
-        .domains-page { padding-bottom: 2rem; max-width: 800px; }
-        .domain-list {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem;
-        }
-        .domain-card { border-radius: 0.75rem; border: 1px solid #e2e8f0; }
+        .domains-page { padding: 2rem 2rem 3rem; }
     }
 
     .page-title {
@@ -87,87 +102,147 @@
     .page-subtitle {
         font-size: 0.875rem;
         color: #64748b;
-        margin: 0 0 1.25rem;
+        margin: 0 0 1.5rem;
     }
 
-    .domain-list {
-        display: flex;
-        flex-direction: column;
+    /* ── Card grid ────────────────────────────────────────────────────────── */
+
+    .card-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    @media (min-width: 540px) {
+        .card-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (min-width: 900px) {
+        .card-grid { grid-template-columns: 1fr 1fr 1fr; }
     }
 
     .domain-card {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        width: 100%;
-        padding: 1rem 0;
-        background: none;
-        border: none;
-        border-bottom: 1px solid #f1f5f9;
+        flex-direction: column;
+        gap: 0.5rem;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.875rem;
+        padding: 1rem 1.1rem;
         cursor: pointer;
         text-align: left;
+        font-family: inherit;
         color: inherit;
+        transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
     }
 
-    .domain-card:active { background: #f8fafc; }
+    .domain-card:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px #eff6ff;
+        background: #fafcff;
+    }
 
-    .domain-card-body {
+    .card-top {
         display: flex;
-        flex-direction: column;
-        gap: 0.2rem;
-        min-width: 0;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.5rem;
     }
 
     .domain-name {
-        font-size: 1rem;
-        font-weight: 600;
+        font-size: 0.975rem;
+        font-weight: 700;
         color: #0f172a;
+        line-height: 1.3;
+    }
+
+    .unit-pill {
+        flex-shrink: 0;
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #64748b;
+        background: #f1f5f9;
+        border-radius: 9999px;
+        padding: 0.15rem 0.5rem;
+        white-space: nowrap;
+        margin-top: 0.1rem;
     }
 
     .domain-desc {
         font-size: 0.8rem;
         color: #64748b;
-        white-space: nowrap;
+        margin: 0;
+        line-height: 1.5;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+        -webkit-box-orient: vertical;
         overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 28ch;
     }
 
-    .domain-meta {
+    /* ── Budget payroll block ─────────────────────────────────────────────── */
+
+    .payroll-block {
+        margin-top: auto;
+        padding-top: 0.6rem;
+        border-top: 1px solid #f1f5f9;
         display: flex;
-        align-items: center;
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    .payroll-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
         gap: 0.5rem;
+    }
+
+    .payroll-title {
+        font-size: 0.76rem;
+        color: #64748b;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .payroll-amount {
+        font-size: 0.76rem;
+        font-weight: 600;
+        color: #0f172a;
+        white-space: nowrap;
         flex-shrink: 0;
     }
 
-    .unit-count {
-        font-size: 0.75rem;
-        color: #94a3b8;
+    .payroll-total-row {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 0.1rem;
     }
 
-    .chevron {
-        font-size: 1.2rem;
-        color: #cbd5e1;
-        line-height: 1;
+    .payroll-total {
+        font-size: 0.72rem;
+        color: #94a3b8;
+        font-weight: 500;
     }
+
+    /* ── Misc ─────────────────────────────────────────────────────────────── */
 
     .count {
         font-size: 0.8rem;
         color: #94a3b8;
         text-align: center;
-        margin-top: 1rem;
+        margin-top: 1.25rem;
     }
 
     .skeleton {
-        height: 3rem;
-        border-radius: 0.5rem;
+        height: 7rem;
+        border-radius: 0.875rem;
         background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
         background-size: 200% 100%;
         animation: shimmer 1.2s infinite;
-        margin-bottom: 0.5rem;
     }
-    .skeleton.short { width: 60%; }
 
     @keyframes shimmer {
         0%   { background-position: 200% 0; }
@@ -176,8 +251,8 @@
 
     .error-msg, .empty-msg {
         font-size: 0.9rem;
-        color: #ef4444;
         padding: 1rem 0;
+        color: #ef4444;
     }
     .empty-msg { color: #94a3b8; }
 </style>

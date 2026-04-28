@@ -116,8 +116,8 @@
 
     .dropdown {
         position: absolute;
-        top: calc(100% + 0.4rem);
-        right: 0;
+        top: 0;
+        left: calc(100% + 0.4rem);
         background: #fff;
         border: 1px solid #e2e8f0;
         border-radius: 10px;

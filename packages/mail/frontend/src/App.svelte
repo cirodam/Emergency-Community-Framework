@@ -7,7 +7,7 @@
     import OutboxPage   from "./pages/OutboxPage.svelte";
     import ThreadPage   from "./pages/ThreadPage.svelte";
     import ComposePage  from "./pages/ComposePage.svelte";
-    import NavBar       from "./components/NavBar.svelte";
+    import Sidebar      from "./components/Sidebar.svelte";
 
     let ready = $state(false);
 
@@ -63,7 +63,7 @@
 
 {#if ready && $session}
     <div class="shell">
-        <NavBar />
+        <Sidebar />
         <main class="main">
             {#if $currentPage === "inbox"}
                 <InboxPage />
@@ -86,18 +86,20 @@
     :global(body) {
         margin: 0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        background: #f0fdf4;
+        background: #fff;
         color: #111827;
     }
 
     .shell {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         min-height: 100dvh;
     }
 
     .main {
         flex: 1;
+        min-width: 0;
         overflow-y: auto;
+        background: #fff;
     }
 </style>

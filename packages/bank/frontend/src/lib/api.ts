@@ -48,6 +48,40 @@ export async function getMyAccounts(): Promise<AccountDto[]> {
     return res.json() as Promise<AccountDto[]>;
 }
 
+export async function createMyAccount(label: string, currency = "kin"): Promise<AccountDto> {
+    const res = await apiFetch("/api/me/accounts", {
+        method: "POST",
+        body: JSON.stringify({ label, currency }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to create account");
+    }
+    return res.json() as Promise<AccountDto>;
+}
+
+export async function deleteMyAccount(accountId: string): Promise<void> {
+    const res = await apiFetch(`/api/me/accounts/${encodeURIComponent(accountId)}`, {
+        method: "DELETE",
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to delete account");
+    }
+}
+
+export async function renameMyAccount(accountId: string, label: string): Promise<AccountDto> {
+    const res = await apiFetch(`/api/me/accounts/${encodeURIComponent(accountId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ label }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to rename account");
+    }
+    return res.json() as Promise<AccountDto>;
+}
+
 export async function getAccountsByOwner(ownerId: string): Promise<AccountDto[]> {
     const res = await apiFetch(`/api/accounts/${encodeURIComponent(ownerId)}`);
     if (!res.ok) throw new Error("Failed to load accounts");

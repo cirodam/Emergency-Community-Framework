@@ -1,7 +1,7 @@
 <script lang="ts">
     import {
         listMarketplaces, createMarketplace, updateMarketplace, deleteMarketplace,
-        listCommunityLocations,
+        listCommunityLocations, createCommunityLocation,
     } from "../lib/api.js";
     import type { MarketplaceDto, CommunityLocationDto } from "../lib/api.js";
     import { currentPage, selectedMarketplaceId } from "../lib/nav.js";
@@ -21,6 +21,35 @@
     let formError  = $state("");
 
     let deletingId = $state<string | null>(null);
+
+    // ── Inline location creation ──────────────────────────────────────────────
+    let showLocForm  = $state(false);
+    let locName      = $state("");
+    let locAddress   = $state("");
+    let locDesc      = $state("");
+    let locSaving    = $state(false);
+    let locError     = $state("");
+
+    async function createLocation() {
+        if (!locName.trim())    { locError = "Name is required."; return; }
+        if (!locAddress.trim()) { locError = "Address is required."; return; }
+        locSaving = true; locError = "";
+        try {
+            const created = await createCommunityLocation({
+                name:        locName.trim(),
+                address:     locAddress.trim(),
+                description: locDesc.trim(),
+            });
+            locations = [...locations, created].sort((a, b) => a.name.localeCompare(b.name));
+            formLocId = created.id;
+            showLocForm = false;
+            locName = ""; locAddress = ""; locDesc = "";
+        } catch (e) {
+            locError = e instanceof Error ? e.message : "Failed to create location";
+        } finally {
+            locSaving = false;
+        }
+    }
 
     async function load() {
         loading = true;
@@ -49,6 +78,8 @@
         formLocId = locations[0]?.id ?? "";
         formDesc = "";
         formError = "";
+        showLocForm = false;
+        locName = ""; locAddress = ""; locDesc = ""; locError = "";
         showForm = true;
     }
 
@@ -65,6 +96,8 @@
         showForm = false;
         editing = null;
         formError = "";
+        showLocForm = false;
+        locName = ""; locAddress = ""; locDesc = ""; locError = "";
     }
 
     async function submit() {
@@ -136,14 +169,33 @@
 
             <label class="field">
                 <span class="field-label">Location *</span>
-                {#if locations.length === 0}
-                    <p class="hint">No locations found. Add locations in the community app first.</p>
-                {:else}
+                {#if locations.length === 0 && !showLocForm}
+                    <p class="hint">No locations found. <button type="button" class="link-btn" onclick={() => { showLocForm = true; locError = ""; }}>Create one now</button>.</p>
+                {:else if locations.length > 0}
                     <select class="input" bind:value={formLocId}>
                         {#each locations as loc (loc.id)}
                             <option value={loc.id}>{loc.name} — {loc.address}</option>
                         {/each}
                     </select>
+                    {#if !showLocForm}
+                        <button type="button" class="link-btn" onclick={() => { showLocForm = true; locError = ""; }}>+ New location</button>
+                    {/if}
+                {/if}
+
+                {#if showLocForm}
+                    <div class="loc-form">
+                        <div class="loc-form-title">New location</div>
+                        {#if locError}<p class="form-error">{locError}</p>{/if}
+                        <input class="input" type="text" bind:value={locName} placeholder="Location name *" />
+                        <input class="input" type="text" bind:value={locAddress} placeholder="Address *" />
+                        <input class="input" type="text" bind:value={locDesc} placeholder="Description (optional)" />
+                        <div class="loc-form-actions">
+                            <button type="button" class="btn-secondary" onclick={() => { showLocForm = false; locError = ""; }} disabled={locSaving}>Cancel</button>
+                            <button type="button" class="btn-primary" onclick={createLocation} disabled={locSaving}>
+                                {locSaving ? "Creating…" : "Create location"}
+                            </button>
+                        </div>
+                    </div>
                 {/if}
             </label>
 
@@ -154,7 +206,7 @@
 
             <div class="form-actions">
                 <button class="btn-secondary" type="button" onclick={closeForm}>Cancel</button>
-                <button class="btn-primary" type="submit" disabled={saving || locations.length === 0}>
+                <button class="btn-primary" type="submit" disabled={saving || (locations.length === 0 && !showLocForm)}>
                     {saving ? "Saving…" : editing ? "Save changes" : "Create marketplace"}
                 </button>
             </div>
@@ -239,6 +291,47 @@
     .field { display: flex; flex-direction: column; gap: 0.3rem; }
     .field-label { font-size: 0.78rem; font-weight: 500; color: #475569; }
     .hint { font-size: 0.8rem; color: #94a3b8; margin: 0; }
+
+    .link-btn {
+        background: none;
+        border: none;
+        color: #3b82f6;
+        font-size: 0.8rem;
+        cursor: pointer;
+        padding: 0;
+        font-family: inherit;
+        text-decoration: underline;
+        margin-top: 0.25rem;
+        display: inline;
+    }
+    .link-btn:hover { color: #2563eb; }
+
+    /* ── Inline location form ─────────────────── */
+    .loc-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 0.625rem;
+        padding: 0.875rem 1rem;
+    }
+
+    .loc-form-title {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #0369a1;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .loc-form-actions {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: flex-end;
+        margin-top: 0.25rem;
+    }
 
     .input {
         border: 1px solid #cbd5e1;

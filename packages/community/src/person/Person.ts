@@ -36,6 +36,7 @@ export class Person implements IEconomicActor {
     handle: string;             // lowercase alphanumeric + underscores, unique in community
     disabled: boolean;          // community-determined; exempt from work expectations
     retired: boolean;           // true once the person has reached retirement age and opted in
+    steward: boolean;           // explicitly granted stewardship (also earned automatically by seniority)
     guardianId: string | null;
     phone: string | null;       // E.164, e.g. "+15551234567". null if no phone.
     languages: LanguageProficiency[];
@@ -80,6 +81,7 @@ export class Person implements IEconomicActor {
         this.handle = handle.toLowerCase().replace(/[^a-z0-9_]/g, "");
         this.disabled = disabled;
         this.retired = false;
+        this.steward = false;
         this.guardianId = guardianId;
         this.phone = phone;
         this.languages = languages;
@@ -114,6 +116,7 @@ export class Person implements IEconomicActor {
         handle: string;
         disabled: boolean;
         retired: boolean;
+        steward: boolean;
         bornInCommunity: boolean;
         guardianId: string | null;
         phone: string | null;
@@ -138,6 +141,7 @@ export class Person implements IEconomicActor {
         (p as unknown as Record<string, unknown>)["id"] = record.id;
         (p as unknown as Record<string, unknown>)["joinDate"] = record.joinDate;
         p.retired = record.retired;
+        p.steward = record.steward;
         p.credential = record.credential;
         p._pinHash = record.pinHash;
         p._passwordHash = record.passwordHash;

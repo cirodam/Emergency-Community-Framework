@@ -1,13 +1,11 @@
 <script lang="ts">
-    import { currentPage, type Page } from "../lib/session.js";
+    import { currentPage, session, type Page } from "../lib/session.js";
     import AppSwitcher from "./AppSwitcher.svelte";
 
     interface NavItem { id: Page; label: string; icon: string; }
 
     const items: NavItem[] = [
-        { id: "account",  label: "Account",  icon: "◈" },
-        { id: "send",     label: "Send",     icon: "↑" },
-        { id: "history",  label: "History",  icon: "≡" },
+        { id: "accounts", label: "Accounts", icon: "◈" },
         { id: "settings", label: "Settings", icon: "⚙" },
     ];
 </script>
@@ -29,6 +27,19 @@
             <span class="nav-label">{item.label}</span>
         </button>
     {/each}
+
+    <div class="sidebar-footer">
+        {#if $session}
+            <div class="user-info">
+                <div class="user-avatar">{$session.displayName.split(" ").map((w: string) => w[0]).slice(0, 2).join("")}</div>
+                <div class="user-meta">
+                    <span class="user-name">{$session.displayName}</span>
+                    <span class="user-handle">@{$session.handle}</span>
+                </div>
+            </div>
+            <button class="signout-btn" onclick={() => session.logout()}>Sign out</button>
+        {/if}
+    </div>
 </nav>
 
 <style>
@@ -65,6 +76,7 @@
     .nav-label { font-size: 0.65rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
 
     .nav-brand { display: none; }
+    .sidebar-footer { display: none; }
 
     @media (min-width: 768px) {
         .bottom-nav {
@@ -113,5 +125,61 @@
 
         .nav-icon  { font-size: 1.1rem; }
         .nav-label { font-size: 0.9rem; text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+        .sidebar-footer {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: auto;
+            padding: 0.75rem 0.5rem 0;
+            border-top: 1px solid #e2e8f0;
+            flex-shrink: 0;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0 0.25rem;
+        }
+        .user-avatar {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: 0.7rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .user-meta {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .user-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #0f172a;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .user-handle { font-size: 0.72rem; color: #94a3b8; }
+        .signout-btn {
+            width: 100%;
+            padding: 0.35rem 0.75rem;
+            background: none;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            font-size: 0.78rem;
+            color: #64748b;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.1s;
+        }
+        .signout-btn:hover { background: #f1f5f9; color: #0f172a; }
     }
 </style>

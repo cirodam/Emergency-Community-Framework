@@ -4,7 +4,6 @@
     import { currentPage, session } from "../lib/session.js";
 
     const { threadId }: { threadId: string } = $props();
-
     const s = $derived($session!);
 
     let detail: ThreadDetail | null = $state(null);
@@ -16,22 +15,59 @@
     let sending    = $state(false);
     let sendError  = $state("");
 
+    // Which messages are collapsed (all except the last are collapsed by default)
+    let collapsed: Set<string> = $state(new Set());
+
     async function load() {
         loading = true; error = "";
-        try { detail = await getThread(threadId); }
-        catch (e) { error = e instanceof Error ? e.message : "Failed to load thread"; }
-        finally   { loading = false; }
+        try {
+            detail = await getThread(threadId);
+            // Collapse all but the last message
+            if (detail.messages.length > 1) {
+                const toCollapse = detail.messages.slice(0, -1).map(m => m.id);
+                collapsed = new Set(toCollapse);
+            }
+        } catch (e) {
+            error = e instanceof Error ? e.message : "Failed to load thread";
+        } finally {
+            loading = false;
+        }
     }
 
     $effect(() => { load(); });
+
+    function toggle(id: string) {
+        const next = new Set(collapsed);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        collapsed = next;
+    }
 
     function otherParticipant(): string {
         if (!detail) return "";
         return detail.thread.participantIds.find(id => id !== s.personId) ?? "";
     }
 
-    function formatDate(iso: string): string {
-        return new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+    function senderLabel(msg: MessageDto): string {
+        if (msg.fromPersonId === s.personId) return `${s.firstName} ${s.lastName} <@${s.handle}>`;
+        return `@${msg.fromPersonId}`;
+    }
+
+    function recipientLabel(msg: MessageDto): string {
+        const ids = msg.toPersonIds ?? [];
+        return ids.map(id => id === s.personId ? `@${s.handle}` : `@${id.slice(0, 12)}`).join(", ") || "(none)";
+    }
+
+    function formatFull(iso: string): string {
+        return new Date(iso).toLocaleString([], { dateStyle: "long", timeStyle: "short" });
+    }
+
+    function formatShort(iso: string): string {
+        const d = new Date(iso);
+        const now = new Date();
+        if (d.toDateString() === now.toDateString()) {
+            return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        }
+        return d.toLocaleDateString([], { month: "short", day: "numeric" });
     }
 
     async function reply() {
@@ -45,6 +81,10 @@
                 messages: [...detail!.messages, msg],
             };
             replyBody = "";
+            // Expand the new message
+            const next = new Set(collapsed);
+            next.delete(msg.id);
+            collapsed = next;
         } catch (e) {
             sendError = e instanceof Error ? e.message : "Failed to send reply";
         } finally {
@@ -54,80 +94,173 @@
 </script>
 
 <div class="page">
-    <button class="back-btn" onclick={() => currentPage.go("inbox")}>‹ Inbox</button>
+    <div class="page-header">
+        <button class="back-btn" onclick={() => currentPage.go("inbox")}>‹ Inbox</button>
+        {#if detail}
+            <h1 class="subject">{detail.thread.subject || "(no subject)"}</h1>
+            <span class="msg-count">{detail.messages.length} message{detail.messages.length !== 1 ? "s" : ""}</span>
+        {/if}
+    </div>
 
     {#if loading}
-        <div class="skeleton tall"></div>
+        <div class="skeleton-block"></div>
+        <div class="skeleton-block tall"></div>
     {:else if error}
-        <p class="error-msg">{error}</p>
+        <div class="error-msg">{error}</div>
     {:else if detail}
-        <h2 class="thread-subject">{detail.thread.subject || "(no subject)"}</h2>
-
-        <div class="messages">
-            {#each detail.messages as msg (msg.id)}
+        <div class="conversation">
+            {#each detail.messages as msg, i (msg.id)}
                 {@const mine = msg.fromPersonId === s.personId}
-                <div class="bubble-row" class:mine>
-                    {#if !mine}
-                        <div class="avatar">{msg.fromPersonId.slice(0, 2).toUpperCase()}</div>
-                    {/if}
-                    <div class="bubble" class:mine>
-                        <p class="bubble-body">{msg.body}</p>
-                        <span class="bubble-date">{formatDate(msg.sentAt)}</span>
-                    </div>
-                    {#if mine}
-                        <div class="avatar mine">{s.firstName[0]}{s.lastName[0]}</div>
+                {@const isCollapsed = collapsed.has(msg.id)}
+
+                <div class="email-card" class:mine>
+                    <!-- Message header — always visible, click to expand/collapse -->
+                    <button class="email-header" onclick={() => toggle(msg.id)}>
+                        <div class="header-left">
+                            <div class="sender-avatar" class:mine>
+                                {mine ? `${s.firstName[0]}${s.lastName[0]}` : msg.fromPersonId.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div class="header-meta">
+                                <span class="sender-name">{mine ? `${s.firstName} ${s.lastName}` : `@${msg.fromPersonId.slice(0, 16)}`}</span>
+                                {#if isCollapsed}
+                                    <span class="preview-collapsed">{msg.body.replace(/\n/g, " ").slice(0, 60)}{msg.body.length > 60 ? "…" : ""}</span>
+                                {:else}
+                                    <span class="to-line">to {recipientLabel(msg)}</span>
+                                {/if}
+                            </div>
+                        </div>
+                        <div class="header-right">
+                            <span class="msg-date">{isCollapsed ? formatShort(msg.sentAt) : formatFull(msg.sentAt)}</span>
+                            <span class="chevron">{isCollapsed ? "›" : "‹"}</span>
+                        </div>
+                    </button>
+
+                    {#if !isCollapsed}
+                        <div class="email-body">
+                            <p class="body-text">{msg.body}</p>
+                        </div>
                     {/if}
                 </div>
             {/each}
         </div>
 
-        <div class="reply-box">
+        <!-- Reply form -->
+        <div class="reply-section">
+            <div class="reply-label">Reply</div>
             {#if sendError}
                 <p class="send-error">{sendError}</p>
             {/if}
-            <textarea
-                class="reply-input"
-                placeholder="Write a reply…"
-                bind:value={replyBody}
-                rows={3}
-                disabled={sending}
-                onkeydown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) reply(); }}
-            ></textarea>
-            <button class="send-btn" onclick={reply} disabled={sending || !replyBody.trim()}>
-                {sending ? "Sending…" : "Send ↑"}
-            </button>
+            <div class="reply-box">
+                <textarea
+                    class="reply-input"
+                    placeholder="Write your reply…"
+                    bind:value={replyBody}
+                    rows={5}
+                    disabled={sending}
+                    onkeydown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) reply(); }}
+                ></textarea>
+                <div class="reply-actions">
+                    <span class="reply-hint">Ctrl+Enter to send</span>
+                    <button
+                        class="send-btn"
+                        onclick={reply}
+                        disabled={sending || !replyBody.trim()}
+                    >
+                        {sending ? "Sending…" : "Send"}
+                    </button>
+                </div>
+            </div>
         </div>
     {/if}
 </div>
 
 <style>
-    .page { padding: 1.5rem; max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
+    .page {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 0 0 4rem;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────────────────── */
+
+    .page-header {
+        padding: 1.25rem 1.5rem 1rem;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
 
     .back-btn {
         background: none;
         border: none;
-        font-size: 0.875rem;
+        font-size: 0.8rem;
         color: #16a34a;
         cursor: pointer;
         padding: 0;
         align-self: flex-start;
         font-weight: 600;
+        font-family: inherit;
     }
 
-    .thread-subject { font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0; }
+    .subject {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+        line-height: 1.3;
+    }
 
-    .messages { display: flex; flex-direction: column; gap: 0.75rem; }
+    .msg-count {
+        font-size: 0.78rem;
+        color: #94a3b8;
+    }
 
-    .bubble-row {
+    /* ── Conversation ───────────────────────────────────────────────────── */
+
+    .conversation {
         display: flex;
-        align-items: flex-end;
-        gap: 0.5rem;
+        flex-direction: column;
+        padding: 1rem 1.5rem;
+        gap: 0.375rem;
     }
-    .bubble-row.mine { flex-direction: row-reverse; }
 
-    .avatar {
-        width: 2rem;
-        height: 2rem;
+    .email-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .email-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.875rem 1rem;
+        width: 100%;
+        background: none;
+        border: none;
+        cursor: pointer;
+        text-align: left;
+        font-family: inherit;
+        transition: background 0.1s;
+    }
+    .email-header:hover { background: #f8fafc; }
+
+    .header-left {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .sender-avatar {
+        width: 2.25rem;
+        height: 2.25rem;
         border-radius: 50%;
         background: #dcfce7;
         color: #15803d;
@@ -137,43 +270,124 @@
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+        text-transform: uppercase;
     }
-    .avatar.mine { background: #e0f2fe; color: #0369a1; }
+    .sender-avatar.mine { background: #e0f2fe; color: #0369a1; }
 
-    .bubble {
-        max-width: 70%;
-        padding: 0.75rem 1rem;
-        border-radius: 1rem;
-        background: #f1f5f9;
-    }
-    .bubble.mine { background: #dcfce7; }
-
-    .bubble-body { margin: 0 0 0.35rem; font-size: 0.9rem; color: #0f172a; white-space: pre-wrap; word-break: break-word; }
-    .bubble-date { font-size: 0.7rem; color: #94a3b8; }
-
-    .reply-box {
+    .header-meta {
         display: flex;
         flex-direction: column;
+        gap: 0.15rem;
+        min-width: 0;
+    }
+
+    .sender-name {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #0f172a;
+    }
+
+    .to-line {
+        font-size: 0.78rem;
+        color: #94a3b8;
+    }
+
+    .preview-collapsed {
+        font-size: 0.82rem;
+        color: #94a3b8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 40ch;
+        display: block;
+    }
+
+    .header-right {
+        display: flex;
+        align-items: center;
         gap: 0.5rem;
-        border-top: 1px solid #e2e8f0;
-        padding-top: 1rem;
-        margin-top: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .msg-date {
+        font-size: 0.78rem;
+        color: #94a3b8;
+        white-space: nowrap;
+    }
+
+    .chevron {
+        font-size: 1rem;
+        color: #cbd5e1;
+        line-height: 1;
+    }
+
+    .email-body {
+        padding: 0 1rem 1rem 4rem; /* indent to align with sender name */
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .body-text {
+        margin: 0.875rem 0 0;
+        font-size: 0.9rem;
+        color: #1e293b;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    /* ── Reply ──────────────────────────────────────────────────────────── */
+
+    .reply-section {
+        margin: 0 1.5rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        overflow: hidden;
+    }
+
+    .reply-label {
+        padding: 0.6rem 1rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #64748b;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .reply-box {
+        padding: 0.75rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
     }
 
     .reply-input {
+        width: 100%;
+        box-sizing: border-box;
         resize: vertical;
-        padding: 0.75rem 1rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 0.75rem;
+        padding: 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
         font-size: 0.9rem;
         font-family: inherit;
         outline: none;
         background: #fff;
+        color: #0f172a;
+        transition: border-color 0.15s;
     }
-    .reply-input:focus { border-color: #16a34a; box-shadow: 0 0 0 2px #dcfce7; }
+    .reply-input:focus { border-color: #16a34a; }
+
+    .reply-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .reply-hint {
+        font-size: 0.75rem;
+        color: #cbd5e1;
+    }
 
     .send-btn {
-        align-self: flex-end;
         padding: 0.5rem 1.25rem;
         background: #16a34a;
         color: #fff;
@@ -182,19 +396,35 @@
         font-size: 0.875rem;
         font-weight: 600;
         cursor: pointer;
+        font-family: inherit;
+        transition: background 0.15s;
     }
+    .send-btn:hover:not(:disabled) { background: #15803d; }
     .send-btn:disabled { background: #86efac; cursor: default; }
 
     .send-error { font-size: 0.8rem; color: #dc2626; margin: 0; }
 
-    .skeleton.tall {
-        height: 16rem;
-        background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    /* ── Misc ───────────────────────────────────────────────────────────── */
+
+    .skeleton-block {
+        margin: 1rem 1.5rem 0;
+        height: 4rem;
+        border-radius: 0.75rem;
+        background: linear-gradient(90deg, #f8fafc 25%, #f1f5f9 50%, #f8fafc 75%);
         background-size: 200% 100%;
         animation: shimmer 1.3s infinite;
-        border-radius: 0.75rem;
     }
-    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .skeleton-block.tall { height: 10rem; margin-top: 0.5rem; }
+    @keyframes shimmer {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
 
-    .error-msg { color: #dc2626; font-size: 0.875rem; padding: 1rem; background: #fef2f2; border-radius: 0.5rem; }
+    .error-msg {
+        color: #dc2626;
+        font-size: 0.875rem;
+        padding: 1rem 1.5rem;
+        background: #fef2f2;
+    }
 </style>
+

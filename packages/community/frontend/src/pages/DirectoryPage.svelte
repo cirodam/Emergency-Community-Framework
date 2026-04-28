@@ -1,12 +1,21 @@
 <script lang="ts">
-    import { listPersons } from "../lib/api.js";
+    import { listPersons, setPassword, grantSteward, revokeSteward } from "../lib/api.js";
     import type { PersonDto } from "../lib/api.js";
-    import { currentPage } from "../lib/session.js";
+    import { session, currentPage } from "../lib/session.js";
 
     let members: PersonDto[] = $state([]);
     let loading = $state(true);
     let error = $state("");
     let query = $state("");
+
+    // ── Expand / reset state ───────────────────────────────────────────────────
+    let expandedId: string | null = $state(null);
+    let newPass    = $state("");
+    let resetError = $state("");
+    let resetOk    = $state(false);
+    let resetting  = $state(false);
+    let stewardError = $state("");
+    let stewardWorking = $state(false);
 
     async function load() {
         loading = true;
@@ -32,6 +41,52 @@
               )
             : members
     );
+
+    function toggleExpand(id: string) {
+        expandedId = expandedId === id ? null : id;
+        newPass    = "";
+        resetError = "";
+        resetOk    = false;
+        stewardError = "";
+    }
+
+    async function doResetPassword(personId: string) {
+        if (newPass.length < 8) { resetError = "Password must be at least 8 characters"; return; }
+        resetting = true; resetError = ""; resetOk = false;
+        try {
+            await setPassword(personId, newPass);
+            resetOk = true;
+            newPass = "";
+        } catch (e) {
+            resetError = e instanceof Error ? e.message : "Failed to reset password";
+        } finally {
+            resetting = false;
+        }
+    }
+
+    async function doGrantSteward(personId: string) {
+        stewardWorking = true; stewardError = "";
+        try {
+            const updated = await grantSteward(personId);
+            members = members.map(m => m.id === personId ? updated : m);
+        } catch (e) {
+            stewardError = e instanceof Error ? e.message : "Failed to grant stewardship";
+        } finally {
+            stewardWorking = false;
+        }
+    }
+
+    async function doRevokeSteward(personId: string) {
+        stewardWorking = true; stewardError = "";
+        try {
+            const updated = await revokeSteward(personId);
+            members = members.map(m => m.id === personId ? updated : m);
+        } catch (e) {
+            stewardError = e instanceof Error ? e.message : "Failed to revoke stewardship";
+        } finally {
+            stewardWorking = false;
+        }
+    }
 </script>
 
 <div class="directory-page">
@@ -59,16 +114,79 @@
     {:else}
         <div class="member-list">
             {#each filtered as m (m.id)}
-                <div class="member-row">
-                    <div class="member-avatar">{m.firstName[0]}{m.lastName[0]}</div>
-                    <div class="member-info">
-                        <span class="member-name">{m.firstName} {m.lastName}</span>
-                        <span class="member-handle">@{m.handle}</span>
-                    </div>
-                    {#if m.retired}
-                        <span class="badge retired">Retired</span>
-                    {:else if m.disabled}
-                        <span class="badge exempt">Exempt</span>
+                <div class="member-card" class:expanded={expandedId === m.id}>
+                    <button class="member-row" onclick={() => toggleExpand(m.id)}>
+                        <div class="member-avatar">{m.firstName[0]}{m.lastName[0]}</div>
+                        <div class="member-info">
+                            <span class="member-name">{m.firstName} {m.lastName}</span>
+                            <span class="member-handle">@{m.handle}</span>
+                        </div>
+                        {#if m.isSteward}
+                            <span class="badge steward">Steward</span>
+                        {/if}
+                        {#if m.retired}
+                            <span class="badge retired">Retired</span>
+                        {:else if m.disabled}
+                            <span class="badge exempt">Exempt</span>
+                        {/if}
+                        <span class="chevron">{expandedId === m.id ? "▲" : "▼"}</span>
+                    </button>
+
+                    {#if expandedId === m.id}
+                        <div class="member-detail">
+                            {#if m.phone}
+                                <p class="detail-phone">📞 {m.phone}</p>
+                            {/if}
+                            {#if $session?.isSteward}
+                                <div class="reset-section">
+                                    <p class="reset-label">Reset password</p>
+                                    <div class="reset-row">
+                                        <input
+                                            type="password"
+                                            bind:value={newPass}
+                                            placeholder="New password (min 8 chars)"
+                                            autocomplete="new-password"
+                                            disabled={resetting}
+                                            onkeydown={(e) => e.key === "Enter" && doResetPassword(m.id)}
+                                        />
+                                        <button
+                                            class="btn-reset"
+                                            onclick={() => doResetPassword(m.id)}
+                                            disabled={resetting || newPass.length < 8}
+                                        >
+                                            {resetting ? "…" : "Set"}
+                                        </button>
+                                    </div>
+                                    {#if resetError}<p class="reset-error">{resetError}</p>{/if}
+                                    {#if resetOk}<p class="reset-ok">Password reset ✓</p>{/if}
+                                </div>
+                                <div class="steward-section">
+                                    {#if stewardError}<p class="reset-error">{stewardError}</p>{/if}
+                                    {#if m.steward}
+                                        <button
+                                            class="btn-steward-revoke"
+                                            onclick={() => doRevokeSteward(m.id)}
+                                            disabled={stewardWorking}
+                                        >
+                                            {stewardWorking ? "…" : "Remove steward grant"}
+                                        </button>
+                                        {#if !m.isSteward}
+                                            <p class="steward-note">Not yet steward by seniority — grant can be removed.</p>
+                                        {/if}
+                                    {:else if !m.isSteward}
+                                        <button
+                                            class="btn-steward-grant"
+                                            onclick={() => doGrantSteward(m.id)}
+                                            disabled={stewardWorking}
+                                        >
+                                            {stewardWorking ? "…" : "Make steward"}
+                                        </button>
+                                    {:else}
+                                        <p class="steward-note">Steward by seniority.</p>
+                                    {/if}
+                                </div>
+                            {/if}
+                        </div>
                     {/if}
                 </div>
             {/each}
@@ -90,8 +208,8 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
         }
-        .member-row:nth-last-child(-n+2) { border-bottom: none; }
-        .member-row:nth-child(odd):not(:last-child) { border-right: 1px solid #f1f5f9; }
+        .member-card:nth-last-child(-n+2) > .member-row { border-bottom: none; }
+        .member-card:nth-child(odd):not(:last-child) > .member-row { border-right: 1px solid #f1f5f9; }
     }
 
     .page-title { font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0 0 1rem; }
@@ -148,9 +266,19 @@
         gap: 0.85rem;
         padding: 0.75rem 1.25rem;
         border-bottom: 1px solid #f1f5f9;
+        width: 100%;
+        background: none;
+        border-top: none;
+        border-left: none;
+        border-right: none;
+        text-align: left;
+        cursor: pointer;
+        font-family: inherit;
     }
 
-    .member-row:last-child { border-bottom: none; }
+    .member-row:hover { background: #f8fafc; }
+    .member-card:last-child > .member-row { border-bottom: none; }
+    .member-card.expanded > .member-row { border-bottom: 1px solid #f1f5f9; }
 
     .member-avatar {
         width: 2.5rem;
@@ -182,6 +310,106 @@
 
     .badge.retired { background: #ede9fe; color: #7c3aed; }
     .badge.exempt  { background: #fef3c7; color: #d97706; }
+    .badge.steward { background: #dbeafe; color: #1d4ed8; }
+
+    .chevron { font-size: 0.6rem; color: #cbd5e1; margin-left: auto; flex-shrink: 0; }
+
+    /* ── Expanded detail panel ── */
+    .member-detail {
+        padding: 0.85rem 1.25rem 1rem;
+        background: #f8fafc;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .detail-phone {
+        font-size: 0.85rem;
+        color: #475569;
+        margin: 0 0 0.75rem;
+    }
+
+    .reset-section { margin-bottom: 0; }
+
+    .reset-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #94a3b8;
+        margin: 0 0 0.45rem;
+    }
+
+    .reset-row {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .reset-row input {
+        flex: 1;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.15s;
+    }
+
+    .reset-row input:focus { border-color: #16a34a; }
+
+    .btn-reset {
+        padding: 0.5rem 0.9rem;
+        background: #0f172a;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.15s;
+    }
+
+    .btn-reset:hover:not(:disabled) { background: #1e293b; }
+    .btn-reset:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .reset-error { font-size: 0.82rem; color: #dc2626; margin: 0.4rem 0 0; }
+    .reset-ok    { font-size: 0.82rem; color: #16a34a; margin: 0.4rem 0 0; font-weight: 600; }
+
+    .steward-section { margin-top: 0.75rem; }
+
+    .steward-note {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        margin: 0.35rem 0 0;
+    }
+
+    .btn-steward-grant {
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 0.4rem 0.85rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        background: #dbeafe;
+        color: #1d4ed8;
+        transition: background 0.15s;
+    }
+    .btn-steward-grant:hover:not(:disabled) { background: #bfdbfe; }
+
+    .btn-steward-revoke {
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 0.4rem 0.85rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        background: #fee2e2;
+        color: #b91c1c;
+        transition: background 0.15s;
+    }
+    .btn-steward-revoke:hover:not(:disabled) { background: #fecaca; }
+    .btn-steward-grant:disabled,
+    .btn-steward-revoke:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .count { text-align: center; font-size: 0.8rem; color: #94a3b8; margin-top: 0.75rem; }
 </style>

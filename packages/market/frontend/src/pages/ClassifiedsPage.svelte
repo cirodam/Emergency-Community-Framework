@@ -39,7 +39,7 @@
     let editDesc    = $state("");
     let editPrice   = $state("");
 
-    const myId = $derived(session.personId);
+    const myId = $derived($session?.personId);
     const filtered = $derived(
         filter === "all" ? items.filter(c => c.status === "open") : items.filter(c => c.status === "open" && c.category === filter)
     );
