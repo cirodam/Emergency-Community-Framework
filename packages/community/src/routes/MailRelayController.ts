@@ -1,9 +1,34 @@
+import logger from "../logger.js";
 import { type Request, type Response } from "express";
+import { timingSafeEqual } from "crypto";
 import { NodeService, sendMessage, type EcfMessage } from "@ecf/core";
 import { FederationMembershipService } from "../FederationMembershipService.js";
 import { PersonService } from "../person/PersonService.js";
 
 const MAIL_URL = process.env.MAIL_URL ?? process.env.PUBLIC_MAIL_URL ?? "http://localhost:3020";
+
+// ── Federation member cache ───────────────────────────────────────────────────
+
+const MEMBER_CACHE_TTL_MS = 60_000;
+let memberCache: Map<string, string> | null = null;
+let memberCacheExpiry = 0;
+
+async function resolveCommunityUrl(federationBase: string, handle: string): Promise<string | null> {
+    const now = Date.now();
+    if (!memberCache || now > memberCacheExpiry) {
+        try {
+            const res = await fetch(`${federationBase}/api/members`, { signal: AbortSignal.timeout(5_000) });
+            if (res.ok) {
+                const members = await res.json() as { handle: string; url: string }[];
+                memberCache = new Map(members.map(m => [m.handle, m.url]));
+                memberCacheExpiry = now + MEMBER_CACHE_TTL_MS;
+            }
+        } catch (err) {
+            logger.warn(`[mail-relay] could not fetch federation members: ${(err as Error).message}`);
+        }
+    }
+    return memberCache?.get(handle) ?? null;
+}
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -48,10 +73,24 @@ export interface MailDeliverBody {
  *   sentAt: string,
  * }
  *
- * No person auth — this is an internal call from the local mail service.
- * Rate-limiting / abuse prevention is a future concern.
+ * Protected by a shared secret in the x-mail-relay-secret header.
+ * Set MAIL_RELAY_SECRET in the environment to enable this endpoint.
  */
 export async function routeExternalMail(req: Request, res: Response): Promise<void> {
+    const secret = process.env.MAIL_RELAY_SECRET;
+    if (!secret) {
+        res.status(503).json({ error: "Mail relay is not configured (MAIL_RELAY_SECRET unset)" }); return;
+    }
+    const provided    = req.headers["x-mail-relay-secret"] ?? "";
+    const providedBuf = Buffer.from(String(provided)).subarray(0, 512);
+    const expectedBuf = Buffer.from(secret).subarray(0, 512);
+    const len = Math.max(providedBuf.length, expectedBuf.length);
+    const a = Buffer.alloc(len); const b = Buffer.alloc(len);
+    providedBuf.copy(a); expectedBuf.copy(b);
+    if (!timingSafeEqual(a, b)) {
+        res.status(401).json({ error: "Unauthorized" }); return;
+    }
+
     const { toCommunityHandle, toHandles, fromHandle, messageId, threadId, subject, body, sentAt } = req.body ?? {};
 
     if (typeof toCommunityHandle !== "string" || !toCommunityHandle) {
@@ -80,18 +119,13 @@ export async function routeExternalMail(req: Request, res: Response): Promise<vo
         res.status(503).json({ error: "Community is not an approved federation member — cannot route external mail" }); return;
     }
 
-    // Fetch members from federation to find the target community's URL
+    // Resolve target community URL via federation (cached, 5 s timeout)
     let targetUrl: string | null = null;
     try {
         const fedBase = record.federationUrl.replace(/\/$/, "");
-        const membersRes = await fetch(`${fedBase}/api/members`);
-        if (membersRes.ok) {
-            const members = await membersRes.json() as { handle: string; url: string }[];
-            const match = members.find(m => m.handle === toCommunityHandle);
-            if (match?.url) targetUrl = match.url;
-        }
+        targetUrl = await resolveCommunityUrl(fedBase, toCommunityHandle);
     } catch (err) {
-        console.warn(`[mail-relay] could not fetch federation members: ${(err as Error).message}`);
+        logger.warn(`[mail-relay] could not fetch federation members: ${(err as Error).message}`);
     }
 
     if (!targetUrl) {
@@ -120,7 +154,7 @@ export async function routeExternalMail(req: Request, res: Response): Promise<vo
             node.getIdentity().address,
         );
     } catch (err) {
-        console.warn(`[mail-relay] delivery to ${toCommunityHandle} failed: ${(err as Error).message}`);
+        logger.warn(`[mail-relay] delivery to ${toCommunityHandle} failed: ${(err as Error).message}`);
         res.status(502).json({ error: `Could not deliver to community "${toCommunityHandle}": ${(err as Error).message}` });
         return;
     }
@@ -151,7 +185,7 @@ export async function handleInboundMail(
     for (const handle of toHandles) {
         const person = personSvc.getByHandle(handle);
         if (person) resolvedIds.push(person.id);
-        else console.warn(`[mail-relay] inbound: unknown handle "${handle}" — skipping`);
+        else logger.warn(`[mail-relay] inbound: unknown handle "${handle}" — skipping`);
     }
 
     if (!resolvedIds.length) {

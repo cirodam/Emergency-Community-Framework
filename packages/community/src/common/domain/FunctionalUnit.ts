@@ -34,4 +34,11 @@ export class FunctionalUnit implements IEconomicActor {
 
     /** Stable type tag — used to filter units within a domain (e.g. "clinic", "dental-clinic"). */
     getType(): string { return this._type; }
+
+    /** Apply name/description overrides after construction (e.g. from API request body). */
+    applyOverrides(name?: string, description?: string): void {
+        const self = this as unknown as Record<string, unknown>;
+        if (name !== undefined)        self["name"]        = name;
+        if (description !== undefined) self["description"] = description;
+    }
 }

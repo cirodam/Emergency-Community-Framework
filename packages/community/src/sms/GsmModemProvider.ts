@@ -1,3 +1,4 @@
+import logger from "../logger.js";
 import { SerialPort } from "serialport";
 import type { SmsProvider } from "./SmsProvider.js";
 
@@ -62,13 +63,13 @@ export class GsmModemProvider implements SmsProvider {
         });
 
         this.port.on("error", err => {
-            console.error("[sms] serial port error:", err.message);
+            logger.error(`[sms] serial port error: ${err.message}`);
         });
 
         await this.atCmd("ATE0\r\n", "OK");               // disable echo
         await this.atCmd("AT+CMGF=1\r\n", "OK");          // text mode
         await this.atCmd("AT+CNMI=1,2,0,0,0\r\n", "OK"); // push incoming as +CMT URCs
-        console.log("[sms] GSM modem ready");
+        logger.info("[sms] GSM modem ready");
     }
 
     startReceiving(handler: MessageHandler): void {
@@ -173,7 +174,7 @@ export class GsmModemProvider implements SmsProvider {
             const body = line;
             this.pendingCmtFrom = null;
             this.messageHandler?.(from, body).catch(err =>
-                console.error("[sms] message handler error:", err),
+                (err: unknown) => logger.error({ err }, "[sms] message handler error"),
             );
         }
     }

@@ -7,6 +7,7 @@ import { CommunityRole } from "../common/CommunityRole.js";
 import { RoleType } from "../common/RoleType.js";
 import { LeaderPool } from "../governance/LeaderPool.js";
 import type { BudgetCategory } from "../common/domain/FunctionalDomain.js";
+import { PersonService } from "../person/PersonService.js";
 
 const svc = () => DomainService.getInstance();
 
@@ -35,8 +36,7 @@ export function updateDomain(req: Request, res: Response): void {
             res.status(400).json({ error: "poolId must be a string or null" }); return;
         }
         domain.poolId = poolId;
-        // Persist via DomainService (re-save domain state)
-        svc().registerDomain(domain); // no-op if already registered, updates map
+        svc().saveDomain(domain);
     }
     res.json(toDomainDto(domain));
 }
@@ -73,12 +73,10 @@ export function createUnit(req: Request, res: Response): void {
     const unit = UnitTemplateRegistry.create(type.trim());
     if (!unit) { res.status(400).json({ error: `Unknown unit type "${type}"` }); return; }
 
-    if (typeof name === "string" && name.trim()) {
-        (unit as unknown as Record<string, unknown>)["name"] = name.trim();
-    }
-    if (typeof description === "string") {
-        (unit as unknown as Record<string, unknown>)["description"] = description;
-    }
+    unit.applyOverrides(
+        typeof name === "string" && name.trim() ? name.trim() : undefined,
+        typeof description === "string" ? description : undefined,
+    );
 
     svc().createUnit(unit, domainId);
     res.status(201).json(toUnitDto(unit));
@@ -155,10 +153,25 @@ export function updateRole(req: Request, res: Response): void {
     const role = svc().getRole(req.params.id as string);
     if (!role) { res.status(404).json({ error: "Role not found" }); return; }
     const { memberId, kinPerMonth, funded, termStartDate, termEndDate, title, description } = req.body ?? {};
-    if (title        !== undefined) role.title        = title;
-    if (description  !== undefined) role.description  = description;
+    if (title !== undefined) {
+        if (typeof title !== "string" || !title.trim()) {
+            res.status(400).json({ error: "title must be a non-empty string" }); return;
+        }
+        role.title = title.trim();
+    }
+    if (description !== undefined) {
+        if (typeof description !== "string") {
+            res.status(400).json({ error: "description must be a string" }); return;
+        }
+        role.description = description;
+    }
     if (memberId     !== undefined) role.memberId     = memberId;
-    if (kinPerMonth  !== undefined) role.kinPerMonth  = kinPerMonth;
+    if (kinPerMonth  !== undefined) {
+        if (typeof kinPerMonth !== "number" || kinPerMonth < 0) {
+            res.status(400).json({ error: "kinPerMonth must be a non-negative number" }); return;
+        }
+        role.kinPerMonth = kinPerMonth;
+    }
     if (funded       !== undefined) role.funded       = funded;
     if (termStartDate !== undefined) role.termStartDate = termStartDate ? new Date(termStartDate) : null;
     if (termEndDate   !== undefined) role.termEndDate   = termEndDate   ? new Date(termEndDate)   : null;
@@ -208,9 +221,24 @@ export function updateRoleType(req: Request, res: Response): void {
     const rt = svc().getRoleType(req.params.id as string);
     if (!rt) { res.status(404).json({ error: "Role type not found" }); return; }
     const { title, description, defaultKinPerMonth } = req.body ?? {};
-    if (title              !== undefined) rt.title              = title;
-    if (description        !== undefined) rt.description        = description;
-    if (defaultKinPerMonth !== undefined) rt.defaultKinPerMonth = defaultKinPerMonth;
+    if (title !== undefined) {
+        if (typeof title !== "string" || !title.trim()) {
+            res.status(400).json({ error: "title must be a non-empty string" }); return;
+        }
+        rt.title = title.trim();
+    }
+    if (description !== undefined) {
+        if (typeof description !== "string") {
+            res.status(400).json({ error: "description must be a string" }); return;
+        }
+        rt.description = description;
+    }
+    if (defaultKinPerMonth !== undefined) {
+        if (typeof defaultKinPerMonth !== "number" || defaultKinPerMonth < 0) {
+            res.status(400).json({ error: "defaultKinPerMonth must be a non-negative number" }); return;
+        }
+        rt.defaultKinPerMonth = defaultKinPerMonth;
+    }
     svc().saveRoleType(rt);
     res.json(toRoleTypeDto(rt));
 }
@@ -256,6 +284,9 @@ export function addPoolMember(req: Request, res: Response): void {
     const { personId } = req.body ?? {};
     if (typeof personId !== "string" || !personId) {
         res.status(400).json({ error: "personId is required" }); return;
+    }
+    if (!PersonService.getInstance().get(personId)) {
+        res.status(404).json({ error: "Person not found" }); return;
     }
     pool.addPerson(personId);
     svc().savePool(pool);

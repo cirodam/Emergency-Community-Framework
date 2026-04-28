@@ -2,8 +2,6 @@ import { Request, Response } from "express";
 import { PersonService } from "../person/PersonService.js";
 import { Person } from "../person/Person.js";
 import { Constitution } from "../governance/Constitution.js";
-import { ConstitutionLoader } from "../governance/ConstitutionLoader.js";
-import { resolve } from "path";
 
 const svc = () => PersonService.getInstance();
 
@@ -61,16 +59,12 @@ export async function setup(req: Request, res: Response): Promise<void> {
     // Grant the founder explicit stewardship
     svc().grantSteward(person.id);
 
-    // Set the community name in the constitution
-    const constitution = Constitution.getInstance();
-    constitution.setCommunityName(communityName.trim());
-
-    // Persist the updated constitution — find the loader via DATA_DIR env var
-    const dataDir = process.env.DATA_DIR ?? "data";
-    new ConstitutionLoader(resolve(dataDir, "governance")).save();
+    // Set the community name in the constitution and persist
+    Constitution.getInstance().setCommunityName(communityName.trim());
+    Constitution.getInstance().save();
 
     res.status(201).json({
-        communityName: constitution.communityName,
+        communityName: Constitution.getInstance().communityName,
         founder: {
             id:        person.id,
             firstName: person.firstName,

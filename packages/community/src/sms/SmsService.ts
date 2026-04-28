@@ -1,3 +1,4 @@
+import logger from "../logger.js";
 import { PersonService } from "../person/PersonService.js";
 import { BankClient } from "@ecf/core";
 import { parseSmsCommand } from "./SmsCommandParser.js";
@@ -44,7 +45,7 @@ export class SmsService {
     // ── Inbound entry point (also called by SmsController webhook) ────────────
 
     async handle(from: string, body: string): Promise<void> {
-        console.log(`[sms] inbound from ${from}: ${body}`);
+        logger.info(`[sms] inbound from ${from}: ${body}`);
         const reply = await this.dispatch(from, body.trim());
         if (reply) {
             await this.send(from, reply);
@@ -85,7 +86,7 @@ export class SmsService {
             if (!account) return "No account found.";
             return `Bal: ${account.amount.toLocaleString()} kin`;
         } catch (err) {
-            console.error("[sms] balance lookup failed:", err);
+            logger.error({ err }, "[sms] balance lookup failed");
             return "Balance unavailable. Try again shortly.";
         }
     }
@@ -155,7 +156,7 @@ export class SmsService {
                 `SMS transfer to @${recipientHandle}`,
             );
         } catch (err) {
-            console.error("[sms] transfer failed:", err);
+            logger.error({ err }, "[sms] transfer failed");
             return "Transfer failed. Try again.";
         }
 
@@ -170,7 +171,7 @@ export class SmsService {
         try {
             await this.provider.send(to, body);
         } catch (err) {
-            console.error(`[sms] failed to send reply to ${to}:`, err);
+            logger.error({ err }, `[sms] failed to send reply to ${to}`);
         }
     }
 }

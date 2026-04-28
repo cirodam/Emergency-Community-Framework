@@ -1,3 +1,4 @@
+import logger from "./logger.js";
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
@@ -19,9 +20,7 @@ import { CalendarService } from "./calendar/CalendarService.js";
 import { LocationLoader } from "./location/LocationLoader.js";
 import { LocationService } from "./location/LocationService.js";
 import { RoleTypeLoader } from "./common/RoleTypeLoader.js";
-import { RoleType, DEFAULT_ROLE_TYPES } from "./common/RoleType.js";
 import { CommunityRoleLoader } from "./common/domain/CommunityRoleLoader.js";
-import { FunctionalUnit } from "./common/domain/FunctionalUnit.js";
 import { FunctionalUnitLoader } from "./common/domain/FunctionalUnitLoader.js";
 import { FunctionalDomainLoader } from "./common/domain/FunctionalDomainLoader.js";
 import { LeaderPoolLoader } from "./governance/LeaderPoolLoader.js";
@@ -39,44 +38,13 @@ import { SocialInsuranceMemberLoader } from "./domains/social_insurance/SocialIn
 import communityRoutes from "./routes/communityRoutes.js";
 import { handleInboundMail } from "./routes/MailRelayController.js";
 import { handleBankTransferReceive } from "./routes/TransferController.js";
-import { CommunityBankDomain } from "./domains/community_bank/CommunityBankDomain.js";
 import { CommunityTreasury } from "./domains/community_treasury/CommunityTreasury.js";
 import { CommunityTreasuryLoader } from "./domains/community_treasury/CommunityTreasuryLoader.js";
 import { FederationMembershipService } from "./FederationMembershipService.js";
 import { GsmModemProvider } from "./sms/GsmModemProvider.js";
 import { SmsService } from "./sms/SmsService.js";
-import { FoodDomain } from "./domains/food/FoodDomain.js";
-import { FoodUnitTemplates } from "./domains/food/FoodUnitTemplates.js";
-import { AgricultureDomain } from "./domains/agriculture/AgricultureDomain.js";
-import { AgricultureUnitTemplates } from "./domains/agriculture/AgricultureUnitTemplates.js";
-import { HealthcareDomain } from "./domains/healthcare/HealthcareDomain.js";
-import { HealthcareUnitTemplates } from "./domains/healthcare/HealthcareUnitTemplates.js";
-import { HousingDomain } from "./domains/housing/HousingDomain.js";
-import { HousingUnitTemplates } from "./domains/housing/HousingUnitTemplates.js";
-import { EnergyDomain } from "./domains/energy/EnergyDomain.js";
-import { EnergyUnitTemplates } from "./domains/energy/EnergyUnitTemplates.js";
-import { CommunicationsDomain } from "./domains/communications/CommunicationsDomain.js";
-import { CommunicationsUnitTemplates } from "./domains/communications/CommunicationsUnitTemplates.js";
-import { DeathcareDomain } from "./domains/deathcare/DeathcareDomain.js";
-import { DeathcareUnitTemplates } from "./domains/deathcare/DeathcareUnitTemplates.js";
-import { SanitationDomain } from "./domains/sanitation/SanitationDomain.js";
-import { SanitationUnitTemplates } from "./domains/sanitation/SanitationUnitTemplates.js";
-import { WaterDomain } from "./domains/water/WaterDomain.js";
-import { WaterUnitTemplates } from "./domains/water/WaterUnitTemplates.js";
-import { FireDomain } from "./domains/fire/FireDomain.js";
-import { FireUnitTemplates } from "./domains/fire/FireUnitTemplates.js";
-import { ChildcareDomain } from "./domains/childcare/ChildcareDomain.js";
-import { ChildcareUnitTemplates } from "./domains/childcare/ChildcareUnitTemplates.js";
-import { DependencyCareDomain } from "./domains/dependency_care/DependencyCareDomain.js";
-import { DependencyCareUnitTemplates } from "./domains/dependency_care/DependencyCareUnitTemplates.js";
-import { EducationDomain } from "./domains/education/EducationDomain.js";
-import { EducationUnitTemplates } from "./domains/education/EducationUnitTemplates.js";
-import { EnrichmentDomain } from "./domains/enrichment/EnrichmentDomain.js";
-import { EnrichmentUnitTemplates } from "./domains/enrichment/EnrichmentUnitTemplates.js";
-import { TransitDomain } from "./domains/transit/TransitDomain.js";
-import { TransitUnitTemplates } from "./domains/transit/TransitUnitTemplates.js";
-import { CourierDomain } from "./domains/courier/CourierDomain.js";
-import { CourierUnitTemplates } from "./domains/courier/CourierUnitTemplates.js";
+import { seedDomains } from "./bootstrap/seedDomains.js";
+import { registerMonetaryHandlers } from "./bootstrap/registerMonetaryHandlers.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -121,9 +89,9 @@ async function main(): Promise<void> {
         : NodeService.getInstance().getSigner();
 
     if (communityPrivateKeyHex) {
-        console.log(`[community] using shared community key (cluster mode) — pubkey: ${communitySigner.publicKeyHex.slice(0, 16)}…`);
+        logger.info(`[community] using shared community key (cluster mode) — pubkey: ${communitySigner.publicKeyHex.slice(0, 16)}…`);
     } else if (CLUSTER_PEERS.length > 0) {
-        console.warn(
+        logger.warn(
             "[community] CLUSTER_PEERS is set but COMMUNITY_PRIVATE_KEY is not. " +
             "Each node will use its own key — credentials issued by one node will " +
             "NOT be accepted by others. Generate a shared key with:\n" +
@@ -148,9 +116,9 @@ async function main(): Promise<void> {
     // loading any services from disk. This ensures the replica starts
     // with a consistent copy of the community data.
     if (!cluster.isPrimary()) {
-        console.log("[cluster] starting as replica — pulling state from primary...");
+        logger.info("[cluster] starting as replica — pulling state from primary...");
         await cluster.syncFromPrimary();
-        console.log("[cluster] cold-start sync complete — booting services");
+        logger.info("[cluster] cold-start sync complete — booting services");
     }
 
     // ── Federation membership (community node owns the application process) ─
@@ -164,6 +132,7 @@ async function main(): Promise<void> {
     // ── Constitution ───────────────────────────────────────────────────────
     const constitutionLoader = new ConstitutionLoader(resolve(DATA_DIR, "governance"));
     constitutionLoader.load();
+    Constitution.getInstance().init(constitutionLoader);
 
     // ── Persons ────────────────────────────────────────────────────────────
     const personLoader = new PersonLoader(resolve(DATA_DIR, "persons"));
@@ -224,15 +193,15 @@ async function main(): Promise<void> {
             new Date(app.birthDate),
         );
         await PersonService.getInstance().add(person);
-        console.log(`[community] admitted ${app.firstName} ${app.lastName} via application ${app.id}`);
+        logger.info(`[community] admitted ${app.firstName} ${app.lastName} via application ${app.id}`);
 
         // Push updated census to federation (no-op if not a federation member).
         pushCensus().then(result => {
             if (result?.duplicates.length) {
-                console.warn(`[census] duplicate nullifiers detected across communities: ${result.duplicates.join(", ")}`);
+                logger.warn(`[census] duplicate nullifiers detected across communities: ${result.duplicates.join(", ")}`);
             }
         }).catch(err => {
-            console.warn(`[census] failed to push census after admission: ${(err as Error).message}`);
+            logger.warn(`[census] failed to push census after admission: ${(err as Error).message}`);
         });
     });
 
@@ -249,246 +218,12 @@ async function main(): Promise<void> {
     const roleTypeLoader = new RoleTypeLoader(resolve(DATA_DIR, "role-types"));
     domainSvc.initRoleTypes(roleTypeLoader);
 
-    // Seed defaults on first boot (once any custom types exist we leave them alone)
-    if (domainSvc.getRoleTypes().length === 0) {
-        for (const def of DEFAULT_ROLE_TYPES) {
-            domainSvc.createRoleType(new RoleType(def.title, def.description, def.defaultKinPerMonth));
-        }
-        console.log(`[community] seeded ${DEFAULT_ROLE_TYPES.length} default role types`);
-    }
-
-    // Register the four monetary/financial domains so they participate in
-    // governance — they get leader pools, roles, and appear in the domain API.
-    // Monetary init (async bank connection) happens separately below.
-    domainSvc.registerDomain(CentralBank.getInstance());
-    if (CentralBank.getInstance().unitIds.length === 0) {
-        domainSvc.createUnit(
-            new FunctionalUnit("Central Bank Office", "The central administrative office of the central bank.", "office"),
-            CentralBank.getInstance().id,
-        );
-    }
-
-    domainSvc.registerDomain(SocialInsuranceBank.getInstance());
-    if (SocialInsuranceBank.getInstance().unitIds.length === 0) {
-        domainSvc.createUnit(
-            new FunctionalUnit("Social Insurance Office", "The central administrative office of the social insurance bank.", "office"),
-            SocialInsuranceBank.getInstance().id,
-        );
-    }
-
-    domainSvc.registerDomain(CommunityTreasury.getInstance());
-
-    domainSvc.registerDomain(CommunityBankDomain.getInstance());
-    if (CommunityBankDomain.getInstance().unitIds.length === 0) {
-        domainSvc.createUnit(
-            new FunctionalUnit("Main Branch", "The primary branch of the community bank.", "branch"),
-            CommunityBankDomain.getInstance().id,
-        );
-    }
-    domainSvc.registerDomain(FoodDomain.getInstance());
-    if (FoodDomain.getInstance().unitIds.length === 0) {
-        domainSvc.createUnit(
-            new FunctionalUnit("Food Supply Office", "Central office coordinating food procurement, storage, and distribution for the community.", "food-supply-office"),
-            FoodDomain.getInstance().id,
-        );
-        domainSvc.createUnit(
-            new FunctionalUnit("Community Kitchen", "Shared kitchen space for food preparation and cooking. Handles raw ingredient processing, meal preparation, and food preservation for the community.", "community-kitchen"),
-            FoodDomain.getInstance().id,
-        );
-    }
-    domainSvc.registerDomain(AgricultureDomain.getInstance());
-    if (AgricultureDomain.getInstance().unitIds.length === 0) {
-        domainSvc.createUnit(
-            new FunctionalUnit("Farm Coordination Office", "Coordinates land allocation, planting schedules, shared equipment, and harvest logistics across community farms and individual growers.", "farm-coordination-office"),
-            AgricultureDomain.getInstance().id,
-        );
-    }
-    domainSvc.registerDomain(HealthcareDomain.getInstance());
-    if (HealthcareDomain.getInstance().unitIds.length === 0) {
-        domainSvc.createUnit(
-            new FunctionalUnit("Medicine Supply Office", "Manages procurement, storage, and distribution of medicines and medical supplies for the community.", "medicine-supply-office"),
-            HealthcareDomain.getInstance().id,
-        );
-        domainSvc.createUnit(
-            new FunctionalUnit("Primary Care Clinic", "General medical care, preventive health, chronic disease management, and triage for the community.", "primary-care-clinic"),
-            HealthcareDomain.getInstance().id,
-        );
-    }
-    domainSvc.registerDomain(HousingDomain.getInstance());
-    domainSvc.registerDomain(EnergyDomain.getInstance());
-    if (EnergyDomain.getInstance().unitIds.length === 0) {
-        domainSvc.createUnit(
-            new FunctionalUnit("Liquid Fuels Office", "Manages production or procurement, storage, and rationing of liquid fuels including biodiesel and petrol.", "liquid-fuel-office"),
-            EnergyDomain.getInstance().id,
-        );
-    }
-    domainSvc.registerDomain(CommunicationsDomain.getInstance());
-    domainSvc.registerDomain(DeathcareDomain.getInstance());
-    domainSvc.registerDomain(SanitationDomain.getInstance());
-    domainSvc.registerDomain(WaterDomain.getInstance());
-    domainSvc.registerDomain(FireDomain.getInstance());
-    domainSvc.registerDomain(ChildcareDomain.getInstance());
-    domainSvc.registerDomain(DependencyCareDomain.getInstance());
-    if (DependencyCareDomain.getInstance().unitIds.length === 0) {
-        domainSvc.createUnit(
-            new FunctionalUnit("Community Outreach Team", "Identifies at-risk, isolated, or vulnerable community members — including elderly, disabled, and food-insecure individuals — and coordinates delivery of food, medicine, and care services to them.", "community-outreach-team"),
-            DependencyCareDomain.getInstance().id,
-        );
-    }
-    domainSvc.registerDomain(EducationDomain.getInstance());
-    domainSvc.registerDomain(EnrichmentDomain.getInstance());
-    domainSvc.registerDomain(TransitDomain.getInstance());
-    domainSvc.registerDomain(CourierDomain.getInstance());
-
-    // Register all unit templates so POST /api/units can instantiate them by type.
-    FoodUnitTemplates.register();
-    AgricultureUnitTemplates.register();
-    HealthcareUnitTemplates.register();
-    HousingUnitTemplates.register();
-    EnergyUnitTemplates.register();
-    CommunicationsUnitTemplates.register();
-    DeathcareUnitTemplates.register();
-    SanitationUnitTemplates.register();
-    WaterUnitTemplates.register();
-    FireUnitTemplates.register();
-    ChildcareUnitTemplates.register();
-    DependencyCareUnitTemplates.register();
-    EducationUnitTemplates.register();
-    EnrichmentUnitTemplates.register();
-    TransitUnitTemplates.register();
-    CourierUnitTemplates.register();
+    seedDomains(domainSvc);
 
     // ── Monetary institutions (non-fatal — bank may be unreachable) ────────
     const bank = new BankClient(BANK_URL, body => communitySigner.signBody(body));
 
-    // On join: open a primary kin account and issue the age-derived endowment.
-    // Non-fatal: if the bank is temporarily unreachable the person record still
-    // commits — the monetary operations are best-effort at join time.
-    PersonService.getInstance().onPersonJoined(async (person) => {
-        const displayName  = `${person.firstName} ${person.lastName}`;
-        const centralBank  = CentralBank.getInstance();
-        const siBank       = SocialInsuranceBank.getInstance();
-        const treasury     = CommunityTreasury.getInstance();
-        const constitution = Constitution.getInstance();
-
-        try {
-            const memberAccount = await bank.openAccount(person.id, displayName, "kin");
-            console.log(`[community] opened bank account for @${person.handle}`);
-
-            if (!centralBank.isReady() || !siBank.isReady() || !treasury.isReady()) {
-                console.warn(`[community] monetary institutions not ready — skipping issuance for @${person.handle}`);
-                return;
-            }
-
-            if (person.bornInCommunity) {
-                // ── Born into the community ───────────────────────────────────
-                // No back-endowment — this person has no prior years to credit.
-                // Issue a fixed birth grant into the community fund, which
-                // forwards it directly to the member. Their kin accrual begins
-                // on their first birthday via the anniversary handler.
-                const grantAmount = constitution.birthGrant;
-                if (grantAmount > 0) {
-                    await centralBank.issue(grantAmount, treasury.accountId,       "birth grant — community fund");
-                    await treasury.transfer(memberAccount.accountId, grantAmount,  "birth grant — to member");
-                    console.log(`[community] issued birth grant for @${person.handle}: ${grantAmount} kin`);
-                } else {
-                    console.log(`[community] birth grant is 0 — no issuance for @${person.handle}`);
-                }
-            } else {
-                // ── Joining from outside ──────────────────────────────────────
-                // Age-derived back-endowment: floor(age in years) × kinPerPersonYear.
-                // All kin is issued into the community fund first; the fund then
-                // distributes per policy: pool fraction → insurance fund,
-                // seed balance → member, remainder stays in the community fund.
-                const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
-                const ageInYears  = Math.floor((Date.now() - person.birthDate.getTime()) / MS_PER_YEAR);
-                const endowment   = ageInYears * constitution.kinPerPersonYear;
-
-                if (endowment <= 0) {
-                    console.log(`[community] zero endowment for @${person.handle} (age ${ageInYears}) — skipping issuance`);
-                    return;
-                }
-
-                const poolAmount     = Math.floor(endowment * constitution.endowmentPoolFraction);
-                const circulating    = endowment - poolAmount;
-                const seedAmount     = Math.min(constitution.endowmentSeedBalance, circulating);
-                const treasuryAmount = circulating - seedAmount;
-
-                await centralBank.issue(endowment, treasury.accountId,              "join endowment — community fund");
-                await treasury.transfer(siBank.poolAccountId,    poolAmount,        "join endowment — insurance fund");
-                await treasury.transfer(memberAccount.accountId, seedAmount,        "join endowment — member seed balance");
-                // treasuryAmount remains in the community fund
-
-                siBank.recordContribution(person.id, poolAmount);
-
-                console.log(
-                    `[community] issued join endowment for @${person.handle}: ` +
-                    `${endowment} kin (community fund: ${treasuryAmount}, insurance: ${poolAmount}, member seed: ${seedAmount})`,
-                );
-            }
-        } catch (err) {
-            console.warn(`[community] join handler failed for @${person.handle}: ${(err as Error).message}`);
-        }
-    });
-
-    // On discharge (departure or death): retire the person's endowment from
-    // circulation. Target retirement = floor(age in years) × kinPerPersonYear.
-    // The person's entire balance is transferred to the central bank and retired.
-    // If balance >= target: the surplus goes to the community treasury.
-    // If balance < target: the shortfall is recorded and gradually recouped via
-    // the regular demurrage cycle.
-    PersonService.getInstance().onPersonDischarged(async (person) => {
-        const centralBank  = CentralBank.getInstance();
-        const treasury     = CommunityTreasury.getInstance();
-        const constitution = Constitution.getInstance();
-
-        if (!centralBank.isReady() || !treasury.isReady()) {
-            console.warn(`[community] monetary institutions not ready — skipping discharge settlement for @${person.handle}`);
-            return;
-        }
-
-        try {
-            const memberAccount = await bank.getPrimaryAccountAsync(person.id);
-            if (!memberAccount) {
-                console.warn(`[community] no bank account found for @${person.handle} — skipping discharge settlement`);
-                return;
-            }
-
-            const MS_PER_YEAR   = 365.25 * 24 * 60 * 60 * 1000;
-            const ageInYears    = Math.floor((Date.now() - person.birthDate.getTime()) / MS_PER_YEAR);
-            const targetRetire  = ageInYears * constitution.kinPerPersonYear;
-            const balance       = memberAccount.amount;
-
-            if (balance > 0) {
-                // Retire the full balance from circulation
-                await centralBank.retire(balance, memberAccount.accountId,
-                    `discharge settlement — @${person.handle}`);
-            }
-
-            if (balance >= targetRetire) {
-                // Surplus above the endowment target goes to the community treasury
-                const surplus = balance - targetRetire;
-                if (surplus > 0) {
-                    await centralBank.issue(surplus, treasury.accountId,
-                        `discharge surplus — @${person.handle}`);
-                    console.log(`[community] discharge @${person.handle}: retired ${targetRetire}, surplus ${surplus} kin → treasury`);
-                } else {
-                    console.log(`[community] discharge @${person.handle}: retired ${balance} kin (exact)`);
-                }
-            } else {
-                // Shortfall — record it for gradual demurrage recovery
-                const shortfall = targetRetire - balance;
-                centralBank.recordDischargeShortfall(shortfall);
-                console.log(`[community] discharge @${person.handle}: retired ${balance} kin, shortfall ${shortfall} kin recorded`);
-            }
-
-            // All balances are now zero — close the accounts
-            await bank.closeAccounts(person.id);
-            console.log(`[community] closed bank accounts for @${person.handle}`);
-        } catch (err) {
-            console.warn(`[community] discharge handler failed for @${person.handle}: ${(err as Error).message}`);
-        }
-    });
+    registerMonetaryHandlers(bank);
 
     const centralBankLoader   = new CentralBankLoader(DATA_DIR);
     const siBankLoader        = new SocialInsuranceBankLoader(DATA_DIR);
@@ -499,7 +234,7 @@ async function main(): Promise<void> {
         await CentralBank.getInstance().init(bank, centralBankLoader);
         await SocialInsuranceBank.getInstance().init(bank, siBankLoader, siMemberLoader);
         await CommunityTreasury.getInstance().init(bank, treasuryLoader);
-        console.log("[community] monetary institutions ready");
+        logger.info("[community] monetary institutions ready");
     }
 
     async function tryInitMonetary(attempt = 1): Promise<void> {
@@ -507,7 +242,7 @@ async function main(): Promise<void> {
             await initMonetaryInstitutions();
         } catch (err) {
             const delay = Math.min(30_000, attempt * 5_000);
-            console.warn(
+            logger.warn(
                 `[community] bank unreachable (attempt ${attempt}), ` +
                 `running in degraded mode — retrying in ${delay / 1000}s. ` +
                 `Error: ${(err as Error).message}`,
@@ -515,94 +250,6 @@ async function main(): Promise<void> {
             setTimeout(() => tryInitMonetary(attempt + 1), delay);
         }
     }
-
-    // Annual person-year issuance: on each member's birthday, issue one kinPerPersonYear
-    // split by birthdayCirculationFraction (member) and the remainder (retirement pool).
-    PersonService.getInstance().onPersonAnniversary(async (person) => {
-        const centralBank  = CentralBank.getInstance();
-        const siBank       = SocialInsuranceBank.getInstance();
-        const treasury     = CommunityTreasury.getInstance();
-        const constitution = Constitution.getInstance();
-
-        if (!centralBank.isReady() || !siBank.isReady() || !treasury.isReady()) {
-            console.warn(`[community] monetary institutions not ready — skipping annual issuance for @${person.handle}`);
-            return;
-        }
-
-        try {
-            const memberAccount = await bank.getPrimaryAccountAsync(person.id);
-            if (!memberAccount) {
-                console.warn(`[community] no primary account for @${person.handle} — skipping annual issuance`);
-                return;
-            }
-
-            // All kin is issued into the community fund first; the fund then
-            // distributes per policy: member fraction → member, remainder → insurance fund.
-            const annual       = constitution.kinPerPersonYear;
-            const memberAmount = Math.floor(annual * constitution.birthdayCirculationFraction);
-            const poolAmount   = annual - memberAmount;
-
-            await centralBank.issue(annual, treasury.accountId, "annual issuance — community fund");
-            await treasury.transfer(siBank.poolAccountId,    poolAmount,   "annual issuance — insurance fund");
-            await treasury.transfer(memberAccount.accountId, memberAmount, "annual issuance — member share");
-
-            siBank.recordContribution(person.id, poolAmount);
-
-            console.log(
-                `[community] annual issuance for @${person.handle}: ` +
-                `${annual} kin (insurance: ${poolAmount}, member: ${memberAmount})`,
-            );
-        } catch (err) {
-            console.warn(`[community] annual issuance failed for @${person.handle}: ${(err as Error).message}`);
-        }
-    });
-
-    // Collect community dues monthly — moves kin from member accounts
-    // to the treasury. Runs 30 days after startup, then every 30 days.
-    // Excludes institutional accounts (issuance, SI pool, treasury itself).
-    const runCommunityDues = (): void => {
-        const centralBank  = CentralBank.getInstance();
-        const siBank       = SocialInsuranceBank.getInstance();
-        const treasury     = CommunityTreasury.getInstance();
-        const constitution = Constitution.getInstance();
-        if (!centralBank.isReady() || !siBank.isReady() || !treasury.isReady()) {
-            console.warn("[community] monetary institutions not ready — skipping community dues collection");
-            return;
-        }
-        treasury.collectDues(
-            constitution.communityDuesRate,
-            constitution.demurrageFloor,
-            [centralBank.issuanceAccountId, siBank.poolAccountId],
-        ).then(({ count }) => {
-            console.log(`[community] community dues collected from ${count} accounts`);
-        }).catch(err => {
-            console.error("[community] community dues collection failed:", err);
-        });
-    };
-    // Run the dues check daily; collectDues() fires only when a full 30-day
-    // cycle has elapsed. Using a daily tick avoids Node.js's 32-bit timer
-    // overflow (setTimeout > ~24.8 days fires immediately).
-    let lastDuesDate: Date | null = null;
-    const MS_PER_DAY = 24 * 60 * 60 * 1000;
-    setInterval(() => {
-        const now = new Date();
-        if (
-            lastDuesDate === null ||
-            now.getTime() - lastDuesDate.getTime() >= 30 * MS_PER_DAY
-        ) {
-            lastDuesDate = now;
-            runCommunityDues();
-        }
-    }, MS_PER_DAY);
-
-    // Check birthdays once at startup, then every 24 hours.
-    const runAnniversaryCheck = (): void => {
-        PersonService.getInstance().checkAnniversaries().catch(err =>
-            console.error("[community] anniversary check failed:", err),
-        );
-    };
-    runAnniversaryCheck();
-    setInterval(runAnniversaryCheck, 24 * 60 * 60 * 1000);
 
     // Start without awaiting — governance routes come up immediately.
     void tryInitMonetary();
@@ -619,14 +266,14 @@ async function main(): Promise<void> {
         modemProvider.init()
             .then(() => {
                 SmsService.getInstance().init(bank, modemProvider);
-                console.log(`[sms] modem active on ${modemPath}`);
+                logger.info(`[sms] modem active on ${modemPath}`);
             })
             .catch(err => {
-                console.warn(`[sms] modem unavailable on ${modemPath}: ${(err as Error).message}`);
-                console.warn("[sms] SMS banking disabled — fix the modem and restart");
+                logger.warn(`[sms] modem unavailable on ${modemPath}: ${(err as Error).message}`);
+                logger.warn("[sms] SMS banking disabled — fix the modem and restart");
             });
     } else {
-        console.log("[sms] SMS_MODEM_PATH not set — SMS banking disabled");
+        logger.info("[sms] SMS_MODEM_PATH not set — SMS banking disabled");
     }
 
     // ── Routes ──────────────────────────────────────────────────────────
@@ -679,12 +326,12 @@ async function main(): Promise<void> {
     });
 
     app.listen(PORT, () => {
-        console.log(`[community] listening on port ${PORT} (bank: ${BANK_URL})`);
+        logger.info(`[community] listening on port ${PORT} (bank: ${BANK_URL})`);
     });
 }
 
 main().catch(err => {
-    console.error("[community] startup failed:", err);
+    logger.error({ err }, "[community] startup failed");
     process.exit(1);
 });
 

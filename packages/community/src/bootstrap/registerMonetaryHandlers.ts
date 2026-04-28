@@ -1,0 +1,232 @@
+import logger from "../logger.js";
+import { BankClient } from "@ecf/core";
+import { PersonService } from "../person/PersonService.js";
+import { CentralBank } from "../domains/central_bank/CentralBank.js";
+import { SocialInsuranceBank } from "../domains/social_insurance/SocialInsuranceBank.js";
+import { CommunityTreasury } from "../domains/community_treasury/CommunityTreasury.js";
+import { Constitution } from "../governance/Constitution.js";
+
+/**
+ * Register all monetary event handlers and periodic schedulers.
+ * Called once during startup, after the BankClient is created.
+ * The handlers are non-fatal — the bank may be unreachable at call time.
+ */
+export function registerMonetaryHandlers(bank: BankClient): void {
+
+    // On join: open a primary kin account and issue the age-derived endowment.
+    // Non-fatal: if the bank is temporarily unreachable the person record still
+    // commits — the monetary operations are best-effort at join time.
+    PersonService.getInstance().onPersonJoined(async (person) => {
+        const displayName  = `${person.firstName} ${person.lastName}`;
+        const centralBank  = CentralBank.getInstance();
+        const siBank       = SocialInsuranceBank.getInstance();
+        const treasury     = CommunityTreasury.getInstance();
+        const constitution = Constitution.getInstance();
+
+        try {
+            const memberAccount = await bank.openAccount(person.id, displayName, "kin");
+            logger.info(`[community] opened bank account for @${person.handle}`);
+
+            if (!centralBank.isReady() || !siBank.isReady() || !treasury.isReady()) {
+                logger.warn(`[community] monetary institutions not ready — skipping issuance for @${person.handle}`);
+                return;
+            }
+
+            if (person.bornInCommunity) {
+                // ── Born into the community ───────────────────────────────────
+                // No back-endowment — this person has no prior years to credit.
+                // Issue a fixed birth grant into the community fund, which
+                // forwards it directly to the member. Their kin accrual begins
+                // on their first birthday via the anniversary handler.
+                const grantAmount = constitution.birthGrant;
+                if (grantAmount > 0) {
+                    await centralBank.issue(grantAmount, treasury.accountId,       "birth grant — community fund");
+                    await treasury.transfer(memberAccount.accountId, grantAmount,  "birth grant — to member");
+                    logger.info(`[community] issued birth grant for @${person.handle}: ${grantAmount} kin`);
+                } else {
+                    logger.info(`[community] birth grant is 0 — no issuance for @${person.handle}`);
+                }
+            } else {
+                // ── Joining from outside ──────────────────────────────────────
+                // Age-derived back-endowment: floor(age in years) × kinPerPersonYear.
+                // All kin is issued into the community fund first; the fund then
+                // distributes per policy: pool fraction → insurance fund,
+                // seed balance → member, remainder stays in the community fund.
+                const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
+                const ageInYears  = Math.floor((Date.now() - person.birthDate.getTime()) / MS_PER_YEAR);
+                const endowment   = ageInYears * constitution.kinPerPersonYear;
+
+                if (endowment <= 0) {
+                    logger.info(`[community] zero endowment for @${person.handle} (age ${ageInYears}) — skipping issuance`);
+                    return;
+                }
+
+                const poolAmount     = Math.floor(endowment * constitution.endowmentPoolFraction);
+                const circulating    = endowment - poolAmount;
+                const seedAmount     = Math.min(constitution.endowmentSeedBalance, circulating);
+                const treasuryAmount = circulating - seedAmount;
+
+                await centralBank.issue(endowment, treasury.accountId,              "join endowment — community fund");
+                await treasury.transfer(siBank.poolAccountId,    poolAmount,        "join endowment — insurance fund");
+                await treasury.transfer(memberAccount.accountId, seedAmount,        "join endowment — member seed balance");
+                // treasuryAmount remains in the community fund
+
+                siBank.recordContribution(person.id, poolAmount);
+
+                logger.info(
+                    `[community] issued join endowment for @${person.handle}: ` +
+                    `${endowment} kin (community fund: ${treasuryAmount}, insurance: ${poolAmount}, member seed: ${seedAmount})`,
+                );
+            }
+        } catch (err) {
+            logger.warn(`[community] join handler failed for @${person.handle}: ${(err as Error).message}`);
+        }
+    });
+
+    // On discharge (departure or death): retire the person's endowment from
+    // circulation. Target retirement = floor(age in years) × kinPerPersonYear.
+    // The person's entire balance is transferred to the central bank and retired.
+    // If balance >= target: the surplus goes to the community treasury.
+    // If balance < target: the shortfall is recorded and gradually recouped via
+    // the regular demurrage cycle.
+    PersonService.getInstance().onPersonDischarged(async (person) => {
+        const centralBank  = CentralBank.getInstance();
+        const treasury     = CommunityTreasury.getInstance();
+        const constitution = Constitution.getInstance();
+
+        if (!centralBank.isReady() || !treasury.isReady()) {
+            logger.warn(`[community] monetary institutions not ready — skipping discharge settlement for @${person.handle}`);
+            return;
+        }
+
+        try {
+            const memberAccount = await bank.getPrimaryAccountAsync(person.id);
+            if (!memberAccount) {
+                logger.warn(`[community] no bank account found for @${person.handle} — skipping discharge settlement`);
+                return;
+            }
+
+            const MS_PER_YEAR   = 365.25 * 24 * 60 * 60 * 1000;
+            const ageInYears    = Math.floor((Date.now() - person.birthDate.getTime()) / MS_PER_YEAR);
+            const targetRetire  = ageInYears * constitution.kinPerPersonYear;
+            const balance       = memberAccount.amount;
+
+            if (balance > 0) {
+                // Retire the full balance from circulation
+                await centralBank.retire(balance, memberAccount.accountId,
+                    `discharge settlement — @${person.handle}`);
+            }
+
+            if (balance >= targetRetire) {
+                // Surplus above the endowment target goes to the community treasury
+                const surplus = balance - targetRetire;
+                if (surplus > 0) {
+                    await centralBank.issue(surplus, treasury.accountId,
+                        `discharge surplus — @${person.handle}`);
+                    logger.info(`[community] discharge @${person.handle}: retired ${targetRetire}, surplus ${surplus} kin → treasury`);
+                } else {
+                    logger.info(`[community] discharge @${person.handle}: retired ${balance} kin (exact)`);
+                }
+            } else {
+                // Shortfall — record it for gradual demurrage recovery
+                const shortfall = targetRetire - balance;
+                centralBank.recordDischargeShortfall(shortfall);
+                logger.info(`[community] discharge @${person.handle}: retired ${balance} kin, shortfall ${shortfall} kin recorded`);
+            }
+
+            // All balances are now zero — close the accounts
+            await bank.closeAccounts(person.id);
+            logger.info(`[community] closed bank accounts for @${person.handle}`);
+        } catch (err) {
+            logger.warn(`[community] discharge handler failed for @${person.handle}: ${(err as Error).message}`);
+        }
+    });
+
+    // Annual person-year issuance: on each member's birthday, issue one kinPerPersonYear
+    // split by birthdayCirculationFraction (member) and the remainder (insurance pool).
+    PersonService.getInstance().onPersonAnniversary(async (person) => {
+        const centralBank  = CentralBank.getInstance();
+        const siBank       = SocialInsuranceBank.getInstance();
+        const treasury     = CommunityTreasury.getInstance();
+        const constitution = Constitution.getInstance();
+
+        if (!centralBank.isReady() || !siBank.isReady() || !treasury.isReady()) {
+            logger.warn(`[community] monetary institutions not ready — skipping annual issuance for @${person.handle}`);
+            return;
+        }
+
+        try {
+            const memberAccount = await bank.getPrimaryAccountAsync(person.id);
+            if (!memberAccount) {
+                logger.warn(`[community] no primary account for @${person.handle} — skipping annual issuance`);
+                return;
+            }
+
+            // All kin is issued into the community fund first; the fund then
+            // distributes per policy: member fraction → member, remainder → insurance fund.
+            const annual       = constitution.kinPerPersonYear;
+            const memberAmount = Math.floor(annual * constitution.birthdayCirculationFraction);
+            const poolAmount   = annual - memberAmount;
+
+            await centralBank.issue(annual, treasury.accountId, "annual issuance — community fund");
+            await treasury.transfer(siBank.poolAccountId,    poolAmount,   "annual issuance — insurance fund");
+            await treasury.transfer(memberAccount.accountId, memberAmount, "annual issuance — member share");
+
+            siBank.recordContribution(person.id, poolAmount);
+
+            logger.info(
+                `[community] annual issuance for @${person.handle}: ` +
+                `${annual} kin (insurance: ${poolAmount}, member: ${memberAmount})`,
+            );
+        } catch (err) {
+            logger.warn(`[community] annual issuance failed for @${person.handle}: ${(err as Error).message}`);
+        }
+    });
+
+    // Collect community dues monthly — moves kin from member accounts
+    // to the treasury. Runs 30 days after startup, then every 30 days.
+    // Excludes institutional accounts (issuance, SI pool, treasury itself).
+    const runCommunityDues = (): void => {
+        const centralBank  = CentralBank.getInstance();
+        const siBank       = SocialInsuranceBank.getInstance();
+        const treasury     = CommunityTreasury.getInstance();
+        const constitution = Constitution.getInstance();
+        if (!centralBank.isReady() || !siBank.isReady() || !treasury.isReady()) {
+            logger.warn("[community] monetary institutions not ready — skipping community dues collection");
+            return;
+        }
+        treasury.collectDues(
+            constitution.communityDuesRate,
+            constitution.demurrageFloor,
+            [centralBank.issuanceAccountId, siBank.poolAccountId],
+        ).then(({ count }) => {
+            logger.info(`[community] community dues collected from ${count} accounts`);
+        }).catch(err => {
+            logger.error({ err }, "[community] community dues collection failed");
+        });
+    };
+    // Run the dues check daily; collectDues() fires only when a full 30-day
+    // cycle has elapsed. Using a daily tick avoids Node.js's 32-bit timer
+    // overflow (setTimeout > ~24.8 days fires immediately).
+    let lastDuesDate: Date | null = null;
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    setInterval(() => {
+        const now = new Date();
+        if (
+            lastDuesDate === null ||
+            now.getTime() - lastDuesDate.getTime() >= 30 * MS_PER_DAY
+        ) {
+            lastDuesDate = now;
+            runCommunityDues();
+        }
+    }, MS_PER_DAY);
+
+    // Check birthdays once at startup, then every 24 hours.
+    const runAnniversaryCheck = (): void => {
+        PersonService.getInstance().checkAnniversaries().catch(err =>
+            (err: unknown) => logger.error({ err }, "[community] anniversary check failed"),
+        );
+    };
+    runAnniversaryCheck();
+    setInterval(runAnniversaryCheck, 24 * 60 * 60 * 1000);
+}

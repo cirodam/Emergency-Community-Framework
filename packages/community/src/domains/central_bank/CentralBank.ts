@@ -1,3 +1,4 @@
+import logger from "../../logger.js";
 import { BankClient } from "@ecf/core";
 import { CentralBankLoader } from "./CentralBankLoader.js";
 import { FunctionalDomain } from "../../common/domain/FunctionalDomain.js";
@@ -112,7 +113,7 @@ export class CentralBank extends FunctionalDomain {
         this._dischargeShortfall += amount;
         const record = this._loader.load();
         this._loader.save({ ...record, dischargeShortfall: this._dischargeShortfall });
-        console.log(`[central-bank] discharge shortfall +${amount} kin (total: ${this._dischargeShortfall})`);
+        logger.info(`[central-bank] discharge shortfall +${amount} kin (total: ${this._dischargeShortfall})`);
     }
 
     /**

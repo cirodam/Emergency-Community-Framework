@@ -250,6 +250,11 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
 
 // ── Constitution singleton ────────────────────────────────────────────────────
 
+/** Minimal interface so Constitution doesn't depend on the loader class. */
+export interface ConstitutionSaver {
+    save(): void;
+}
+
 export class Constitution {
     private static instance: Constitution;
     private doc: ConstitutionDocument = {
@@ -257,12 +262,24 @@ export class Constitution {
         amendments:   [],
         authorityMap: [...DEFAULT_CONSTITUTION.authorityMap],
     };
+    private _saver: ConstitutionSaver | null = null;
 
     private constructor() {}
 
     static getInstance(): Constitution {
         if (!Constitution.instance) Constitution.instance = new Constitution();
         return Constitution.instance;
+    }
+
+    /** Register the loader so handlers can call save() without knowing DATA_DIR. */
+    init(saver: ConstitutionSaver): void {
+        this._saver = saver;
+    }
+
+    /** Persist the current document via the registered loader. */
+    save(): void {
+        if (!this._saver) throw new Error("Constitution.init() must be called before save()");
+        this._saver.save();
     }
 
     /**

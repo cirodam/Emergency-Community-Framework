@@ -1,7 +1,8 @@
 import { type Request, type Response } from "express";
-import { BankClient, NodeService, sendMessage, type EcfMessage } from "@ecf/core";
+import { NodeService, sendMessage, type EcfMessage } from "@ecf/core";
 import { CentralBank } from "../domains/central_bank/CentralBank.js";
 import { FederationMembershipService } from "../FederationMembershipService.js";
+import { nodeBankClient as bank } from "../nodeBankClient.js";
 
 export interface TransferRouteBody {
     address: { community: string; federation?: string; commonwealth?: string; globe?: string };
@@ -15,15 +16,6 @@ export interface TransferReceiveBody {
     toAccountId: string;
     amount: number;
     memo?: string;
-}
-
-const BANK_URL = process.env.BANK_URL ?? "http://localhost:3001";
-
-function bank(): BankClient {
-    return new BankClient(
-        BANK_URL,
-        body => NodeService.getInstance().getSigner().signBody(body),
-    );
 }
 
 /**
@@ -134,6 +126,11 @@ export async function sendTransfer(
 export async function handleBankTransferReceive(
     msg: EcfMessage<TransferReceiveBody>,
 ): Promise<{ ok: boolean }> {
+    const record = FederationMembershipService.getInstance().getStatus();
+    if (!record || msg.from !== record.federationUrl) {
+        throw new Error("Unauthorized sender — not the registered federation");
+    }
+
     const { toAccountId, amount, memo } = msg.body ?? {};
 
     if (typeof toAccountId !== "string" || !toAccountId) throw new Error("toAccountId is required");

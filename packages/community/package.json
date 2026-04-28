@@ -18,7 +18,9 @@
   "dependencies": {
     "@ecf/core": "*",
     "express": "^5.2.1",
+    "express-rate-limit": "^7.5.0",
     "express-session": "^1.19.0",
+    "pino": "^9.0.0",
     "serialport": "^13.0.0",
     "@serialport/parser-readline": "^13.0.0"
   }

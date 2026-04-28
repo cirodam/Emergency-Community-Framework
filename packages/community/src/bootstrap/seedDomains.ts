@@ -1,0 +1,155 @@
+import logger from "../logger.js";
+import { DomainService } from "../DomainService.js";
+import { FunctionalUnit } from "../common/domain/FunctionalUnit.js";
+import { RoleType, DEFAULT_ROLE_TYPES } from "../common/RoleType.js";
+import { CentralBank } from "../domains/central_bank/CentralBank.js";
+import { SocialInsuranceBank } from "../domains/social_insurance/SocialInsuranceBank.js";
+import { CommunityTreasury } from "../domains/community_treasury/CommunityTreasury.js";
+import { CommunityBankDomain } from "../domains/community_bank/CommunityBankDomain.js";
+import { FoodDomain } from "../domains/food/FoodDomain.js";
+import { FoodUnitTemplates } from "../domains/food/FoodUnitTemplates.js";
+import { AgricultureDomain } from "../domains/agriculture/AgricultureDomain.js";
+import { AgricultureUnitTemplates } from "../domains/agriculture/AgricultureUnitTemplates.js";
+import { HealthcareDomain } from "../domains/healthcare/HealthcareDomain.js";
+import { HealthcareUnitTemplates } from "../domains/healthcare/HealthcareUnitTemplates.js";
+import { HousingDomain } from "../domains/housing/HousingDomain.js";
+import { HousingUnitTemplates } from "../domains/housing/HousingUnitTemplates.js";
+import { EnergyDomain } from "../domains/energy/EnergyDomain.js";
+import { EnergyUnitTemplates } from "../domains/energy/EnergyUnitTemplates.js";
+import { CommunicationsDomain } from "../domains/communications/CommunicationsDomain.js";
+import { CommunicationsUnitTemplates } from "../domains/communications/CommunicationsUnitTemplates.js";
+import { DeathcareDomain } from "../domains/deathcare/DeathcareDomain.js";
+import { DeathcareUnitTemplates } from "../domains/deathcare/DeathcareUnitTemplates.js";
+import { SanitationDomain } from "../domains/sanitation/SanitationDomain.js";
+import { SanitationUnitTemplates } from "../domains/sanitation/SanitationUnitTemplates.js";
+import { WaterDomain } from "../domains/water/WaterDomain.js";
+import { WaterUnitTemplates } from "../domains/water/WaterUnitTemplates.js";
+import { FireDomain } from "../domains/fire/FireDomain.js";
+import { FireUnitTemplates } from "../domains/fire/FireUnitTemplates.js";
+import { ChildcareDomain } from "../domains/childcare/ChildcareDomain.js";
+import { ChildcareUnitTemplates } from "../domains/childcare/ChildcareUnitTemplates.js";
+import { DependencyCareDomain } from "../domains/dependency_care/DependencyCareDomain.js";
+import { DependencyCareUnitTemplates } from "../domains/dependency_care/DependencyCareUnitTemplates.js";
+import { EducationDomain } from "../domains/education/EducationDomain.js";
+import { EducationUnitTemplates } from "../domains/education/EducationUnitTemplates.js";
+import { EnrichmentDomain } from "../domains/enrichment/EnrichmentDomain.js";
+import { EnrichmentUnitTemplates } from "../domains/enrichment/EnrichmentUnitTemplates.js";
+import { TransitDomain } from "../domains/transit/TransitDomain.js";
+import { TransitUnitTemplates } from "../domains/transit/TransitUnitTemplates.js";
+import { CourierDomain } from "../domains/courier/CourierDomain.js";
+import { CourierUnitTemplates } from "../domains/courier/CourierUnitTemplates.js";
+
+/**
+ * Seed role types and register all functional domains + unit templates on first boot.
+ * Called once during startup, after DomainService.init() and initRoleTypes().
+ */
+export function seedDomains(domainSvc: DomainService): void {
+    // Seed defaults on first boot (once any custom types exist we leave them alone)
+    if (domainSvc.getRoleTypes().length === 0) {
+        for (const def of DEFAULT_ROLE_TYPES) {
+            domainSvc.createRoleType(new RoleType(def.title, def.description, def.defaultKinPerMonth));
+        }
+        logger.info(`[community] seeded ${DEFAULT_ROLE_TYPES.length} default role types`);
+    }
+
+    // Register the four monetary/financial domains so they participate in
+    // governance — they get leader pools, roles, and appear in the domain API.
+    // Monetary init (async bank connection) happens separately below.
+    domainSvc.registerDomain(CentralBank.getInstance());
+    if (CentralBank.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Central Bank Office", "The central administrative office of the central bank.", "office"),
+            CentralBank.getInstance().id,
+        );
+    }
+
+    domainSvc.registerDomain(SocialInsuranceBank.getInstance());
+    if (SocialInsuranceBank.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Social Insurance Office", "The central administrative office of the social insurance bank.", "office"),
+            SocialInsuranceBank.getInstance().id,
+        );
+    }
+
+    domainSvc.registerDomain(CommunityTreasury.getInstance());
+
+    domainSvc.registerDomain(CommunityBankDomain.getInstance());
+    if (CommunityBankDomain.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Main Branch", "The primary branch of the community bank.", "branch"),
+            CommunityBankDomain.getInstance().id,
+        );
+    }
+    domainSvc.registerDomain(FoodDomain.getInstance());
+    if (FoodDomain.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Food Supply Office", "Central office coordinating food procurement, storage, and distribution for the community.", "food-supply-office"),
+            FoodDomain.getInstance().id,
+        );
+        domainSvc.createUnit(
+            new FunctionalUnit("Community Kitchen", "Shared kitchen space for food preparation and cooking. Handles raw ingredient processing, meal preparation, and food preservation for the community.", "community-kitchen"),
+            FoodDomain.getInstance().id,
+        );
+    }
+    domainSvc.registerDomain(AgricultureDomain.getInstance());
+    if (AgricultureDomain.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Farm Coordination Office", "Coordinates land allocation, planting schedules, shared equipment, and harvest logistics across community farms and individual growers.", "farm-coordination-office"),
+            AgricultureDomain.getInstance().id,
+        );
+    }
+    domainSvc.registerDomain(HealthcareDomain.getInstance());
+    if (HealthcareDomain.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Medicine Supply Office", "Manages procurement, storage, and distribution of medicines and medical supplies for the community.", "medicine-supply-office"),
+            HealthcareDomain.getInstance().id,
+        );
+        domainSvc.createUnit(
+            new FunctionalUnit("Primary Care Clinic", "General medical care, preventive health, chronic disease management, and triage for the community.", "primary-care-clinic"),
+            HealthcareDomain.getInstance().id,
+        );
+    }
+    domainSvc.registerDomain(HousingDomain.getInstance());
+    domainSvc.registerDomain(EnergyDomain.getInstance());
+    if (EnergyDomain.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Liquid Fuels Office", "Manages production or procurement, storage, and rationing of liquid fuels including biodiesel and petrol.", "liquid-fuel-office"),
+            EnergyDomain.getInstance().id,
+        );
+    }
+    domainSvc.registerDomain(CommunicationsDomain.getInstance());
+    domainSvc.registerDomain(DeathcareDomain.getInstance());
+    domainSvc.registerDomain(SanitationDomain.getInstance());
+    domainSvc.registerDomain(WaterDomain.getInstance());
+    domainSvc.registerDomain(FireDomain.getInstance());
+    domainSvc.registerDomain(ChildcareDomain.getInstance());
+    domainSvc.registerDomain(DependencyCareDomain.getInstance());
+    if (DependencyCareDomain.getInstance().unitIds.length === 0) {
+        domainSvc.createUnit(
+            new FunctionalUnit("Community Outreach Team", "Identifies at-risk, isolated, or vulnerable community members — including elderly, disabled, and food-insecure individuals — and coordinates delivery of food, medicine, and care services to them.", "community-outreach-team"),
+            DependencyCareDomain.getInstance().id,
+        );
+    }
+    domainSvc.registerDomain(EducationDomain.getInstance());
+    domainSvc.registerDomain(EnrichmentDomain.getInstance());
+    domainSvc.registerDomain(TransitDomain.getInstance());
+    domainSvc.registerDomain(CourierDomain.getInstance());
+
+    // Register all unit templates so POST /api/units can instantiate them by type.
+    FoodUnitTemplates.register();
+    AgricultureUnitTemplates.register();
+    HealthcareUnitTemplates.register();
+    HousingUnitTemplates.register();
+    EnergyUnitTemplates.register();
+    CommunicationsUnitTemplates.register();
+    DeathcareUnitTemplates.register();
+    SanitationUnitTemplates.register();
+    WaterUnitTemplates.register();
+    FireUnitTemplates.register();
+    ChildcareUnitTemplates.register();
+    DependencyCareUnitTemplates.register();
+    EducationUnitTemplates.register();
+    EnrichmentUnitTemplates.register();
+    TransitUnitTemplates.register();
+    CourierUnitTemplates.register();
+}

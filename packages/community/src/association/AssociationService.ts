@@ -1,3 +1,4 @@
+import logger from "../logger.js";
 import { Association } from "./Association.js";
 import { AssociationLoader } from "./AssociationLoader.js";
 
@@ -21,7 +22,7 @@ export class AssociationService {
             this.associations.set(a.id, a);
             this.handleIndex.set(a.handle, a.id);
         }
-        console.log(`[AssociationService] loaded ${this.associations.size} association(s)`);
+        logger.info(`[AssociationService] loaded ${this.associations.size} association(s)`);
     }
 
     // ── Queries ───────────────────────────────────────────────────────────────

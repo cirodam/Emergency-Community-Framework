@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { PersonCredential } from "@ecf/core";
 import { MemberApplicationService } from "../applications/MemberApplicationService.js";
+import { MemberApplication } from "../applications/MemberApplication.js";
 import { PersonService } from "../person/PersonService.js";
 
 type AuthedRequest = Request & { personId?: string; credential?: PersonCredential };
@@ -8,7 +9,7 @@ type AuthedRequest = Request & { personId?: string; credential?: PersonCredentia
 const svc    = () => MemberApplicationService.getInstance();
 const people = () => PersonService.getInstance();
 
-function toDto(app: ReturnType<typeof svc>["get"] extends (id: string) => infer R ? R : never) {
+function toDto(app: MemberApplication | undefined | null) {
     if (!app) return null;
     const vouchers = app.voucherIds.map(id => {
         const p = people().get(id);
@@ -137,9 +138,13 @@ export function removeVouch(req: AuthedRequest, res: Response): void {
 
 // POST /api/applications/:id/withdraw
 export function withdrawApplication(req: AuthedRequest, res: Response): void {
+    const app = svc().get(req.params.id as string);
+    if (!app) { res.status(404).json({ error: "Application not found" }); return; }
+    if (app.submittedBy !== "self" && app.submittedBy !== req.personId) {
+        res.status(403).json({ error: "You may only withdraw your own application" }); return;
+    }
     try {
-        const app = svc().withdraw(req.params.id as string);
-        res.json(toDto(app));
+        res.json(toDto(svc().withdraw(app.id)));
     } catch (err) {
         res.status(400).json({ error: (err as Error).message });
     }

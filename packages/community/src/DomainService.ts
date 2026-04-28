@@ -1,3 +1,4 @@
+import logger from "./logger.js";
 import { FunctionalDomain, type BudgetItem } from "./common/domain/FunctionalDomain.js";
 import { FunctionalUnit } from "./common/domain/FunctionalUnit.js";
 import { FunctionalDomainLoader } from "./common/domain/FunctionalDomainLoader.js";
@@ -32,7 +33,13 @@ export class DomainService {
     private roleTypeLoader: RoleTypeLoader         | null = null;
     private poolLoader:     LeaderPoolLoader       | null = null;
 
+    private initialized = false;
+
     private constructor() {}
+
+    private assertInit(): void {
+        if (!this.initialized) throw new Error("DomainService.init() must be called before write operations");
+    }
 
     static getInstance(): DomainService {
         if (!DomainService.instance) DomainService.instance = new DomainService();
@@ -55,12 +62,13 @@ export class DomainService {
         for (const unit of unitLoader.loadAll())   this.units.set(unit.id, unit);
         for (const role of roleLoader.loadAll())   this.roles.set(role.id, role);
         for (const pool of poolLoader.loadAll())   this.pools.set(pool.id, pool);
+        this.initialized = true;
     }
 
     initRoleTypes(loader: RoleTypeLoader): void {
         this.roleTypeLoader = loader;
         for (const rt of loader.loadAll()) this.roleTypes.set(rt.id, rt);
-        console.log(`[DomainService] loaded ${this.roleTypes.size} role type(s)`);
+        logger.info(`[DomainService] loaded ${this.roleTypes.size} role type(s)`);
     }
 
     /**
@@ -70,6 +78,11 @@ export class DomainService {
     registerDomain(domain: FunctionalDomain): void {
         this.domainLoader?.restore(domain);
         this.domains.set(domain.id, domain);
+    }
+
+    /** Persist an already-registered domain's current in-memory state to disk. */
+    saveDomain(domain: FunctionalDomain): void {
+        this.domainLoader?.save(domain);
     }
 
     // ── Domains ───────────────────────────────────────────────────────────────
@@ -92,6 +105,7 @@ export class DomainService {
     }
 
     createUnit(unit: FunctionalUnit, domainId: string): void {
+        this.assertInit();
         this.units.set(unit.id, unit);
         this.unitLoader?.save(unit);
         const domain = this.domains.get(domainId);
@@ -106,6 +120,7 @@ export class DomainService {
     }
 
     deleteUnit(id: string): boolean {
+        this.assertInit();
         const unit = this.units.get(id);
         if (!unit) return false;
         this.units.delete(id);
@@ -135,6 +150,7 @@ export class DomainService {
     }
 
     createRole(role: CommunityRole, unitId: string): void {
+        this.assertInit();
         this.roles.set(role.id, role);
         this.roleLoader?.save(role);
         const unit = this.units.get(unitId);
@@ -149,6 +165,7 @@ export class DomainService {
     }
 
     deleteRole(id: string): boolean {
+        this.assertInit();
         if (!this.roles.has(id)) return false;
         this.roles.delete(id);
         this.roleLoader?.delete(id);
@@ -174,6 +191,7 @@ export class DomainService {
     }
 
     createRoleType(roleType: RoleType): void {
+        this.assertInit();
         this.roleTypes.set(roleType.id, roleType);
         this.roleTypeLoader?.save(roleType);
     }
@@ -183,6 +201,7 @@ export class DomainService {
     }
 
     deleteRoleType(id: string): boolean {
+        this.assertInit();
         if (!this.roleTypes.has(id)) return false;
         this.roleTypes.delete(id);
         this.roleTypeLoader?.delete(id);
@@ -225,6 +244,7 @@ export class DomainService {
     }
 
     addBudgetItem(domainId: string, item: Omit<BudgetItem, "id">): BudgetItem | null {
+        this.assertInit();
         const domain = this.domains.get(domainId);
         if (!domain) return null;
         const newItem: BudgetItem = { id: crypto.randomUUID(), ...item };
@@ -234,6 +254,7 @@ export class DomainService {
     }
 
     updateBudgetItem(domainId: string, itemId: string, patch: Partial<Omit<BudgetItem, "id">>): BudgetItem | null {
+        this.assertInit();
         const domain = this.domains.get(domainId);
         if (!domain) return null;
         const item = domain.budgetItems.find(i => i.id === itemId);
@@ -247,6 +268,7 @@ export class DomainService {
     }
 
     removeBudgetItem(domainId: string, itemId: string): boolean {
+        this.assertInit();
         const domain = this.domains.get(domainId);
         if (!domain) return false;
         const idx = domain.budgetItems.findIndex(i => i.id === itemId);
@@ -273,30 +295,20 @@ export class DomainService {
         let totalPayroll = 0;
         let totalItems   = 0;
 
-        const domains = Array.from(this.domains.values()).map(domain => {
-            const payroll = domain.unitIds.flatMap(unitId => {
-                const unit = this.units.get(unitId);
-                if (!unit) return [];
-                return unit.roleIds.flatMap(roleId => {
-                    const role = this.roles.get(roleId);
-                    if (!role) return [];
-                    return [{ roleId: role.id, title: role.title, memberId: role.memberId, kinPerMonth: role.kinPerMonth }];
-                });
-            });
+        const domains = Array.from(this.domains.values()).flatMap(domain => {
+            const budget = this.getDomainBudget(domain.id);
+            if (!budget) return [];
 
-            const payrollTotal = payroll.reduce((sum, r) => sum + r.kinPerMonth, 0);
-            const itemsTotal   = domain.budgetItems.reduce((sum, i) => sum + i.amount, 0);
+            totalPayroll += budget.totals.payroll;
+            totalItems   += budget.totals.items;
 
-            totalPayroll += payrollTotal;
-            totalItems   += itemsTotal;
-
-            return {
+            return [{
                 domainId:   domain.id,
                 domainName: domain.name,
-                payroll,
-                items:   domain.budgetItems,
-                totals:  { payroll: payrollTotal, items: itemsTotal, total: payrollTotal + itemsTotal },
-            };
+                payroll:    budget.payroll,
+                items:      budget.items,
+                totals:     budget.totals,
+            }];
         });
 
         return {
@@ -311,6 +323,7 @@ export class DomainService {
     getPools(): LeaderPool[] { return Array.from(this.pools.values()); }
 
     createPool(pool: LeaderPool): void {
+        this.assertInit();
         this.pools.set(pool.id, pool);
         this.poolLoader?.save(pool);
     }
@@ -320,6 +333,7 @@ export class DomainService {
     }
 
     deletePool(id: string): boolean {
+        this.assertInit();
         if (!this.pools.has(id)) return false;
         this.pools.delete(id);
         this.poolLoader?.delete(id);
@@ -361,12 +375,12 @@ export class DomainService {
             const amount = Math.round(role.kinPerMonth * 100) / 100;
             if (amount <= 0) continue;
             if (remaining < amount) {
-                console.warn(`[DomainService] cannot afford payroll for "${role.title}" (needs ${amount}, has ${remaining})`);
+                logger.warn(`[DomainService] cannot afford payroll for "${role.title}" (needs ${amount}, has ${remaining})`);
                 continue;
             }
             const recipientAccount = await bank.getPrimaryAccountAsync(role.memberId);
             if (!recipientAccount) {
-                console.warn(`[DomainService] no primary account for role holder ${role.memberId} ("${role.title}")`);
+                logger.warn(`[DomainService] no primary account for role holder ${role.memberId} ("${role.title}")`);
                 continue;
             }
             await bank.transfer(payerAccount.accountId, recipientAccount.accountId, amount, `payroll: ${role.title}`);

@@ -1,3 +1,4 @@
+import logger from "./logger.js";
 import { NodeService, UpstreamMembershipService, type UpstreamApplicationStatus, sendMessage } from "@ecf/core";
 
 export type FederationApplicationStatus = UpstreamApplicationStatus;
@@ -64,7 +65,9 @@ export class FederationMembershipService extends UpstreamMembershipService<Feder
                     const member  = members.find(m => m.id === memberId);
                     if (member?.bankAccountId) this.record.federationAccountId = member.bankAccountId;
                 }
-            } catch { /* non-fatal */ }
+            } catch (err) {
+                logger.warn(`[FederationMembershipService] onApproved: could not fetch /api/members: ${(err as Error).message}`);
+            }
         }
 
         if (!this.record.federationHandle) {
@@ -80,7 +83,9 @@ export class FederationMembershipService extends UpstreamMembershipService<Feder
                     if (id.commonwealthHandle) this.record.commonwealthHandle = id.commonwealthHandle;
                     if (id.globeHandle)        this.record.globeHandle        = id.globeHandle;
                 }
-            } catch { /* non-fatal */ }
+            } catch (err) {
+                logger.warn(`[FederationMembershipService] onApproved: could not fetch /api/identity: ${(err as Error).message}`);
+            }
         }
 
         if (!this.record.commonwealthUrl) {
@@ -98,7 +103,9 @@ export class FederationMembershipService extends UpstreamMembershipService<Feder
                     if (chain.globeUrl)           this.record.globeUrl           = chain.globeUrl;
                     if (chain.globeHandle)        this.record.globeHandle        = chain.globeHandle;
                 }
-            } catch { /* non-fatal */ }
+            } catch (err) {
+                logger.warn(`[FederationMembershipService] onApproved: could not fetch /api/membership-chain: ${(err as Error).message}`);
+            }
         }
     }
 
@@ -158,7 +165,7 @@ export class FederationMembershipService extends UpstreamMembershipService<Feder
             appliedAt:           new Date().toISOString(),
         };
         this.save();
-        console.log(`[FederationMembership] applied to ${federationUrl}: application ${data.id}`);
+        logger.info(`[FederationMembership] applied to ${federationUrl}: application ${data.id}`);
         return this.record;
     }
 

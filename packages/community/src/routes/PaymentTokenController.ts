@@ -1,17 +1,8 @@
 import { type Request, type Response } from "express";
 import { PaymentTokenService } from "../PaymentTokenService.js";
 import { PersonService } from "../person/PersonService.js";
-import { BankClient } from "@ecf/core";
-import { NodeService, serializeRoutableAddress } from "@ecf/core";
-
-const BANK_URL = process.env.BANK_URL ?? "http://localhost:3001";
-
-function bank(): BankClient {
-    return new BankClient(
-        BANK_URL,
-        body => NodeService.getInstance().getSigner().signBody(body),
-    );
-}
+import { serializeRoutableAddress } from "@ecf/core";
+import { nodeBankClient as bank } from "../nodeBankClient.js";
 
 // ── Token management (steward-only) ──────────────────────────────────────────
 

@@ -1,3 +1,4 @@
+import logger from "./logger.js";
 import { randomUUID } from "crypto";
 import { FileStore } from "@ecf/core";
 import type { RoutableAddress } from "@ecf/core";
@@ -46,7 +47,7 @@ export class PaymentTokenService {
     init(dataDir: string, ownAddress: RoutableAddress): void {
         this.store      = new FileStore(dataDir);
         this.ownAddress = ownAddress;
-        console.log(`[PaymentTokenService] ready (${dataDir})`);
+        logger.info(`[PaymentTokenService] ready (${dataDir})`);
     }
 
     get address(): RoutableAddress {

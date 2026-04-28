@@ -39,6 +39,10 @@ export async function addPerson(req: Request, res: Response): Promise<void> {
     let handle = base;
     let suffix = 2;
     while (svc().getByHandle(handle)) {
+        if (suffix > 999) {
+            res.status(409).json({ error: "Could not generate a unique handle" });
+            return;
+        }
         handle = `${base}_${suffix++}`;
     }
 
@@ -65,7 +69,9 @@ export function updatePerson(req: Request, res: Response): void {
         const person = svc().update(req.params.id as string, req.body ?? {});
         res.json(toDto(person));
     } catch (err) {
-        res.status(404).json({ error: (err as Error).message });
+        const msg = (err as Error).message ?? "";
+        const status = msg.toLowerCase().includes("not found") ? 404 : 400;
+        res.status(status).json({ error: msg });
     }
 }
 

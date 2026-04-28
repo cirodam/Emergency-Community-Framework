@@ -1,4 +1,6 @@
+import logger from "../logger.js";
 import { Request, Response } from "express";
+import { timingSafeEqual } from "crypto";
 import { SmsService } from "../sms/SmsService.js";
 
 /**
@@ -27,10 +29,16 @@ export async function smsInbound(req: Request, res: Response): Promise<void> {
         return;
     }
 
-    // Constant-time comparison to resist timing attacks
-    const provided = req.headers["x-sms-secret"] ?? "";
-    const expected  = secret;
-    if (provided.length !== expected.length || provided !== expected) {
+    // Constant-time comparison to resist timing attacks (no length pre-check)
+    const provided    = req.headers["x-sms-secret"] ?? "";
+    const providedBuf = Buffer.from(String(provided)).subarray(0, 512);
+    const expectedBuf = Buffer.from(secret).subarray(0, 512);
+    const len = Math.max(providedBuf.length, expectedBuf.length);
+    const a = Buffer.alloc(len);
+    const b = Buffer.alloc(len);
+    providedBuf.copy(a);
+    expectedBuf.copy(b);
+    if (!timingSafeEqual(a, b)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
     }
@@ -48,6 +56,6 @@ export async function smsInbound(req: Request, res: Response): Promise<void> {
     // Process asynchronously — respond 202 immediately so the caller doesn't time out
     res.status(202).send();
     SmsService.getInstance().handle(from.trim(), body).catch(err =>
-        console.error("[sms] webhook handler error:", err),
+        (err: unknown) => logger.error({ err }, "[sms] webhook handler error"),
     );
 }
