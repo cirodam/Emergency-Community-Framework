@@ -86,6 +86,7 @@
 <div class="applications-page">
     <div class="page-header">
         <h2 class="page-title">Applications</h2>
+        <p class="page-subtitle">People applying for membership.</p>
     </div>
 
     {#if loading}
@@ -230,12 +231,7 @@
         margin-bottom: 1.25rem;
     }
 
-    .page-title {
-        margin: 0;
-        font-size: 1.4rem;
-        font-weight: 700;
-        color: #0f172a;
-    }
+    .page-subtitle { margin-bottom: 1.5rem; }
 
     /* ── Buttons ─────────────────────────────────────────────────────────── */
     .action-error { color: #dc2626; font-size: 0.85rem; margin: 0 0 0.75rem; }

@@ -9,15 +9,15 @@ services:
       NODE_ENV: production
       DATA_DIR: /app/data
       BANK_URL: http://bank:3001
-      # SMS banking — set SMS_MODEM_PATH to enable (e.g. /dev/ttyUSB0).
-      # SMS_MODEM_PATH: /dev/ttyUSB0
-      # SMS_MODEM_BAUD: 9600
+      # SMS banking via Waveshare SIM7600G-H GSM dongle.
+      # USB2 and USB3 are the AT command ports on this modem (confirmed 115200).
+      SMS_MODEM_PATH: /dev/ttyUSB2
+      SMS_MODEM_BAUD: 115200
       # SMS_WEBHOOK_SECRET: changeme   # for the optional inbound webhook
     volumes:
       - community-data:/app/data
-    # Uncomment to pass through the GSM modem device:
-    # devices:
-    #   - "/dev/ttyUSB0:/dev/ttyUSB0"
+    group_add:
+      - dialout
 
   bank:
     build:

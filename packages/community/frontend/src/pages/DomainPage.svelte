@@ -171,7 +171,6 @@
 
     // Types already present in this domain
     const presentTypes = $derived(new Set(units.map(u => u.type)));
-
 </script>
 
 <div class="domain-page">
@@ -351,6 +350,7 @@
                             <div class="budget-row">
                                 <span class="budget-label">
                                     {item.label}
+                                    {#if item.perMember}<span class="per-member-tag">per member</span>{/if}
                                     <span class="category-tag">{item.category}</span>
                                 </span>
                                 <span class="budget-amount-row">
@@ -828,6 +828,16 @@
         padding: 0.1rem 0.4rem;
         flex-shrink: 0;
         text-transform: capitalize;
+    }
+
+    .per-member-tag {
+        font-size: 0.68rem;
+        font-weight: 500;
+        color: #2563eb;
+        background: #eff6ff;
+        border-radius: 9999px;
+        padding: 0.1rem 0.4rem;
+        flex-shrink: 0;
     }
 
     .budget-amount {

@@ -1,0 +1,45 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   ECF Community — Shared utility styles
+   Imported once in main.ts. Do NOT duplicate these in component <style> blocks.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Page typography ────────────────────────────────────────────────────── */
+
+.page-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.page-subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin: 0;
+}
+
+/* ── Feedback states ────────────────────────────────────────────────────── */
+
+/* Gray "failed to load / no items" state. Red form-error variants stay local. */
+.loading-msg {
+    text-align: center;
+    color: #94a3b8;
+    padding: 3rem 0;
+    font-size: 0.95rem;
+}
+
+/* ── Stat cards (CentralBankPage + SocialInsurancePage) ─────────────────── */
+
+.stat-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.stat-label   { font-size: 0.8rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; }
+.stat-value   { font-size: 2.4rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; margin-bottom: 0.75rem; }
+.stat-unit    { font-size: 1rem; font-weight: 600; color: #64748b; }
+.stat-note    { font-size: 0.82rem; color: #94a3b8; margin: 0; line-height: 1.6; }
+.stat-offline { font-size: 0.9rem; color: #94a3b8; font-style: italic; }

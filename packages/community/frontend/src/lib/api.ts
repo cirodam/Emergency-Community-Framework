@@ -80,6 +80,14 @@ export interface EconomicsDto {
         workingAgeMin:  number;
         retirementAge:  number;
     } | null;
+    healthcareStaffing: {
+        gp:           { recommended: number; ratioPerPerson: number };
+        nurse:        { recommended: number; ratioPerPerson: number };
+        dentist:      { recommended: number; ratioPerPerson: number };
+        mentalHealth: { recommended: number; ratioPerPerson: number };
+        paramedic:    { recommended: number; ratioPerPerson: number };
+        midwife:      { recommended: number; ratioPerPerson: number };
+    } | null;
 }
 
 export async function getEconomics(): Promise<EconomicsDto> {
@@ -98,11 +106,12 @@ export interface BudgetPayrollRow {
 }
 
 export interface BudgetItem {
-    id:       string;
-    label:    string;
-    amount:   number;
-    category: "supplies" | "equipment" | "services" | "other";
-    note:     string;
+    id:        string;
+    label:     string;
+    amount:    number;
+    category:  "supplies" | "equipment" | "services" | "other";
+    note:      string;
+    perMember?: boolean;
 }
 
 export interface BudgetDomainRow {
@@ -126,6 +135,8 @@ export interface CommunityBudgetDto {
         domains:      BudgetDomainRow[];
         totals:       { payroll: number; items: number; total: number };
     };
+    memberCount:            number;
+    foodAllowancePerMember: number;
     solvent: boolean;
 }
 
@@ -150,6 +161,7 @@ export interface SetupPayload {
     birthDate: string;   // ISO date string, e.g. "1990-04-25"
     handle: string;
     password: string;
+    phone?: string;
 }
 
 export interface SetupResult {
@@ -228,6 +240,29 @@ export async function setPassword(personId: string, password: string): Promise<v
     }
 }
 
+export async function setPin(personId: string, pin: string): Promise<void> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(personId)}/pin`, {
+        method: "POST",
+        body: JSON.stringify({ pin }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to set PIN");
+    }
+}
+
+export async function updatePerson(personId: string, patch: { phone?: string }): Promise<PersonDto> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(personId)}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to update profile");
+    }
+    return res.json() as Promise<PersonDto>;
+}
+
 export async function grantSteward(personId: string): Promise<PersonDto> {
     const res = await apiFetch(`/api/persons/${encodeURIComponent(personId)}/steward`, { method: "POST" });
     if (!res.ok) {
@@ -252,6 +287,34 @@ export async function getConstitution(): Promise<ConstitutionDocument> {
     const res = await fetch("/api/constitution");
     if (!res.ok) throw new Error("Failed to load constitution");
     return res.json() as Promise<ConstitutionDocument>;
+}
+
+export async function updateConstitutionParameter(key: string, value: number | boolean): Promise<void> {
+    const res = await apiFetch(`/api/constitution/parameters/${encodeURIComponent(key)}`, {
+        method: "PATCH",
+        body:   JSON.stringify({ value }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to update parameter");
+    }
+}
+
+export interface SimulateStepResult {
+    ok:             boolean;
+    demurrageCount: number;
+    duesCount:      number;
+    foodCount:      number;
+    payrollDomains: number;
+}
+
+export async function simulateBudgetStep(): Promise<SimulateStepResult> {
+    const res = await apiFetch("/api/budget/simulate-step", { method: "POST" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Simulation failed");
+    }
+    return res.json() as Promise<SimulateStepResult>;
 }
 
 // ── Associations ──────────────────────────────────────────────────────────────

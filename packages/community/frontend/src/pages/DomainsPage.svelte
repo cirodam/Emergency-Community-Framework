@@ -36,7 +36,7 @@
 
 <div class="domains-page">
     <h2 class="page-title">Domains</h2>
-    <p class="page-subtitle">Functional domains that organise community life.</p>
+    <p class="page-subtitle">Domains provide services to the community.</p>
 
     {#if loading}
         <div class="card-grid">
@@ -61,17 +61,10 @@
                     {#if d.description}
                         <p class="domain-desc">{d.description}</p>
                     {/if}
-                    {#if bud && bud.payroll.length > 0}
-                        <div class="payroll-block">
-                            {#each bud.payroll as row (row.roleId)}
-                                <div class="payroll-row">
-                                    <span class="payroll-title">{row.title}</span>
-                                    <span class="payroll-amount">{fmt(row.kinPerMonth)} kin/mo</span>
-                                </div>
-                            {/each}
-                            <div class="payroll-total-row">
-                                <span class="payroll-total">{fmt(bud.totals.payroll)} kin/mo total</span>
-                            </div>
+                    {#if bud && bud.totals.total > 0}
+                        <div class="outflow-line">
+                            <span class="outflow-label">Outflow</span>
+                            <span class="outflow-amount">{fmt(bud.totals.total)} kin/mo</span>
                         </div>
                     {/if}
                 </button>
@@ -92,18 +85,8 @@
         .domains-page { padding: 2rem 2rem 3rem; }
     }
 
-    .page-title {
-        font-size: 1.4rem;
-        font-weight: 700;
-        color: #0f172a;
-        margin: 0 0 0.25rem;
-    }
-
-    .page-subtitle {
-        font-size: 0.875rem;
-        color: #64748b;
-        margin: 0 0 1.5rem;
-    }
+    .page-title    { margin-bottom: 0.25rem; }
+    .page-subtitle { margin-bottom: 1.5rem; }
 
     /* ── Card grid ────────────────────────────────────────────────────────── */
 
@@ -180,51 +163,31 @@
         overflow: hidden;
     }
 
-    /* ── Budget payroll block ─────────────────────────────────────────────── */
+    /* ── Budget outflow line ──────────────────────────────────────────────── */
 
-    .payroll-block {
+    .outflow-line {
         margin-top: auto;
-        padding-top: 0.6rem;
+        padding-top: 0.55rem;
         border-top: 1px solid #f1f5f9;
-        display: flex;
-        flex-direction: column;
-        gap: 0.2rem;
-    }
-
-    .payroll-row {
         display: flex;
         justify-content: space-between;
         align-items: baseline;
         gap: 0.5rem;
     }
 
-    .payroll-title {
-        font-size: 0.76rem;
-        color: #64748b;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+    .outflow-label {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
 
-    .payroll-amount {
-        font-size: 0.76rem;
-        font-weight: 600;
+    .outflow-amount {
+        font-size: 0.8rem;
+        font-weight: 700;
         color: #0f172a;
         white-space: nowrap;
-        flex-shrink: 0;
-    }
-
-    .payroll-total-row {
-        display: flex;
-        justify-content: flex-end;
-        margin-top: 0.1rem;
-    }
-
-    .payroll-total {
-        font-size: 0.72rem;
-        color: #94a3b8;
-        font-weight: 500;
     }
 
     /* ── Misc ─────────────────────────────────────────────────────────────── */

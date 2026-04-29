@@ -70,7 +70,7 @@ function createSessionStore() {
 
 export const session = createSessionStore();
 
-export type Page = "profile" | "directory" | "constitution" | "economy" | "settings" | "domains" | "domain" | "unit" | "governance" | "central-bank" | "social-insurance" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations" | "proposals" | "proposal" | "nodes";
+export type Page = "profile" | "directory" | "constitution" | "settings" | "domains" | "domain" | "unit" | "leadership" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations" | "proposals" | "proposal" | "nodes" | "central-bank" | "social-insurance";
 
 function createPageStore() {
     const { subscribe, set } = writable<Page>("profile");

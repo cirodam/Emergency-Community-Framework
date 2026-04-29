@@ -4,6 +4,7 @@ import { SocialInsuranceBank } from "../domains/social_insurance/SocialInsurance
 import { Constitution } from "../governance/Constitution.js";
 import { PersonService } from "../person/PersonService.js";
 import { nodeBankClient as bankClient } from "../nodeBankClient.js";
+import { HealthcareDomain } from "../domains/healthcare/HealthcareDomain.js";
 
 // GET /api/economics — public, no auth required.
 // Returns live monetary data: kin/kithe in circulation and SI pool stats.
@@ -59,6 +60,7 @@ export async function getEconomics(_req: Request, res: Response): Promise<void> 
             workingAgeMin:  workingMin,
             retirementAge:  retireAge,
         },
+        healthcareStaffing: HealthcareDomain.staffingHeuristic(total),
     });
 }
 

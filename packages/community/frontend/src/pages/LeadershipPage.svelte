@@ -1,7 +1,6 @@
 <script lang="ts">
     import { listPools, createPool, listDomains, listPersons } from "../lib/api.js";
     import type { PoolDto, DomainDto, PersonDto } from "../lib/api.js";
-    import { currentPage } from "../lib/session.js";
 
     // ── State ──────────────────────────────────────────────────────────────────
     let pools: PoolDto[]      = $state([]);
@@ -168,53 +167,6 @@
         {/if}
     </section>
 
-    <!-- ── Constitution ──────────────────────────────────────────────── -->
-    <section class="section">
-        <div class="section-header">
-            <div>
-                <h2 class="section-title">Constitution</h2>
-                <p class="section-subtitle">The foundational rules and parameters governing this community.</p>
-            </div>
-        </div>
-        <button class="constitution-link" onclick={() => currentPage.go("constitution")}>
-            <span class="constitution-link-icon">§</span>
-            <div class="constitution-link-text">
-                <span class="constitution-link-label">View Constitution</span>
-                <span class="constitution-link-sub">Parameters, governance authority levels, and amendment history</span>
-            </div>
-            <span class="constitution-link-chevron">›</span>
-        </button>
-    </section>
-
-    <!-- ── Referenda ───────────────────────────────────────────────────── -->
-    <section class="section">
-        <div class="section-header">
-            <div>
-                <h2 class="section-title">Referenda</h2>
-                <p class="section-subtitle">Community-wide votes on constitutional amendments and major decisions.</p>
-            </div>
-        </div>
-        <div class="placeholder-card">
-            <span class="placeholder-icon">§</span>
-            <p class="placeholder-text">No active referenda.</p>
-            <p class="placeholder-sub">Constitutional amendments and major decisions will appear here for community vote.</p>
-        </div>
-    </section>
-
-    <!-- ── Proposals ──────────────────────────────────────────────────── -->
-    <section class="section">
-        <div class="section-header">
-            <div>
-                <h2 class="section-title">Council Proposals</h2>
-                <p class="section-subtitle">Items under review by the governing council.</p>
-            </div>
-        </div>
-        <div class="placeholder-card">
-            <span class="placeholder-icon">⊛</span>
-            <p class="placeholder-text">No active proposals.</p>
-            <p class="placeholder-sub">Proposals from leadership pools and domain councils will appear here.</p>
-        </div>
-    </section>
 </div>
 
 <style>
@@ -233,51 +185,6 @@
 
     /* ── Sections ──────────────────────────────────────────────────────── */
     .section { display: flex; flex-direction: column; gap: 1rem; }
-
-    .constitution-link {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 1rem 1.1rem;
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        cursor: pointer;
-        text-align: left;
-        width: 100%;
-        transition: background 0.15s;
-    }
-    .constitution-link:hover { background: #f8fafc; }
-
-    .constitution-link-icon {
-        font-size: 1.5rem;
-        color: #94a3b8;
-        flex-shrink: 0;
-    }
-
-    .constitution-link-text {
-        display: flex;
-        flex-direction: column;
-        gap: 0.2rem;
-        flex: 1;
-    }
-
-    .constitution-link-label {
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: #0f172a;
-    }
-
-    .constitution-link-sub {
-        font-size: 0.78rem;
-        color: #64748b;
-    }
-
-    .constitution-link-chevron {
-        font-size: 1.3rem;
-        color: #cbd5e1;
-        flex-shrink: 0;
-    }
 
     .section-header {
         display: flex;
@@ -466,4 +373,5 @@
 
     .error-msg { font-size: 0.875rem; color: #dc2626; padding: 0.75rem 1rem; background: #fef2f2; border-radius: 0.5rem; }
     .empty-msg { font-size: 0.875rem; color: #64748b; }
+
 </style>

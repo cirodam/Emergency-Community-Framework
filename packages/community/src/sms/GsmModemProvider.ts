@@ -13,8 +13,8 @@ import type { SmsProvider } from "./SmsProvider.js";
  *     and the container may need access to the `dialout` group.
  *
  * Env vars consumed here (read by SmsService, passed into constructor):
- *   SMS_MODEM_PATH   - serial device path (default: /dev/ttyUSB0)
- *   SMS_MODEM_BAUD   - baud rate (default: 9600)
+ *   SMS_MODEM_PATH   - serial device path (default: /dev/ttyUSB2 for SIM7600G-H)
+ *   SMS_MODEM_BAUD   - baud rate (default: 115200)
  *
  * Protocol overview:
  *   - Uses AT text mode (AT+CMGF=1)
@@ -46,7 +46,7 @@ export class GsmModemProvider implements SmsProvider {
     private sendLocked = false;
     private readonly sendQueue: Array<() => void> = [];
 
-    constructor(path: string, baudRate = 9600) {
+    constructor(path: string, baudRate = 115200) {
         this.port = new SerialPort({ path, baudRate, autoOpen: false });
     }
 

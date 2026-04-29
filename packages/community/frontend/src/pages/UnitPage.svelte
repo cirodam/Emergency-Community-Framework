@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { getUnit, listRoles, listRoleTypes, createRole, updateRole, deleteRole } from "../lib/api.js";
-    import type { UnitDto, RoleDto, RoleTypeDto } from "../lib/api.js";
+    import { getUnit, listRoles, listRoleTypes, listPersons, createRole, updateRole, deleteRole } from "../lib/api.js";
+    import type { UnitDto, RoleDto, RoleTypeDto, PersonDto } from "../lib/api.js";
     import { currentPage, selectedUnitId, selectedDomainId } from "../lib/session.js";
 
     let unit: UnitDto | null = $state(null);
@@ -27,18 +27,45 @@
     // Delete
     let deletingId: string | null = $state(null);
 
+    // Assign member to role
+    let persons: PersonDto[] = $state([]);
+    let assigningRoleId: string | null = $state(null);
+    let assignPersonId = $state("");
+    let assignSaving = $state(false);
+
+    function startAssign(role: RoleDto) {
+        assigningRoleId = role.id;
+        assignPersonId  = role.memberId ?? "";
+    }
+
+    async function saveAssign(roleId: string) {
+        if (!assignPersonId && !roles.find(r => r.id === roleId)?.memberId) return;
+        assignSaving = true;
+        try {
+            const updated = await updateRole(roleId, { memberId: assignPersonId || null });
+            roles = roles.map(r => r.id === updated.id ? updated : r);
+        } catch {
+            // silently revert
+        } finally {
+            assignSaving  = false;
+            assigningRoleId = null;
+        }
+    }
+
     async function load(id: string) {
         loading = true;
         error = "";
         try {
-            const [u, allRoles, rts] = await Promise.all([
+            const [u, allRoles, rts, ps] = await Promise.all([
                 getUnit(id),
                 listRoles(),
                 listRoleTypes(),
+                listPersons(),
             ]);
             unit = u;
             roles = allRoles.filter(r => u.roleIds.includes(r.id));
             roleTypes = rts;
+            persons = ps;
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to load unit";
         } finally {
@@ -169,6 +196,13 @@
                                         <span class="unfunded-badge">unfunded</span>
                                     {/if}
                                 </div>
+                                {#if role.memberId}
+                                    {@const holder = persons.find(p => p.id === role.memberId)}
+                                    <div class="role-holder-row">
+                                        <span class="role-holder">{holder ? `${holder.firstName} ${holder.lastName}` : role.memberId}</span>
+                                        <button class="reassign-btn" onclick={() => startAssign(role)} title="Reassign">✎</button>
+                                    </div>
+                                {/if}
                                 <button
                                     class="delete-btn"
                                     onclick={() => doDelete(role.id)}
@@ -179,6 +213,23 @@
 
                             {#if role.description}
                                 <p class="role-desc">{role.description}</p>
+                            {/if}
+
+                            {#if assigningRoleId === role.id}
+                                <div class="assign-row">
+                                    <select class="assign-select" bind:value={assignPersonId}>
+                                        <option value="">— unassign —</option>
+                                        {#each persons as p (p.id)}
+                                            <option value={p.id}>{p.firstName} {p.lastName}</option>
+                                        {/each}
+                                    </select>
+                                    <button class="assign-save-btn" onclick={() => saveAssign(role.id)} disabled={assignSaving}>
+                                        {assignSaving ? "…" : "Save"}
+                                    </button>
+                                    <button class="assign-cancel-btn" onclick={() => assigningRoleId = null}>Cancel</button>
+                                </div>
+                            {:else if !role.memberId}
+                                <button class="assign-btn" onclick={() => startAssign(role)}>+ Assign member</button>
                             {/if}
 
                             <div class="role-footer">
@@ -401,6 +452,80 @@
         background: #f1f5f9;
         border-radius: 9999px;
         padding: 0.1rem 0.4rem;
+    }
+
+    .role-holder-row {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-top: 0.1rem;
+    }
+    .role-holder {
+        font-size: 0.8rem;
+        color: #16a34a;
+        font-weight: 500;
+    }
+    .reassign-btn {
+        background: none;
+        border: none;
+        font-size: 0.8rem;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+    }
+    .reassign-btn:hover { color: #475569; }
+
+    .assign-btn {
+        align-self: flex-start;
+        font-size: 0.75rem;
+        color: #3b82f6;
+        background: none;
+        border: 1px solid #bfdbfe;
+        border-radius: 0.375rem;
+        padding: 0.2rem 0.55rem;
+        cursor: pointer;
+        margin-top: 0.1rem;
+        transition: background 0.15s;
+    }
+    .assign-btn:hover { background: #eff6ff; }
+
+    .assign-row {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-top: 0.25rem;
+        flex-wrap: wrap;
+    }
+    .assign-select {
+        font-size: 0.82rem;
+        padding: 0.25rem 0.45rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.375rem;
+        color: #0f172a;
+        background: #fff;
+        flex: 1;
+        min-width: 0;
+    }
+    .assign-save-btn {
+        font-size: 0.78rem;
+        padding: 0.25rem 0.6rem;
+        background: #3b82f6;
+        color: #fff;
+        border: none;
+        border-radius: 0.375rem;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .assign-save-btn:disabled { opacity: 0.5; }
+    .assign-cancel-btn {
+        font-size: 0.78rem;
+        padding: 0.25rem 0.5rem;
+        background: none;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.375rem;
+        color: #64748b;
+        cursor: pointer;
     }
 
     .role-desc {

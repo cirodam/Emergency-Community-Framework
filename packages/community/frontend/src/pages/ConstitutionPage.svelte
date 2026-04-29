@@ -123,10 +123,8 @@
         }
     }
 
-    .page-title    { font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0 0 1rem; }
+    .page-title    { margin-bottom: 1rem; }
     .section-title { font-size: 1rem; font-weight: 600; color: #475569; margin: 1.5rem 0 0.75rem; }
-
-    .loading-msg { text-align: center; color: #94a3b8; padding: 3rem 0; font-size: 0.95rem; }
 
     .meta-card {
         background: #fff;

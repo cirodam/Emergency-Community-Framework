@@ -261,7 +261,7 @@ async function main(): Promise<void> {
     //     - "/dev/ttyUSB0:/dev/ttyUSB0"
     const modemPath = process.env.SMS_MODEM_PATH;
     if (modemPath) {
-        const baudRate   = Number(process.env.SMS_MODEM_BAUD ?? 9600);
+        const baudRate   = Number(process.env.SMS_MODEM_BAUD ?? 115200);
         const modemProvider = new GsmModemProvider(modemPath, baudRate);
         modemProvider.init()
             .then(() => {

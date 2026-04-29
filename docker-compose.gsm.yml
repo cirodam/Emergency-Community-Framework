@@ -1,0 +1,6 @@
+# Override: add GSM modem device mapping when /dev/ttyUSB2 is present.
+# Usage: docker-compose -f docker-compose.community.yml -f docker-compose.gsm.yml up
+services:
+  community:
+    devices:
+      - "/dev/ttyUSB2:/dev/ttyUSB2"

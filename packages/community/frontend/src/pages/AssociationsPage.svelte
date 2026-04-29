@@ -145,7 +145,7 @@
         margin-bottom: 1.25rem;
     }
 
-    .page-title { font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0 0 0.2rem; }
+    .page-title { margin-bottom: 0.2rem; }
     .page-subtitle { font-size: 0.82rem; color: #64748b; margin: 0; }
 
     .new-btn {

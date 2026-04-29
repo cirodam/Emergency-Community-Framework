@@ -8,7 +8,7 @@
  *
  *   SEND <amount> @<handle> <pin>
  *     → transfer <amount> kin to the person with @<handle>, authenticated by <pin>
- *     → amount must be a positive integer
+ *     → amount must be a positive number (decimals allowed, e.g. 30.45)
  *     → pin must be 4–8 digits
  *
  *   HELP (or any unrecognised input)
@@ -34,10 +34,10 @@ export function parseSmsCommand(raw: string): SmsCommand {
 
     // SEND <amount> @<handle> <pin>
     const sendMatch = text.match(
-        /^send\s+(\d+)\s+@?([a-z0-9_]+)\s+(\d{4,8})$/i,
+        /^send\s+(\d+(?:\.\d+)?)\s+@?([a-z0-9_]+)\s+(\d{4,8})$/i,
     );
     if (sendMatch) {
-        const amount = parseInt(sendMatch[1]!, 10);
+        const amount = parseFloat(sendMatch[1]!);
         const handle = sendMatch[2]!.toLowerCase();
         const pin    = sendMatch[3]!;
 

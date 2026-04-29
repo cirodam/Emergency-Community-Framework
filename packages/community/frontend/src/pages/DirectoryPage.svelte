@@ -249,8 +249,6 @@
 
     input[type="search"]:focus { border-color: #16a34a; }
 
-    .loading-msg { text-align: center; color: #94a3b8; padding: 3rem 0; font-size: 0.95rem; }
-
     .member-list {
         display: flex;
         flex-direction: column;

@@ -10,6 +10,7 @@ import { RoleTypeLoader } from "./common/RoleTypeLoader.js";
 import { LeaderPool } from "./governance/LeaderPool.js";
 import { LeaderPoolLoader } from "./governance/LeaderPoolLoader.js";
 import { BankClient } from "@ecf/core";
+import { PersonService } from "./person/PersonService.js";
 
 /**
  * DomainService is the single source of truth for the community's operational structure.
@@ -233,12 +234,18 @@ export class DomainService {
             });
         });
 
+        const memberCount = (() => {
+            try { return PersonService.getInstance().count(); } catch { return 0; }
+        })();
+        const items = domain.budgetItems.map(i =>
+            i.perMember ? { ...i, amount: i.amount * memberCount } : i,
+        );
         const payrollTotal = payroll.reduce((sum, r) => sum + r.kinPerMonth, 0);
-        const itemsTotal   = domain.budgetItems.reduce((sum, i) => sum + i.amount, 0);
+        const itemsTotal   = items.reduce((sum, i) => sum + i.amount, 0);
 
         return {
             payroll,
-            items: domain.budgetItems,
+            items,
             totals: { payroll: payrollTotal, items: itemsTotal, total: payrollTotal + itemsTotal },
         };
     }
@@ -263,6 +270,7 @@ export class DomainService {
         if (patch.amount   !== undefined) item.amount   = patch.amount;
         if (patch.category !== undefined) item.category = patch.category;
         if (patch.note     !== undefined) item.note     = patch.note;
+        if (patch.perMember !== undefined) item.perMember = patch.perMember;
         this.domainLoader?.save(domain);
         return item;
     }
@@ -350,22 +358,23 @@ export class DomainService {
     // ── Payroll ───────────────────────────────────────────────────────────────
 
     /**
-     * Pay all active roles in a domain (domain-level roles then each unit's roles)
-     * from their respective bank accounts via the BankClient.
+     * Pay all active roles in a domain from the given payer account (typically
+     * the community treasury). Units themselves have no bank accounts — payroll
+     * flows treasury → role holder.
      */
-    async payDomainMonthly(domainId: string, bank: BankClient): Promise<void> {
+    async payDomainMonthly(domainId: string, bank: BankClient, payerAccountId: string): Promise<void> {
         const domain = this.domains.get(domainId);
         if (!domain) throw new Error(`Domain ${domainId} not found`);
 
         for (const unitId of domain.unitIds) {
             const unit = this.units.get(unitId);
             if (!unit) continue;
-            await this._payRoles(unit.id, unit.roleIds, bank);
+            await this._payRoles(payerAccountId, unit.roleIds, bank);
         }
     }
 
-    private async _payRoles(payerId: string, roleIds: string[], bank: BankClient): Promise<void> {
-        const payerAccount = await bank.getPrimaryAccountAsync(payerId);
+    private async _payRoles(payerAccountId: string, roleIds: string[], bank: BankClient): Promise<void> {
+        const payerAccount = await bank.getAccountById(payerAccountId);
         if (!payerAccount) return;
 
         let remaining = payerAccount.amount;
@@ -383,7 +392,7 @@ export class DomainService {
                 logger.warn(`[DomainService] no primary account for role holder ${role.memberId} ("${role.title}")`);
                 continue;
             }
-            await bank.transfer(payerAccount.accountId, recipientAccount.accountId, amount, `payroll: ${role.title}`);
+            await bank.transfer(payerAccountId, recipientAccount.accountId, amount, `payroll: ${role.title}`);
             remaining -= amount;
         }
     }

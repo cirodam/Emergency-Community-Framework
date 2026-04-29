@@ -10,8 +10,9 @@ import * as mailRelay from "./MailRelayController.js";
 const router = Router();
 
 // Economics (public transparency)
-router.get("/economics", economics.getEconomics);
-router.get("/budget",    budget.getCommunityBudget);
+router.get( "/economics",            economics.getEconomics);
+router.get( "/budget",               budget.getCommunityBudget);
+router.post("/budget/simulate-step", requireSteward, budget.simulateStep);
 
 // Federation membership
 router.get( "/federation",       federation.getFederationStatus);

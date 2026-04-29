@@ -38,7 +38,7 @@
 
 <div class="detail-page">
     <div class="top-bar">
-        <button class="back-btn" onclick={() => currentPage.go("economy")}>← Economy</button>
+        <button class="back-btn" onclick={() => currentPage.go("governance")}>← Governance</button>
         <button class="refresh-btn" onclick={load} disabled={loading} aria-label="Refresh">↻</button>
     </div>
 
@@ -315,23 +315,7 @@
         50%       { opacity: 0.5; }
     }
 
-    .error-msg { text-align: center; color: #94a3b8; padding: 3rem 0; font-size: 0.95rem; }
-
-    /* Stat card */
-    .stat-card {
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 18px;
-        padding: 1.25rem;
-        margin-bottom: 1rem;
-    }
-
-    .stat-label { font-size: 0.8rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; }
-    .stat-value { font-size: 2.4rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; margin-bottom: 0.75rem; }
     .cb-color   { color: #15803d; }
-    .stat-unit  { font-size: 1rem; font-weight: 600; color: #64748b; }
-    .stat-note  { font-size: 0.82rem; color: #94a3b8; margin: 0; line-height: 1.6; }
-    .stat-offline { font-size: 0.9rem; color: #94a3b8; font-style: italic; }
 
     /* Demographics card */
     .demo-card { padding: 1.1rem 1.25rem; }

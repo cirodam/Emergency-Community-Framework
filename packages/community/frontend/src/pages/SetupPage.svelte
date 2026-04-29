@@ -15,6 +15,7 @@
     let handle        = $state("");
     let password      = $state("");
     let confirm       = $state("");
+    let phone         = $state("");
 
     let error   = $state("");
     let loading = $state(false);
@@ -49,7 +50,7 @@
 
         loading = true;
         try {
-            await runSetup({ communityName, firstName, lastName, birthDate, handle, password });
+            await runSetup({ communityName, firstName, lastName, birthDate, handle, password, phone: phone.trim() || undefined });
             step = 3;
         } catch (e) {
             error = e instanceof Error ? e.message : "Setup failed";
@@ -120,6 +121,17 @@
                         />
                     </div>
                     <span class="hint">Lowercase letters, numbers, underscores</span>
+                </label>
+
+                <label class="field">
+                    <span>Phone number <span class="optional">(optional — for SMS banking)</span></span>
+                    <input
+                        type="tel"
+                        bind:value={phone}
+                        placeholder="+1 404 555 0100"
+                        autocomplete="tel"
+                        disabled={loading}
+                    />
                 </label>
 
                 <label class="field">
@@ -217,10 +229,12 @@
     .field > span { font-size: 0.82rem; font-weight: 500; color: #374151; }
 
     .hint { font-size: 0.75rem; color: #94a3b8; margin-top: 0.1rem; }
+    .optional { font-weight: 400; color: #94a3b8; }
 
     .field input[type="text"],
     .field input[type="password"],
-    .field input[type="date"] {
+    .field input[type="date"],
+    .field input[type="tel"] {
         border: 1px solid #cbd5e1;
         border-radius: 10px;
         font-size: 1rem;

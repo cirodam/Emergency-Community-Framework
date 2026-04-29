@@ -6,10 +6,16 @@ export type BudgetCategory = "supplies" | "equipment" | "services" | "other";
 export interface BudgetItem {
     id: string;
     label: string;
-    /** Monthly amount in kin. */
+    /**
+     * Monthly amount in kin.
+     * If perMember is true, this is the per-person rate; the effective total is
+     * amount × member count (computed at query time, not stored).
+     */
     amount: number;
     category: BudgetCategory;
     note: string;
+    /** When true, the effective monthly cost scales with member count. */
+    perMember?: boolean;
 }
 
 /**

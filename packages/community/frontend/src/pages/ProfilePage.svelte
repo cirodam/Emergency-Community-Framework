@@ -1,7 +1,7 @@
 <script lang="ts">
     import { session } from "../lib/session.js";
     import type { PersonDto } from "../lib/api.js";
-    import { getPerson } from "../lib/api.js";
+    import { getPerson, setPin, updatePerson } from "../lib/api.js";
 
     function signOut() { session.logout(); }
 
@@ -11,6 +11,52 @@
     let loading = $state(true);
     let error = $state("");
 
+    // ── SMS PIN ───────────────────────────────────────────────────────────────
+    let pin        = $state("");
+    let pinConfirm = $state("");
+    let pinSaving  = $state(false);
+    let pinMsg     = $state("");
+    let pinError   = $state("");
+
+    // ── Phone ─────────────────────────────────────────────────────────────────
+    let phoneEdit    = $state("");
+    let phoneSaving  = $state(false);
+    let phoneMsg     = $state("");
+    let phoneError   = $state("");
+
+    async function savePin() {
+        pinMsg = ""; pinError = "";
+        if (!/^\d{4,8}$/.test(pin)) { pinError = "PIN must be 4–8 digits."; return; }
+        if (pin !== pinConfirm)      { pinError = "PINs do not match.";      return; }
+        pinSaving = true;
+        try {
+            await setPin(s.personId, pin);
+            pinMsg = "PIN saved.";
+            pin = ""; pinConfirm = "";
+        } catch (e) {
+            pinError = e instanceof Error ? e.message : "Failed to save PIN.";
+        } finally {
+            pinSaving = false;
+        }
+    }
+
+    async function savePhone() {
+        phoneMsg = ""; phoneError = "";
+        const trimmed = phoneEdit.trim();
+        if (!trimmed) { phoneError = "Enter a phone number."; return; }
+        phoneSaving = true;
+        try {
+            const updated = await updatePerson(s.personId, { phone: trimmed });
+            person = updated;
+            phoneMsg = "Phone number saved.";
+            phoneEdit = "";
+        } catch (e) {
+            phoneError = e instanceof Error ? e.message : "Failed to save phone.";
+        } finally {
+            phoneSaving = false;
+        }
+    }
+
     async function load() {
         loading = true;
         error = "";
@@ -18,8 +64,6 @@
             person = await getPerson(s.personId);
         } catch (e) {
             const msg = e instanceof Error ? e.message : "";
-            // Person not found means the session is pointing at a deleted/wiped record.
-            // Log out so the user is sent back to the login page.
             if (msg.includes("not found") || msg.includes("404")) {
                 session.logout();
                 return;
@@ -70,6 +114,60 @@
     {:else if error}
         <p class="error-msg">{error}</p>
     {/if}
+
+    <section class="pin-section">
+        <h2>Phone number</h2>
+        <p class="pin-hint">Used to identify you for SMS banking. Include country code (e.g. +14043906829).</p>
+        {#if person?.phone}
+            <p class="current-phone">Current: <strong>{person.phone}</strong></p>
+        {/if}
+        <div class="pin-fields">
+            <input
+                type="tel"
+                placeholder="+14043906829"
+                bind:value={phoneEdit}
+                disabled={phoneSaving}
+                autocomplete="tel"
+            />
+        </div>
+        {#if phoneError}<p class="pin-error">{phoneError}</p>{/if}
+        {#if phoneMsg}<p class="pin-ok">{phoneMsg}</p>{/if}
+        <button class="pin-btn" onclick={savePhone} disabled={phoneSaving || !phoneEdit.trim()}>
+            {phoneSaving ? "Saving…" : person?.phone ? "Update phone" : "Set phone"}
+        </button>
+    </section>
+
+    <section class="pin-section">
+        <h2>SMS banking PIN</h2>
+        <p class="pin-hint">Set a 4–8 digit PIN to send kin via SMS. Text <strong>BALANCE</strong> or <strong>SEND &lt;amt&gt; @handle &lt;pin&gt;</strong> to this community's number.</p>
+        <div class="pin-fields">
+            <input
+                type="password"
+                inputmode="numeric"
+                pattern="\d{4,8}"
+                maxlength={8}
+                placeholder="New PIN"
+                bind:value={pin}
+                disabled={pinSaving}
+                autocomplete="new-password"
+            />
+            <input
+                type="password"
+                inputmode="numeric"
+                pattern="\d{4,8}"
+                maxlength={8}
+                placeholder="Confirm PIN"
+                bind:value={pinConfirm}
+                disabled={pinSaving}
+                autocomplete="new-password"
+            />
+        </div>
+        {#if pinError}<p class="pin-error">{pinError}</p>{/if}
+        {#if pinMsg}<p class="pin-ok">{pinMsg}</p>{/if}
+        <button class="pin-btn" onclick={savePin} disabled={pinSaving || !pin}>
+            {pinSaving ? "Saving…" : "Save PIN"}
+        </button>
+    </section>
 
     <button class="signout-btn" onclick={signOut}>Sign out</button>
 </div>
@@ -165,4 +263,67 @@
     }
 
     .signout-btn:active { background: #fef2f2; }
+
+    .pin-section {
+        margin-top: 1.5rem;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 1.25rem;
+    }
+
+    .pin-section h2 {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0 0 0.35rem;
+    }
+
+    .pin-hint {
+        font-size: 0.82rem;
+        color: #64748b;
+        margin: 0 0 1rem;
+        line-height: 1.5;
+    }
+
+    .pin-fields {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .pin-fields input {
+        flex: 1;
+        min-width: 0;
+        padding: 0.65rem 0.85rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        font-size: 1rem;
+        letter-spacing: 0.2em;
+        outline: none;
+        transition: border-color 0.15s;
+        box-sizing: border-box;
+    }
+
+    .pin-fields input:focus { border-color: #22c55e; }
+
+    .pin-error { font-size: 0.82rem; color: #dc2626; margin: 0 0 0.5rem; }
+    .pin-ok    { font-size: 0.82rem; color: #16a34a; margin: 0 0 0.5rem; }
+    .current-phone { font-size: 0.82rem; color: #475569; margin: 0 0 0.75rem; }
+
+    .pin-btn {
+        width: 100%;
+        padding: 0.7rem;
+        background: #22c55e;
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.15s;
+    }
+
+    .pin-btn:disabled { opacity: 0.5; cursor: default; }
+    .pin-btn:not(:disabled):active { opacity: 0.85; }
 </style>

@@ -5,10 +5,10 @@ export class HealthcareUnitTemplates {
     static register(): void {
         UnitTemplateRegistry.register({
             type:        "medicine-supply-office",
-            label:       "Medicine Supply Office",
+            label:       "Medical Supply Office",
             description: "Manages procurement, storage, and distribution of medicines and medical supplies for the community.",
             factory: () => new FunctionalUnit(
-                "Medicine Supply Office",
+                "Medical Supply Office",
                 "Manages procurement, storage, and distribution of medicines and medical supplies for the community.",
                 "medicine-supply-office",
             ),

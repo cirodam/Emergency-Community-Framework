@@ -101,7 +101,7 @@ export function seedDomains(domainSvc: DomainService): void {
     domainSvc.registerDomain(HealthcareDomain.getInstance());
     if (HealthcareDomain.getInstance().unitIds.length === 0) {
         domainSvc.createUnit(
-            new FunctionalUnit("Medicine Supply Office", "Manages procurement, storage, and distribution of medicines and medical supplies for the community.", "medicine-supply-office"),
+            new FunctionalUnit("Medical Supply Office", "Manages procurement, storage, and distribution of medicines and medical supplies for the community.", "medicine-supply-office"),
             HealthcareDomain.getInstance().id,
         );
         domainSvc.createUnit(

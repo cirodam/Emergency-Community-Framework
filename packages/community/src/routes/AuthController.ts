@@ -75,6 +75,21 @@ export async function setPassword(req: Request, res: Response): Promise<void> {
     }
 }
 
+// POST /api/persons/:id/pin
+// Body: { pin }  — 4–8 digits
+export async function setPin(req: Request, res: Response): Promise<void> {
+    const { pin } = req.body ?? {};
+    if (typeof pin !== "string" || !/^\d{4,8}$/.test(pin)) {
+        res.status(400).json({ error: "pin must be 4–8 digits" }); return;
+    }
+    try {
+        await svc().setPin(req.params.id as string, pin);
+        res.status(204).send();
+    } catch (err) {
+        res.status(404).json({ error: (err as Error).message });
+    }
+}
+
 // POST /api/auth/verify
 // Body: PersonCredential JSON
 export function verifyCredential(req: Request, res: Response): void {

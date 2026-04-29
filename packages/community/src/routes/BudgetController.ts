@@ -4,7 +4,9 @@ import { SocialInsuranceBank } from "../domains/social_insurance/SocialInsurance
 import { CommunityTreasury } from "../domains/community_treasury/CommunityTreasury.js";
 import { Constitution } from "../governance/Constitution.js";
 import { DomainService } from "../DomainService.js";
+import { PersonService } from "../person/PersonService.js";
 import { nodeBankClient as bankClient } from "../nodeBankClient.js";
+import logger from "../logger.js";
 
 /**
  * GET /api/budget — public transparency endpoint.
@@ -41,9 +43,11 @@ export async function getCommunityBudget(_req: Request, res: Response): Promise<
         const duesableKin         = Math.max(0, kinInCirculation - siPoolBalance - treasuryBalance);
         const estimatedMonthlyDues = Math.round(duesableKin * duesRate * 100) / 100;
 
-        const domainBudget   = DomainService.getInstance().getCommunityBudget();
-        const monthlyOutflow = domainBudget.totals.total;
-        const solvent        = estimatedMonthlyDues >= monthlyOutflow;
+        const domainBudget        = DomainService.getInstance().getCommunityBudget();
+        const memberCount          = PersonService.getInstance().count();
+        const foodAllowancePerMember = 200;
+        const monthlyOutflow       = domainBudget.totals.total + foodAllowancePerMember * memberCount;
+        const solvent              = estimatedMonthlyDues >= monthlyOutflow;
 
         res.json({
             ready: true,
@@ -58,9 +62,90 @@ export async function getCommunityBudget(_req: Request, res: Response): Promise<
                 domains:      domainBudget.domains,
                 totals:       domainBudget.totals,
             },
+            memberCount,
+            foodAllowancePerMember,
             solvent,
         });
     } catch (err) {
         res.status(502).json({ ready: false, error: "Bank unavailable" });
+    }
+}
+
+/**
+ * POST /api/budget/simulate-step — steward only, dev/testing helper.
+ *
+ * Runs one synthetic monthly cycle:
+ *   1. Demurrage sweep (retires surplus kin)
+ *   2. Community dues collection (moves kin → treasury)
+ *   3. Food allowance distribution (treasury → each member's primary account)
+ *   4. Payroll for every domain (moves kin from units/treasury → role holders)
+ */
+export async function simulateStep(_req: Request, res: Response): Promise<void> {
+    const cb         = CentralBank.getInstance();
+    const treasury   = CommunityTreasury.getInstance();
+    const si         = SocialInsuranceBank.getInstance();
+    const constitution = Constitution.getInstance();
+
+    if (!cb.isReady() || !treasury.isReady()) {
+        res.status(503).json({ error: "Monetary institutions not ready" });
+        return;
+    }
+
+    try {
+        const bank = bankClient();
+        const excludeIds = [cb.issuanceAccountId, treasury.accountId];
+        if (si.isReady()) excludeIds.push(si.poolAccountId);
+
+        // 1. Demurrage
+        const { count: demurrageCount } = await cb.applyDemurrage(
+            constitution.bankDemurrageRate,
+            "simulated demurrage",
+            excludeIds,
+            constitution.demurrageFloor,
+        );
+        logger.info(`[simulate-step] demurrage applied to ${demurrageCount} accounts`);
+
+        // 2. Dues
+        const { count: duesCount } = await treasury.collectDues(
+            constitution.communityDuesRate,
+            constitution.demurrageFloor,
+            [cb.issuanceAccountId, si.isReady() ? si.poolAccountId : ""],
+        );
+        logger.info(`[simulate-step] dues collected from ${duesCount} accounts`);
+
+        // 3. Food allowance — distribute from treasury to every member
+        const foodAllowancePerMember = 200;
+        const members = PersonService.getInstance().getAll();
+        let foodCount = 0;
+        for (const person of members) {
+            try {
+                const account = await bank.getPrimaryAccountAsync(person.id);
+                if (!account) continue;
+                await treasury.transfer(account.accountId, foodAllowancePerMember, "food allowance");
+                foodCount++;
+            } catch {
+                // member may have no bank account — skip
+            }
+        }
+        logger.info(`[simulate-step] food allowance distributed to ${foodCount} members`);
+
+        // 4. Payroll — pay every domain from treasury
+        const domainSvc = DomainService.getInstance();
+        const domains   = domainSvc.getCommunityBudget().domains;
+        let payrollDomains = 0;
+        for (const d of domains) {
+            try {
+                await domainSvc.payDomainMonthly(d.domainId, bank, treasury.accountId);
+                payrollDomains++;
+            } catch {
+                // domain may have no units — skip
+            }
+        }
+        logger.info(`[simulate-step] payroll run for ${payrollDomains} domains`);
+
+        res.json({ ok: true, demurrageCount, duesCount, foodCount, payrollDomains });
+    } catch (err) {
+        logger.error({ err }, "[simulate-step] failed");
+        res.status(502).json({ error: "Simulation failed: " + (err as Error).message });
     }
 }

@@ -12,6 +12,7 @@ router.patch( "/persons/:id",            requireSteward, persons.updatePerson);
 router.delete("/persons/:id",            requireSteward, persons.dischargePerson);
 router.post(  "/persons/:id/credential", requireSteward, persons.issueCredential);
 router.post(  "/persons/:id/password",   requireSteward, auth.setPassword);
+router.post(  "/persons/:id/pin",        requireSteward, auth.setPin);
 router.post(  "/persons/:id/steward",    requireSteward, persons.grantSteward);
 router.delete("/persons/:id/steward",    requireSteward, persons.revokeSteward);
 

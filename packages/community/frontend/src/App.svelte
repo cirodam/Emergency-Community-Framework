@@ -7,14 +7,13 @@
     import ProfilePage     from "./pages/ProfilePage.svelte";
     import DirectoryPage   from "./pages/DirectoryPage.svelte";
     import ConstitutionPage from "./pages/ConstitutionPage.svelte";
-    import EconomicsPage       from "./pages/EconomicsPage.svelte";
+    import SettingsPage        from "./pages/SettingsPage.svelte";
     import CentralBankPage     from "./pages/CentralBankPage.svelte";
     import SocialInsurancePage from "./pages/SocialInsurancePage.svelte";
-    import SettingsPage        from "./pages/SettingsPage.svelte";
     import DomainsPage      from "./pages/DomainsPage.svelte";
     import DomainPage      from "./pages/DomainPage.svelte";
     import UnitPage        from "./pages/UnitPage.svelte";
-    import GovernancePage     from "./pages/GovernancePage.svelte";
+    import LeadershipPage    from "./pages/LeadershipPage.svelte";
     import ApplicationsPage   from "./pages/ApplicationsPage.svelte";
     import HowItWorksPage      from "./pages/HowItWorksPage.svelte";
     import BudgetPage          from "./pages/BudgetPage.svelte";
@@ -71,12 +70,6 @@
             <DirectoryPage />
         {:else if $currentPage === "constitution"}
             <ConstitutionPage />
-        {:else if $currentPage === "economy"}
-            <EconomicsPage />
-        {:else if $currentPage === "central-bank"}
-            <CentralBankPage />
-        {:else if $currentPage === "social-insurance"}
-            <SocialInsurancePage />
         {:else if $currentPage === "settings"}
             <SettingsPage />
         {:else if $currentPage === "domains"}
@@ -85,8 +78,8 @@
             <DomainPage />
         {:else if $currentPage === "unit"}
             <UnitPage />
-        {:else if $currentPage === "governance"}
-            <GovernancePage />
+        {:else if $currentPage === "leadership"}
+            <LeadershipPage />
         {:else if $currentPage === "applications"}
             <ApplicationsPage />
         {:else if $currentPage === "how-it-works"}
@@ -105,6 +98,10 @@
             <ProposalsPage />
         {:else if $currentPage === "nodes"}
             <NodesPage />
+        {:else if $currentPage === "central-bank"}
+            <CentralBankPage />
+        {:else if $currentPage === "social-insurance"}
+            <SocialInsurancePage />
         {/if}
     </main>
     <BottomNav />

@@ -128,6 +128,7 @@ export function createRole(req: Request, res: Response): void {
     let resolvedTitle: string;
     let resolvedDescription: string;
     let resolvedRoleTypeId: string | null = null;
+    let resolvedKinPerMonth: number = kinPerMonth ?? 0;
 
     if (typeof roleTypeId === "string" && roleTypeId) {
         const rt = svc().getRoleType(roleTypeId);
@@ -135,6 +136,7 @@ export function createRole(req: Request, res: Response): void {
         resolvedTitle       = rt.title;
         resolvedDescription = rt.description;
         resolvedRoleTypeId  = rt.id;
+        resolvedKinPerMonth = kinPerMonth ?? rt.defaultKinPerMonth;
     } else if (typeof title === "string" && title.trim()) {
         resolvedTitle       = title.trim();
         resolvedDescription = description ?? "";
@@ -142,7 +144,7 @@ export function createRole(req: Request, res: Response): void {
         res.status(400).json({ error: "Either roleTypeId or title is required" }); return;
     }
 
-    const role = new CommunityRole(resolvedTitle, resolvedDescription, kinPerMonth ?? 0, resolvedRoleTypeId);
+    const role = new CommunityRole(resolvedTitle, resolvedDescription, resolvedKinPerMonth, resolvedRoleTypeId);
     svc().createRole(role, unitId);
     res.status(201).json(toRoleDto(role));
 }
@@ -380,9 +382,9 @@ export function getDomainBudget(req: Request, res: Response): void {
 }
 
 // POST /api/domains/:id/budget/items
-// Body: { label, amount, category?, note? }
+// Body: { label, amount, category?, note?, perMember? }
 export function addBudgetItem(req: Request, res: Response): void {
-    const { label, amount, category, note } = req.body ?? {};
+    const { label, amount, category, note, perMember } = req.body ?? {};
     if (typeof label !== "string" || !label.trim()) {
         res.status(400).json({ error: "label is required" }); return;
     }
@@ -391,24 +393,26 @@ export function addBudgetItem(req: Request, res: Response): void {
     }
     const cat: BudgetCategory = VALID_CATEGORIES.has(category) ? category : "other";
     const item = svc().addBudgetItem(req.params.id as string, {
-        label: label.trim(),
+        label:     label.trim(),
         amount,
-        category: cat,
-        note: typeof note === "string" ? note : "",
+        category:  cat,
+        note:      typeof note === "string" ? note : "",
+        perMember: perMember === true,
     });
     if (!item) { res.status(404).json({ error: "Domain not found" }); return; }
     res.status(201).json(item);
 }
 
 // PATCH /api/domains/:id/budget/items/:itemId
-// Body: { label?, amount?, category?, note? }
+// Body: { label?, amount?, category?, note?, perMember? }
 export function updateBudgetItem(req: Request, res: Response): void {
-    const { label, amount, category, note } = req.body ?? {};
+    const { label, amount, category, note, perMember } = req.body ?? {};
     const patch: Record<string, unknown> = {};
-    if (label    !== undefined) patch["label"]    = typeof label === "string" ? label.trim() : label;
-    if (amount   !== undefined) patch["amount"]   = amount;
-    if (category !== undefined) patch["category"] = VALID_CATEGORIES.has(category) ? category : "other";
-    if (note     !== undefined) patch["note"]     = note;
+    if (label     !== undefined) patch["label"]     = typeof label === "string" ? label.trim() : label;
+    if (amount    !== undefined) patch["amount"]    = amount;
+    if (category  !== undefined) patch["category"]  = VALID_CATEGORIES.has(category) ? category : "other";
+    if (note      !== undefined) patch["note"]      = note;
+    if (perMember !== undefined) patch["perMember"] = perMember === true;
     const item = svc().updateBudgetItem(req.params.id as string, req.params.itemId as string, patch);
     if (!item) { res.status(404).json({ error: "Domain or item not found" }); return; }
     res.json(item);

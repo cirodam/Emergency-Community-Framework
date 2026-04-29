@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getCommunityBudget } from "../lib/api.js";
+    import { getCommunityBudget, updateConstitutionParameter, simulateBudgetStep } from "../lib/api.js";
     import type { CommunityBudgetDto, BudgetDomainRow } from "../lib/api.js";
 
     let data: CommunityBudgetDto | null = $state(null);
@@ -8,6 +8,37 @@
 
     // Which domains are expanded
     let expanded: Set<string> = $state(new Set());
+
+    // Dues rate editor
+    let editingDues = $state(false);
+    let duesInput   = $state("");
+    let duesSaving  = $state(false);
+    let duesError   = $state("");
+
+    function startEditDues() {
+        if (!data) return;
+        duesInput  = (data.inflow.duesRate * 100).toFixed(2);
+        duesError  = "";
+        editingDues = true;
+    }
+
+    async function saveDues() {
+        const pct = parseFloat(duesInput);
+        if (isNaN(pct) || pct < 0 || pct > 10) {
+            duesError = "Enter a value between 0 and 10%"; return;
+        }
+        duesSaving = true;
+        duesError  = "";
+        try {
+            await updateConstitutionParameter("communityDuesRate", pct / 100);
+            await load();
+            editingDues = false;
+        } catch (e) {
+            duesError = e instanceof Error ? e.message : "Failed to save";
+        } finally {
+            duesSaving = false;
+        }
+    }
 
     const net = $derived(
         data ? data.inflow.estimatedMonthlyDues - data.outflow.monthlyTotal : 0
@@ -26,6 +57,26 @@
     }
 
     $effect(() => { load(); });
+
+    // Simulate step (dev / testing)
+    let simulating   = $state(false);
+    let simResult    = $state("");
+    let simError     = $state("");
+
+    async function runSimulateStep() {
+        simulating = true;
+        simResult  = "";
+        simError   = "";
+        try {
+            const r = await simulateBudgetStep();
+            simResult = `Done — demurrage: ${r.demurrageCount} accts, dues: ${r.duesCount} accts, food: ${r.foodCount} members, payroll: ${r.payrollDomains} domains`;
+            await load();
+        } catch (e) {
+            simError = e instanceof Error ? e.message : "Simulation failed";
+        } finally {
+            simulating = false;
+        }
+    }
 
     function toggle(domainId: string) {
         const next = new Set(expanded);
@@ -47,6 +98,7 @@
     function monthsCovered(treasury: number, monthly: number): string {
         if (monthly === 0) return "∞";
         const m = treasury / monthly;
+        if (m >= 12) return (m / 12).toFixed(1) + " yr";
         return m.toFixed(1) + " mo";
     }
 
@@ -61,8 +113,19 @@
 <div class="budget-page">
     <div class="page-header">
         <h2 class="page-title">Community Budget</h2>
-        <button class="refresh-btn" onclick={load} disabled={loading} aria-label="Refresh">↻</button>
+        <div class="header-actions">
+            <button class="refresh-btn" onclick={load} disabled={loading} aria-label="Refresh">↻</button>
+            <button class="simulate-btn" onclick={runSimulateStep} disabled={simulating || loading} title="Run one demurrage + payroll cycle (dev)">
+                {simulating ? "Running…" : "Simulate Step"}
+            </button>
+        </div>
     </div>
+    {#if simResult}
+        <div class="sim-result">{simResult}</div>
+    {/if}
+    {#if simError}
+        <div class="sim-error">{simError}</div>
+    {/if}
 
     {#if loading && !data}
         <div class="skeleton"></div>
@@ -82,21 +145,6 @@
             </div>
         {:else}
 
-            <!-- Solvency badge -->
-            <div class="solvency-card" class:solvent={data.solvent} class:at-risk={!data.solvent}>
-                <div class="solvency-icon">{data.solvent ? "✓" : "!"}</div>
-                <div class="solvency-text">
-                    <strong>{data.solvent ? "Solvent" : "At risk"}</strong>
-                    <p>
-                        {#if data.solvent}
-                            The monthly dues cover all commitments.
-                        {:else}
-                            Monthly outflow exceeds the estimated dues.
-                        {/if}
-                    </p>
-                </div>
-            </div>
-
             <!-- Inflow -->
             <section class="budget-section">
                 <h3 class="section-heading">Monthly Inflow</h3>
@@ -108,8 +156,29 @@
                     </div>
                     <div class="kv-row">
                         <span class="kv-label">Dues rate</span>
-                        <span class="kv-value">{(data.inflow.duesRate * 100).toFixed(1)}%</span>
+                        {#if editingDues}
+                            <span class="dues-edit-row">
+                                <input
+                                    class="dues-input"
+                                    type="number"
+                                    min="0" max="10" step="0.1"
+                                    bind:value={duesInput}
+                                    onkeydown={(e) => { if (e.key === 'Enter') saveDues(); if (e.key === 'Escape') editingDues = false; }}
+                                />
+                                <span class="dues-pct-label">%</span>
+                                <button class="dues-save-btn" onclick={saveDues} disabled={duesSaving}>Save</button>
+                                <button class="dues-cancel-btn" onclick={() => editingDues = false} disabled={duesSaving}>✕</button>
+                            </span>
+                        {:else}
+                            <span class="kv-value dues-value">
+                                {(data.inflow.duesRate * 100).toFixed(1)}%
+                                <button class="dues-edit-btn" onclick={startEditDues} title="Change dues rate">✎</button>
+                            </span>
+                        {/if}
                     </div>
+                    {#if duesError}
+                        <p class="dues-error">{duesError}</p>
+                    {/if}
                     <div class="kv-row highlight-row">
                         <span class="kv-label">Estimated monthly dues</span>
                         <span class="kv-value strong">{fmt(data.inflow.estimatedMonthlyDues)} <span class="unit">kin</span></span>
@@ -132,7 +201,7 @@
 
                 <!-- Net line -->
                 <div class="net-row" class:surplus={net >= 0} class:deficit={net < 0}>
-                    <span>{net >= 0 ? "Surplus" : "Deficit"}</span>
+                    <span>{net >= 0 ? "Surplus" : "Shortfall"}</span>
                     <span>{net >= 0 ? "+" : ""}{fmt(net)} kin / mo</span>
                 </div>
 
@@ -155,6 +224,17 @@
                             <span class="legend-dot dot-payroll"></span>Payroll {fmt(data.outflow.totals.payroll)} kin
                             <span class="legend-dot dot-items"></span>Items {fmt(data.outflow.totals.items)} kin
                         </div>
+                    </div>
+                {/if}
+
+                <!-- Per-domain rows -->
+                {#if data.foodAllowancePerMember > 0}
+                    <div class="domain-row community-row">
+                        <span class="domain-name">Food allowance</span>
+                        <span class="domain-meta">
+                            <span class="domain-sub">{fmt(data.foodAllowancePerMember)} kin × {data.memberCount} members</span>
+                            <span class="domain-total">{fmt(data.foodAllowancePerMember * data.memberCount)} kin</span>
+                        </span>
                     </div>
                 {/if}
 
@@ -212,7 +292,7 @@
                                     {/if}
 
                                     {#if domain.payroll.length === 0 && domain.items.length === 0}
-                                        <p class="empty-detail">No staffed roles or budget items.</p>
+                                        <p class="empty-detail">No roles or budget items.</p>
                                     {/if}
 
                                 </div>
@@ -242,8 +322,11 @@
         align-items: center;
         margin-bottom: 1.25rem;
     }
-    .page-title { font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0; }
-
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
     .refresh-btn {
         background: none;
         border: none;
@@ -255,6 +338,36 @@
     }
     .refresh-btn:disabled { opacity: 0.4; }
     .refresh-btn:not(:disabled):active { transform: rotate(180deg); }
+    .simulate-btn {
+        font-size: 0.78rem;
+        padding: 0.3rem 0.75rem;
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        color: #475569;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .simulate-btn:not(:disabled):hover { background: #e2e8f0; }
+    .simulate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .sim-result {
+        font-size: 0.8rem;
+        color: #15803d;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    .sim-error {
+        font-size: 0.8rem;
+        color: #b91c1c;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.75rem;
+    }
 
     .skeleton {
         background: #e2e8f0;
@@ -292,8 +405,8 @@
         margin-bottom: 1.5rem;
         border: 1.5px solid;
     }
-    .solvency-card.solvent  { background: #f0fdf4; border-color: #86efac; }
-    .solvency-card.at-risk  { background: #fff7ed; border-color: #fdba74; }
+    .solvency-card.solvent      { background: #f0fdf4; border-color: #86efac; }
+    .solvency-card.bootstrapping { background: #f8fafc; border-color: #cbd5e1; }
 
     .solvency-icon {
         width: 2.4rem;
@@ -306,13 +419,13 @@
         font-weight: 700;
         flex-shrink: 0;
     }
-    .solvent .solvency-icon  { background: #dcfce7; color: #15803d; }
-    .at-risk .solvency-icon  { background: #ffedd5; color: #c2410c; }
+    .solvent      .solvency-icon  { background: #dcfce7; color: #15803d; }
+    .bootstrapping .solvency-icon  { background: #e2e8f0; color: #64748b; }
 
     .solvency-text strong { font-size: 0.95rem; display: block; margin-bottom: 0.15rem; }
     .solvency-text p { font-size: 0.8rem; color: #64748b; margin: 0; }
-    .solvent .solvency-text strong { color: #15803d; }
-    .at-risk  .solvency-text strong { color: #c2410c; }
+    .solvent      .solvency-text strong { color: #15803d; }
+    .bootstrapping .solvency-text strong { color: #475569; }
 
     /* Sections */
     .budget-section { margin-bottom: 1.75rem; }
@@ -351,6 +464,34 @@
     .kv-value { font-size: 0.95rem; color: #0f172a; font-variant-numeric: tabular-nums; }
     .kv-value.strong { font-weight: 700; }
     .unit { font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* Dues rate editor */
+    .dues-value { display: flex; align-items: center; gap: 0.4rem; }
+    .dues-edit-btn {
+        background: none; border: none; cursor: pointer;
+        font-size: 0.8rem; color: #94a3b8; padding: 0 0.1rem;
+        line-height: 1;
+    }
+    .dues-edit-btn:hover { color: #3b82f6; }
+    .dues-edit-row { display: flex; align-items: center; gap: 0.35rem; }
+    .dues-input {
+        width: 4.5rem; padding: 0.2rem 0.4rem;
+        border: 1px solid #3b82f6; border-radius: 6px;
+        font-size: 0.9rem; font-family: inherit;
+        text-align: right;
+    }
+    .dues-pct-label { font-size: 0.85rem; color: #64748b; }
+    .dues-save-btn {
+        padding: 0.2rem 0.6rem; border: none; border-radius: 6px;
+        background: #3b82f6; color: #fff; font-size: 0.8rem;
+        cursor: pointer; font-family: inherit;
+    }
+    .dues-save-btn:disabled { opacity: 0.6; cursor: default; }
+    .dues-cancel-btn {
+        background: none; border: none; cursor: pointer;
+        font-size: 0.85rem; color: #94a3b8; padding: 0;
+    }
+    .dues-error { font-size: 0.78rem; color: #dc2626; margin: 0 1.1rem 0.5rem; }
 
     /* Net row */
     .net-row {
@@ -397,6 +538,15 @@
         border-radius: 14px;
         margin-bottom: 0.5rem;
         overflow: hidden;
+    }
+
+    .community-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.85rem 1.1rem;
+        background: #fafdf7;
+        border-color: #d1fae5;
     }
 
     .domain-header {

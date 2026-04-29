@@ -21,7 +21,7 @@ export async function setup(req: Request, res: Response): Promise<void> {
         return;
     }
 
-    const { communityName, firstName, lastName, birthDate, handle, password } = req.body ?? {};
+    const { communityName, firstName, lastName, birthDate, handle, password, phone } = req.body ?? {};
 
     if (typeof communityName !== "string" || !communityName.trim()) {
         res.status(400).json({ error: "communityName is required" }); return;
@@ -53,6 +53,7 @@ export async function setup(req: Request, res: Response): Promise<void> {
         parsedBirthDate,
         handle.trim().toLowerCase().replace(/[^a-z0-9_]/g, ""),
     );
+    if (typeof phone === "string" && phone.trim()) person.phone = phone.trim();
     await svc().add(person);
     await svc().setPassword(person.id, password);
 
