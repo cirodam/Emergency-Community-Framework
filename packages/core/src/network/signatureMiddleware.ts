@@ -17,7 +17,14 @@ export function verifyNodeSignature(
     getPublicKey: (req: Request) => string | null | undefined,
 ): RequestHandler {
     return (req: Request, res: Response, next: NextFunction): void => {
-        const publicKey = getPublicKey(req);
+        let publicKey: string | null | undefined;
+        try {
+            publicKey = getPublicKey(req);
+        } catch {
+            // Governing identity not yet resolved (startup race) — retry later
+            res.status(503).json({ error: "Service not ready" });
+            return;
+        }
 
         // undefined → skip verification and allow through
         if (publicKey === undefined) {

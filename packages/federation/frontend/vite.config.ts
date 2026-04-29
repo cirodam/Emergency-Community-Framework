@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [svelte()],
   server: {
     proxy: {
-      '/api': 'http://localhost:3002',
+      '/api': 'http://localhost:3010',
     },
   },
   build: {

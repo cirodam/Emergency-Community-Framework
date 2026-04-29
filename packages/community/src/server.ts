@@ -28,6 +28,8 @@ import { Constitution } from "./governance/Constitution.js";
 import { ConstitutionLoader } from "./governance/ConstitutionLoader.js";
 import { ProposalLoader } from "./governance/ProposalLoader.js";
 import { ProposalService } from "./governance/ProposalService.js";
+import { MotionLoader } from "./governance/MotionLoader.js";
+import { MotionService } from "./governance/MotionService.js";
 import { DomainService } from "./DomainService.js";
 import { BankClient } from "@ecf/core";
 import { CentralBank } from "./domains/central_bank/CentralBank.js";
@@ -45,6 +47,8 @@ import { GsmModemProvider } from "./sms/GsmModemProvider.js";
 import { SmsService } from "./sms/SmsService.js";
 import { seedDomains } from "./bootstrap/seedDomains.js";
 import { registerMonetaryHandlers } from "./bootstrap/registerMonetaryHandlers.js";
+import { NominationLoader } from "./nomination/NominationLoader.js";
+import { NominationService } from "./nomination/NominationService.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -163,6 +167,10 @@ async function main(): Promise<void> {
     const proposalLoader = new ProposalLoader(resolve(DATA_DIR, "proposals"));
     ProposalService.getInstance().init(proposalLoader, constitutionLoader);
 
+    // ── Motions ────────────────────────────────────────────────────────────
+    const motionLoader = new MotionLoader(resolve(DATA_DIR, "motions"));
+    MotionService.getInstance().init(motionLoader);
+
     // ── Payment tokens ─────────────────────────────────────────────────────
     // Auto-assemble RoutableAddress from federation membership record when approved,
     // fall back to ROUTABLE_ADDRESS env var for dev/bootstrap.
@@ -219,6 +227,10 @@ async function main(): Promise<void> {
     domainSvc.initRoleTypes(roleTypeLoader);
 
     seedDomains(domainSvc);
+
+    // ── Nominations ────────────────────────────────────────────────────────
+    const nominationLoader = new NominationLoader(resolve(DATA_DIR, "nominations"));
+    NominationService.getInstance().init(nominationLoader);
 
     // ── Monetary institutions (non-fatal — bank may be unreachable) ────────
     const bank = new BankClient(BANK_URL, body => communitySigner.signBody(body));
@@ -312,6 +324,23 @@ async function main(): Promise<void> {
         const identity = NodeService.getInstance().getIdentity();
         const handle   = Constitution.getInstance().communityHandle;
         res.json({ id: identity.id, entityId: identity.entityId, publicKey: communitySigner.publicKeyHex, name: identity.name, handle });
+    });
+
+    // Rich bootstrap info for a federation setting up this community as its founding member.
+    // Superset of /api/identity — adds memberCount so the federation can set the credit line.
+    app.get("/api/federation/bootstrap", (_req, res) => {
+        const identity    = NodeService.getInstance().getIdentity();
+        const handle      = Constitution.getInstance().communityHandle;
+        const memberCount = PersonService.getInstance().getAll().length;
+        res.json({
+            nodeId:      identity.id,
+            entityId:    identity.entityId,
+            publicKey:   communitySigner.publicKeyHex,
+            name:        identity.name,
+            handle,
+            url:         identity.address,
+            memberCount,
+        });
     });
 
     app.get("/api/constitution", (_req, res) => {

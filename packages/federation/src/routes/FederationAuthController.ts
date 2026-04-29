@@ -26,11 +26,12 @@ function memberPersonDto(req: FederationPersonRequest) {
     const cred   = req.federationPersonCredential;
     const member = req.federationMember;
     return {
-        personId:        cred.personId,
-        handle:          cred.handle,
-        communityHandle: member.handle,
-        communityName:   member.name,
-        expiresAt:       cred.expiresAt,
+        personId:          cred.personId,
+        handle:            cred.handle,
+        communityHandle:   member.handle,
+        communityName:     member.name,
+        communityMemberId: member.id,
+        expiresAt:         cred.expiresAt,
     };
 }
 

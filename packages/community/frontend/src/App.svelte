@@ -14,6 +14,9 @@
     import DomainPage      from "./pages/DomainPage.svelte";
     import UnitPage        from "./pages/UnitPage.svelte";
     import LeadershipPage    from "./pages/LeadershipPage.svelte";
+import AssemblyPage      from "./pages/AssemblyPage.svelte";
+import PoolPage          from "./pages/PoolPage.svelte";
+import MotionPage        from "./pages/MotionPage.svelte";
     import ApplicationsPage   from "./pages/ApplicationsPage.svelte";
     import HowItWorksPage      from "./pages/HowItWorksPage.svelte";
     import BudgetPage          from "./pages/BudgetPage.svelte";
@@ -24,6 +27,10 @@
     import ProposalsPage       from "./pages/ProposalsPage.svelte";
     import ApplyPage           from "./pages/ApplyPage.svelte";
     import NodesPage           from "./pages/NodesPage.svelte";
+    import VacanciesPage       from "./pages/VacanciesPage.svelte";
+    import NominationsPage     from "./pages/NominationsPage.svelte";
+    import ConnectionsPage     from "./pages/ConnectionsPage.svelte";
+    import GrowthPage          from "./pages/GrowthPage.svelte";
     import BottomNav           from "./components/BottomNav.svelte";
 
     type AppState = "loading" | "setup" | "login" | "apply" | "app";
@@ -80,6 +87,12 @@
             <UnitPage />
         {:else if $currentPage === "leadership"}
             <LeadershipPage />
+        {:else if $currentPage === "assembly"}
+            <AssemblyPage />
+        {:else if $currentPage === "pool"}
+            <PoolPage />
+        {:else if $currentPage === "motion"}
+            <MotionPage />
         {:else if $currentPage === "applications"}
             <ApplicationsPage />
         {:else if $currentPage === "how-it-works"}
@@ -102,6 +115,14 @@
             <CentralBankPage />
         {:else if $currentPage === "social-insurance"}
             <SocialInsurancePage />
+        {:else if $currentPage === "vacancies"}
+            <VacanciesPage />
+        {:else if $currentPage === "nominations"}
+            <NominationsPage />
+        {:else if $currentPage === "connections"}
+            <ConnectionsPage />
+        {:else if $currentPage === "growth"}
+            <GrowthPage />
         {/if}
     </main>
     <BottomNav />

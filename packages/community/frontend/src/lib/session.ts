@@ -70,7 +70,7 @@ function createSessionStore() {
 
 export const session = createSessionStore();
 
-export type Page = "profile" | "directory" | "constitution" | "settings" | "domains" | "domain" | "unit" | "leadership" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations" | "proposals" | "proposal" | "nodes" | "central-bank" | "social-insurance";
+export type Page = "profile" | "directory" | "constitution" | "settings" | "domains" | "domain" | "unit" | "leadership" | "assembly" | "pool" | "motion" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations" | "proposals" | "proposal" | "nodes" | "central-bank" | "social-insurance" | "vacancies" | "nominations" | "connections" | "growth";
 
 function createPageStore() {
     const { subscribe, set } = writable<Page>("profile");
@@ -90,3 +90,9 @@ export const selectedAssociationId = writable<string | null>(null);
 
 /** ID of the proposal currently being viewed in the proposal detail page. */
 export const selectedProposalId = writable<string | null>(null);
+
+/** ID of the pool currently being viewed in the pool detail page. */
+export const selectedPoolId = writable<string | null>(null);
+
+/** ID of the motion currently being viewed in the motion detail page. */
+export const selectedMotionId = writable<string | null>(null);

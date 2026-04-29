@@ -1,0 +1,3 @@
+{
+    "svelte.language-server.ls-path": "packages/community/frontend/node_modules/svelte-language-server/bin/server.js"
+}

@@ -169,8 +169,67 @@ export class FederationMembershipService extends UpstreamMembershipService<Feder
         return this.record;
     }
 
-    async submitCensus(nullifiers: string[], memberCount: number): Promise<{ duplicates: string[] }> {
-        if (!this.record || this.record.status !== "approved") {
+    /**
+     * Register this community as the founding member of a federation, bypassing
+     * the normal application flow.  Called when the federation operator configures
+     * the federation via its setup UI and the federation node calls back here.
+     *
+     * Verifies the claim by querying `GET <federationUrl>/api/members` and
+     * confirming this community's nodeId is listed as an `isFounder` member.
+     */
+    async register(
+        federationUrl:   string,
+        communityHandle: string,
+        memberId:        string,
+        bankAccountId:   string | null,
+    ): Promise<FederationMembershipRecord> {
+        if (this.record && this.record.status !== "rejected") {
+            throw new Error(`Already have a federation membership in status "${this.record.status}"`);
+        }
+
+        const base    = federationUrl.replace(/\/$/, "");
+        const nodeId  = NodeService.getInstance().getIdentity().id;
+
+        // Verify: call back to the federation and confirm we're listed as a founder
+        let membersData: { id: string; communityNodeId: string; isFounder: boolean; bankAccountId: string | null }[];
+        try {
+            const res = await fetch(`${base}/api/members`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            membersData = await res.json() as typeof membersData;
+        } catch (err) {
+            throw new Error(`Could not verify registration with federation: ${(err as Error).message}`);
+        }
+
+        const confirmed = membersData.find(m => m.communityNodeId === nodeId && m.isFounder);
+        if (!confirmed) {
+            throw new Error("Federation does not list this community as a founding member — registration refused");
+        }
+
+        this.record = {
+            federationUrl:       base,
+            applicationId:       memberId,
+            memberId,
+            federationAccountId: bankAccountId ?? confirmed.bankAccountId,
+            communityHandle,
+            federationHandle:    null,
+            commonwealthHandle:  null,
+            globeHandle:         null,
+            commonwealthUrl:     null,
+            globeUrl:            null,
+            status:              "approved",
+            appliedAt:           new Date().toISOString(),
+        };
+        this.save();
+
+        // Fetch federation handle, commonwealth chain, etc.
+        await this.onApproved(base, memberId);
+        this.save();
+
+        logger.info(`[FederationMembership] registered as founding member of ${federationUrl} (member ${memberId})`);
+        return this.record;
+    }
+
+    async submitCensus(nullifiers: string[], memberCount: number): Promise<{ duplicates: string[] }> {        if (!this.record || this.record.status !== "approved") {
             throw new Error("Community is not an approved federation member");
         }
 

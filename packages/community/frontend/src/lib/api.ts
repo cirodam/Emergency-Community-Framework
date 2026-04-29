@@ -33,16 +33,33 @@ export interface PersonDto {
     hasPassword: boolean;
 }
 
+export interface ConstitutionParam {
+    value: number | boolean;
+    authority: string;
+    description: string;
+    constraints?: { min?: number; max?: number };
+}
+
+export interface DocumentSection {
+    id:             string;
+    title?:         string;
+    body:           string;
+    paramKeys:      string[];
+    amendAuthority: string;
+}
+
+export interface DocumentArticle {
+    number:    string;
+    title:     string;
+    preamble?: string;
+    sections:  DocumentSection[];
+}
+
 export interface ConstitutionDocument {
     version: number;
     adoptedAt: string;
     communityName: string;
-    parameters: Record<string, {
-        value: number | boolean;
-        authority: string;
-        description: string;
-        constraints?: { min?: number; max?: number };
-    }>;
+    parameters: Record<string, ConstitutionParam>;
     amendments: {
         version: number;
         parameter: string;
@@ -56,6 +73,7 @@ export interface ConstitutionDocument {
         body: string;
         description: string;
     }[];
+    articles: DocumentArticle[];
 }
 
 // ── Economics ─────────────────────────────────────────────────────────────────
@@ -94,6 +112,57 @@ export async function getEconomics(): Promise<EconomicsDto> {
     const res = await fetch("/api/economics");
     if (!res.ok) throw new Error("Failed to load economics data");
     return res.json() as Promise<EconomicsDto>;
+}
+
+// ── Federation membership ─────────────────────────────────────────────────────
+
+export type FederationStatus = "none" | "pending" | "approved" | "rejected";
+
+export interface FederationMembershipRecord {
+    federationUrl:       string;
+    applicationId:       string;
+    memberId:            string | null;
+    federationAccountId: string | null;
+    communityHandle:     string;
+    federationHandle:    string | null;
+    commonwealthHandle:  string | null;
+    globeHandle:         string | null;
+    commonwealthUrl:     string | null;
+    globeUrl:            string | null;
+    status:              FederationStatus;
+    appliedAt:           string;
+}
+
+export async function getFederationMembership(): Promise<FederationMembershipRecord | null> {
+    const res = await fetch("/api/federation");
+    if (!res.ok) throw new Error("Failed to load federation status");
+    const data = await res.json() as { status: string } & Partial<FederationMembershipRecord>;
+    if (data.status === "none") return null;
+    return data as FederationMembershipRecord;
+}
+
+export async function syncFederationMembership(): Promise<FederationMembershipRecord | null> {
+    const res = await apiFetch("/api/federation/sync");
+    if (!res.ok) throw new Error("Failed to sync federation status");
+    const data = await res.json() as { status: string } & Partial<FederationMembershipRecord>;
+    if (data.status === "none") return null;
+    return data as FederationMembershipRecord;
+}
+
+export async function applyToFederation(
+    federationUrl: string,
+    communityName: string,
+    communityHandle: string,
+): Promise<FederationMembershipRecord> {
+    const res = await apiFetch("/api/federation/apply", {
+        method: "POST",
+        body: JSON.stringify({ federationUrl, communityName, communityHandle }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Application failed");
+    }
+    return res.json() as Promise<FederationMembershipRecord>;
 }
 
 // ── Community Budget ───────────────────────────────────────────────────────────
@@ -298,6 +367,18 @@ export async function updateConstitutionParameter(key: string, value: number | b
         const body = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Failed to update parameter");
     }
+}
+
+export async function updateConstitutionSection(sectionId: string, body: string): Promise<ConstitutionDocument> {
+    const res = await apiFetch(`/api/constitution/sections/${encodeURIComponent(sectionId)}`, {
+        method: "PATCH",
+        body:   JSON.stringify({ body }),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to update section");
+    }
+    return res.json() as Promise<ConstitutionDocument>;
 }
 
 export interface SimulateStepResult {
@@ -553,6 +634,7 @@ export interface RoleTypeDto {
     title:              string;
     description:        string;
     defaultKinPerMonth: number;
+    preferredUnitTypes: string[];
 }
 
 export async function listRoles(): Promise<RoleDto[]> {
@@ -993,4 +1075,254 @@ export async function getNodePeers(): Promise<PeerRecordDto[]> {
     const res = await apiFetch("/api/node/peers");
     if (!res.ok) throw new Error("Failed to load peers");
     return res.json() as Promise<PeerRecordDto[]>;
+}
+
+// ── Nominations & Vacancies ───────────────────────────────────────────────────
+
+export type NominationStatus = "pending" | "confirmed" | "declined";
+
+export interface NominationDto {
+    id:         string;
+    createdAt:  string;
+    createdBy:  string;
+    roleId:     string;
+    unitId:     string;
+    domainId:   string;
+    nomineeId:  string;
+    statement:  string;
+    status:     NominationStatus;
+    resolvedAt: string | null;
+    resolvedBy: string | null;
+}
+
+export interface VacancyDto {
+    roleId:      string;
+    roleTitle:   string;
+    kinPerMonth: number;
+    unitId:      string;
+    unitName:    string;
+    domainId:    string;
+    domainName:  string;
+}
+
+export interface ExpiringRoleDto {
+    roleId:      string;
+    roleTitle:   string;
+    memberId:    string;
+    termEndDate: string;
+    unitId:      string;
+    unitName:    string;
+    domainId:    string;
+    domainName:  string;
+}
+
+export async function listVacancies(): Promise<VacancyDto[]> {
+    const res = await fetch("/api/nominations/vacancies");
+    if (!res.ok) throw new Error("Failed to load vacancies");
+    return res.json() as Promise<VacancyDto[]>;
+}
+
+export async function listNominations(): Promise<NominationDto[]> {
+    const res = await apiFetch("/api/nominations");
+    if (!res.ok) throw new Error("Failed to load nominations");
+    return res.json() as Promise<NominationDto[]>;
+}
+
+export async function createNomination(data: {
+    roleId:    string;
+    nomineeId: string;
+    statement: string;
+}): Promise<NominationDto> {
+    const res = await apiFetch("/api/nominations", {
+        method: "POST",
+        body:   JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to submit nomination");
+    }
+    return res.json() as Promise<NominationDto>;
+}
+
+export async function confirmNomination(id: string): Promise<NominationDto> {
+    const res = await apiFetch(`/api/nominations/${encodeURIComponent(id)}/confirm`, { method: "PATCH" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to confirm nomination");
+    }
+    return res.json() as Promise<NominationDto>;
+}
+
+export async function declineNomination(id: string): Promise<NominationDto> {
+    const res = await apiFetch(`/api/nominations/${encodeURIComponent(id)}/decline`, { method: "PATCH" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to decline nomination");
+    }
+    return res.json() as Promise<NominationDto>;
+}
+
+export async function listExpiringRoles(days = 60): Promise<ExpiringRoleDto[]> {
+    const res = await apiFetch(`/api/nominations/expiring?days=${days}`);
+    if (!res.ok) throw new Error("Failed to load expiring roles");
+    return res.json() as Promise<ExpiringRoleDto[]>;
+}
+
+// ── Motions ───────────────────────────────────────────────────────────────────
+
+export type MotionStage   = "draft" | "deliberating" | "voting" | "resolved" | "proposed" | "discussed" | "voted";
+export type MotionOutcome = "passed" | "failed" | "withdrawn" | "referred";
+export type VoteThresholdKey = "thresholdSimpleMajority" | "thresholdSupermajority" | "thresholdNearConsensus";
+
+export interface MotionComment {
+    id:           string;
+    authorId:     string;
+    authorHandle: string;
+    body:         string;
+    createdAt:    string;
+}
+
+export interface MotionVote {
+    personId:  string;
+    handle:    string;
+    vote:      "approve" | "reject" | "abstain";
+    votedAt:   string;
+}
+
+export interface MotionDto {
+    id:                   string;
+    body:                 string;
+    stage:                MotionStage;
+    title:                string;
+    description:          string;
+    proposerId:           string;
+    proposerHandle:       string;
+    createdAt:            string;
+    deliberationStartedAt: string | null;
+    votingOpensAt:        string | null;
+    votingClosesAt:       string | null;
+    thresholdKey:         VoteThresholdKey | null;
+    votes:                MotionVote[];
+    comments:             MotionComment[];
+    outcome:              MotionOutcome | null;
+    outcomeNote:          string;
+    resolvedAt:           string | null;
+    referredToId:         string | null;
+    parentId:             string | null;
+    pendingAmendmentIds:  string[];
+    approvalCount:        number;
+    rejectionCount:       number;
+}
+
+export async function listMotions(opts: { body?: string; stage?: string } = {}): Promise<MotionDto[]> {
+    const params = new URLSearchParams();
+    if (opts.body)  params.set("body",  opts.body);
+    if (opts.stage) params.set("stage", opts.stage);
+    const qs = params.toString();
+    const res = await apiFetch(`/api/motions${qs ? `?${qs}` : ""}`);
+    if (!res.ok) throw new Error("Failed to load motions");
+    return res.json() as Promise<MotionDto[]>;
+}
+
+export async function getMotion(id: string): Promise<MotionDto> {
+    const res = await apiFetch(`/api/motions/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error("Motion not found");
+    return res.json() as Promise<MotionDto>;
+}
+
+export async function createMotion(data: {
+    body:        string;
+    title:       string;
+    description: string;
+    parentId?:   string;
+}): Promise<MotionDto> {
+    const res = await apiFetch("/api/motions", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to create motion");
+    }
+    return res.json() as Promise<MotionDto>;
+}
+
+export async function submitMotionForDeliberation(id: string, thresholdKey?: VoteThresholdKey): Promise<MotionDto> {
+    const res = await apiFetch(`/api/motions/${encodeURIComponent(id)}/deliberate`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ thresholdKey }),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to submit motion");
+    }
+    return res.json() as Promise<MotionDto>;
+}
+
+export async function openMotionVoting(id: string): Promise<MotionDto> {
+    const res = await apiFetch(`/api/motions/${encodeURIComponent(id)}/open-voting`, { method: "POST" });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to open voting");
+    }
+    return res.json() as Promise<MotionDto>;
+}
+
+export async function castMotionVote(id: string, vote: "approve" | "reject" | "abstain"): Promise<MotionDto> {
+    const res = await apiFetch(`/api/motions/${encodeURIComponent(id)}/vote`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ vote }),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to cast vote");
+    }
+    return res.json() as Promise<MotionDto>;
+}
+
+export async function addMotionComment(id: string, body: string): Promise<MotionDto> {
+    const res = await apiFetch(`/api/motions/${encodeURIComponent(id)}/comment`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ body }),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to add comment");
+    }
+    return res.json() as Promise<MotionDto>;
+}
+
+export async function markMotionDiscussed(id: string): Promise<MotionDto> {
+    const res = await apiFetch(`/api/motions/${encodeURIComponent(id)}/discuss`, { method: "POST" });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to mark discussed");
+    }
+    return res.json() as Promise<MotionDto>;
+}
+
+export async function recordMotionOutcome(id: string, outcome: MotionOutcome, outcomeNote = ""): Promise<MotionDto> {
+    const res = await apiFetch(`/api/motions/${encodeURIComponent(id)}/outcome`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ outcome, outcomeNote }),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to record outcome");
+    }
+    return res.json() as Promise<MotionDto>;
+}
+
+export async function withdrawMotion(id: string): Promise<MotionDto> {
+    const res = await apiFetch(`/api/motions/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to withdraw motion");
+    }
+    return res.json() as Promise<MotionDto>;
 }

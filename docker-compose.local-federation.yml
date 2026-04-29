@@ -1,0 +1,155 @@
+# Local federation test stack — one community + one federation node, all on the same Docker network.
+#
+# Usage:
+#   docker-compose -f docker-compose.local-federation.yml up --build
+#
+# Endpoints:
+#   Community:        http://localhost:3002
+#   Community bank:   http://localhost:3001
+#   Market:           http://localhost:3003
+#   Mail:             http://localhost:3020
+#   Federation:       http://localhost:3010
+#   Federation bank:  http://localhost:3011
+#
+# On first boot the federation will automatically register the community as its founding member.
+# Check progress with:
+#   curl http://localhost:3010/api/members
+#   curl http://localhost:3002/api/federation
+
+services:
+
+  # ── Community stack ─────────────────────────────────────────────────────────
+
+  community:
+    build:
+      context: .
+      dockerfile: packages/community/Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      BANK_URL: http://bank:3001
+      SMS_MODEM_PATH: /dev/ttyUSB2
+      SMS_MODEM_BAUD: 115200
+    volumes:
+      - community-data:/app/data
+    group_add:
+      - dialout
+
+  bank:
+    build:
+      context: .
+      dockerfile: packages/bank/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      COMMUNITY_URL: http://community:3002
+      OWNER_TYPE: community
+      PUBLIC_COMMUNITY_URL: http://localhost:3002
+      PUBLIC_BANK_URL: http://localhost:3001
+      PUBLIC_MARKET_URL: http://localhost:3003
+      PUBLIC_MAIL_URL: http://localhost:3020
+    volumes:
+      - bank-data:/app/data
+    depends_on:
+      - community
+
+  market:
+    build:
+      context: .
+      dockerfile: packages/market/Dockerfile
+    ports:
+      - "3003:3003"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      BANK_URL: http://bank:3001
+      COMMUNITY_URL: http://community:3002
+      PUBLIC_COMMUNITY_URL: http://localhost:3002
+      PUBLIC_BANK_URL: http://localhost:3001
+      PUBLIC_MARKET_URL: http://localhost:3003
+      PUBLIC_MAIL_URL: http://localhost:3020
+    volumes:
+      - market-data:/app/data
+    depends_on:
+      - bank
+      - community
+
+  mail:
+    build:
+      context: .
+      dockerfile: packages/mail/Dockerfile
+    ports:
+      - "3020:3020"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      COMMUNITY_URL: http://community:3002
+      PUBLIC_COMMUNITY_URL: http://localhost:3002
+      PUBLIC_BANK_URL: http://localhost:3001
+      PUBLIC_MARKET_URL: http://localhost:3003
+      PUBLIC_MAIL_URL: http://localhost:3020
+    volumes:
+      - mail-data:/app/data
+    depends_on:
+      - community
+
+  # ── Federation stack ─────────────────────────────────────────────────────────
+
+  federation:
+    build:
+      context: .
+      dockerfile: packages/federation/Dockerfile
+    ports:
+      - "3010:3010"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      BANK_URL: http://federation-bank:3011
+      # Internal (Docker network) URL the federation backend uses to reach the community.
+      # The community container is named "community" on the Docker network.
+      COMMUNITY_URL: http://community:3002
+      # The federation's own internal address — used as the federationUrl in callbacks.
+      NODE_ADDRESS: http://federation:3010
+      # Public URLs exposed to browsers (used by /api/config and login redirects)
+      PUBLIC_COMMUNITY_URL: http://localhost:3002
+      PUBLIC_FEDERATION_URL: http://localhost:3010
+    volumes:
+      - federation-data:/app/data
+    depends_on:
+      federation-bank:
+        condition: service_healthy
+      community:
+        condition: service_started
+
+  federation-bank:
+    build:
+      context: .
+      dockerfile: packages/bank/Dockerfile
+    ports:
+      - "3011:3011"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      PORT: 3011
+      COMMUNITY_URL: http://federation:3010
+      OWNER_TYPE: federation
+    volumes:
+      - federation-bank-data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3011/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 5s
+
+volumes:
+  community-data:
+  bank-data:
+  market-data:
+  mail-data:
+  federation-data:
+  federation-bank-data:

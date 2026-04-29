@@ -116,15 +116,15 @@
 
     .dropdown {
         position: absolute;
-        top: 0;
-        left: calc(100% + 0.4rem);
+        top: calc(100% + 0.4rem);
+        left: 0;
         background: #fff;
         border: 1px solid #e2e8f0;
         border-radius: 10px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10);
         min-width: 11rem;
         padding: 0.35rem 0;
-        z-index: 300;
+        z-index: 9999;
     }
 
     .app-item {

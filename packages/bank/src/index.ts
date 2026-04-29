@@ -41,28 +41,24 @@ async function main(): Promise<void> {
     Bank.getInstance().init(accountLoader, transactionLoader);
     AccountOwnerService.getInstance().init(ownerLoader);
 
-    // Bank supports explicit override via env vars (for federation-owned banks)
-    const explicitId  = process.env.OWNER_NODE_ID;
-    const explicitKey = process.env.COMMUNITY_PUBLIC_KEY;
-    const community = explicitId && explicitKey
-        ? { nodeId: explicitId, publicKey: explicitKey }
-        : await resolveCommunityIdentity(COMMUNITY_URL, "[bank]");
-
-    const ownerType = process.env.OWNER_TYPE as "community" | "federation" | undefined ?? "community";
-    if (ownerType !== "community" && ownerType !== "federation") {
-        throw new Error(`[bank] OWNER_TYPE must be "community" or "federation", got "${ownerType}"`);
-    }
-    setCommunityIdentity(community.nodeId, community.publicKey);
-    const charter = new BankCharterLoader(DATA_DIR).load(community.nodeId, ownerType);
-
-    // API routes
+    // Register all routes and start listening BEFORE resolving the governing
+    // community's identity.  Auth middleware closures call getCommunityIdentity()
+    // at request time, so they'll work once identity is set.  Requests that need
+    // auth arriving before identity resolves will get a 500 — acceptable during
+    // the brief startup window.  This breaks the circular startup deadlock where
+    // the federation-bank and federation node each wait for the other.
+    app.get("/health", (_req, res) => { res.json({ status: "ok" }); });
     app.use("/api", bankRoutes);
     app.use("/api", ownerRoutes);
     app.use("/api/node",    networkRouter);
     app.use("/api/message", messageRouter);
 
-    // Charter — who governs this bank
-    app.get("/api/charter", (_req, res) => { res.json(charter); });
+    // Dynamic charter endpoint — 503 until identity is resolved
+    let charter: import("./BankCharterLoader.js").BankCharter | null = null;
+    app.get("/api/charter", (_req, res) => {
+        if (!charter) { res.status(503).json({ error: "Bank not yet chartered" }); return; }
+        res.json(charter);
+    });
 
     // Public config — tells the frontend the browser-accessible service URLs
     app.get("/api/config", (_req, res) => {
@@ -74,9 +70,6 @@ async function main(): Promise<void> {
         });
     });
 
-    // Health check
-    app.get("/health", (_req, res) => { res.json({ status: "ok" }); });
-
     // Serve frontend (production build from public/)
     const publicDir = join(__dirname, "../public");
     app.use(express.static(publicDir));
@@ -84,9 +77,34 @@ async function main(): Promise<void> {
         res.sendFile(join(publicDir, "index.html"));
     });
 
-    app.listen(PORT, () => {
+    await new Promise<void>(r => app.listen(PORT, () => {
         console.log(`[bank] listening on port ${PORT}`);
-    });
+        r();
+    }));
+
+    // Resolve the governing community's identity non-blocking.  Auth middleware
+    // on bankRoutes depends on this; it resolves quickly once the community/
+    // federation node is reachable.
+    const ownerType = process.env.OWNER_TYPE as "community" | "federation" | undefined ?? "community";
+    if (ownerType !== "community" && ownerType !== "federation") {
+        throw new Error(`[bank] OWNER_TYPE must be "community" or "federation", got "${ownerType}"`);
+    }
+
+    const explicitId  = process.env.OWNER_NODE_ID;
+    const explicitKey = process.env.COMMUNITY_PUBLIC_KEY;
+    const identityPromise = (explicitId && explicitKey)
+        ? Promise.resolve({ nodeId: explicitId, publicKey: explicitKey })
+        : resolveCommunityIdentity(COMMUNITY_URL, "[bank]");
+
+    identityPromise
+        .then(community => {
+            setCommunityIdentity(community.nodeId, community.publicKey);
+            charter = new BankCharterLoader(DATA_DIR).load(community.nodeId, ownerType);
+        })
+        .catch(err => {
+            console.error("[bank] identity resolution failed:", err);
+            process.exit(1);
+        });
 }
 
 main().catch(err => {

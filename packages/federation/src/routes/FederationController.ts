@@ -363,7 +363,9 @@ function memberToDto(m: ReturnType<typeof FederationMemberService.prototype.getB
     return {
         id:              m.id,
         name:            m.name,
+        handle:          m.handle,
         communityNodeId: m.communityNodeId,
+        isFounder:       m.isFounder,
         joinedAt:        m.joinedAt,
         bankAccountId:   m.bankAccountId,
         creditLineKin:   m.creditLineKin,

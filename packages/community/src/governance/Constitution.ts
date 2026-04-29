@@ -1,3 +1,5 @@
+import { type DocumentArticle, extractParamKeys } from "../common/DocumentFramework.js";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ParameterAuthority = "immutable" | "referendum" | "assembly" | "council" | "commonwealth";
@@ -43,6 +45,8 @@ export interface ConstitutionDocument {
     parameters:      Record<string, ConstitutionalParameter<number | boolean>>;
     amendments:      ConstitutionAmendment[];
     authorityMap:    ActionAuthority[];
+    /** Structured document body: articles containing sections with {paramKey} prose slots. */
+    articles:        DocumentArticle[];
 }
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
@@ -128,6 +132,12 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
         },
 
         // ── Governance process ───────────────────────────────────────────────
+        assemblySeatCount: {
+            value: 99,
+            authority: "assembly",
+            description: "Number of members drawn by sortition to form the assembly for a given term.",
+            constraints: { min: 9, max: 999 },
+        },
         deliberationPeriodDays: {
             value: 3,
             authority: "assembly",
@@ -230,6 +240,7 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
         },
     },
     amendments: [],
+    articles: [],   // populated below after DEFAULT_ARTICLES is declared
     authorityMap: [
         { action: "admit-member",            body: "assembly",   description: "Admitting a new member to the community" },
         { action: "suspend-member",          body: "assembly",   description: "Suspending a member pending review" },
@@ -247,6 +258,116 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
         { action: "enact-domain-statute",    body: "council",    description: "Enacting an operating rule within a domain" },
     ],
 };
+
+// ── Default Articles ─────────────────────────────────────────────────────────
+
+const DEFAULT_ARTICLES: DocumentArticle[] = [
+    {
+        number: "I",
+        title: "Founding Principles",
+        sections: [
+            {
+                id: "I.1",
+                title: "Why We Are Here",
+                body: "Most of us grew up believing that if we worked hard and played by the rules, our basic needs would be met. For a great many people, that has not proven true. Work no longer guarantees security. Housing costs more than families can afford. Healthcare goes without because the price is too high. Neighbors who need help find that the systems meant to provide it are distant, difficult, and insufficient. These are not personal failures — they are shared experiences, felt across communities of every background. We are not the first to notice, and we are not naive about the difficulty of change. But we believe that people who choose to meet their needs together, in full view of one another, can do better than institutions that have forgotten who they were built to serve. This community is that attempt.",
+                paramKeys: [],
+                amendAuthority: "referendum",
+            },
+            {
+                id: "I.2",
+                title: "Human Dignity",
+                body: "Every person has worth that is not contingent on their productivity, their health, their age, or any other measure of economic usefulness. A person who cannot work has the same claim on a dignified life as anyone else. A community that withholds basic necessities from people who fail to contribute economically has not balanced its books — it has betrayed its purpose. This community holds human dignity as prior to economic participation. No member's standing within it is earned. It is given.",
+                paramKeys: [],
+                amendAuthority: "referendum",
+            },
+            {
+                id: "I.3",
+                title: "Economy in Service of People",
+                body: "An economy is a tool for coordinating how people meet their needs. An economy that denies cancer treatment to keep a claims ratio low, that leaves veterans on the street, that will not feed children despite producing enough food to waste half of it — that economy has not merely developed flaws. It has failed at its only legitimate purpose. The economy of this community exists to meet the needs of its members. That is the measure by which every economic decision here will be judged.",
+                paramKeys: [],
+                amendAuthority: "referendum",
+            },
+            {
+                id: "I.4",
+                title: "Scope",
+                body: "This constitution governs the internal affairs of this community. It does not claim authority over any person who has not chosen membership, and it does not override any rights a member holds as a person beyond this community. It is not a complete theory of society — it is an agreement among people who have chosen to meet their needs together.",
+                paramKeys: [],
+                amendAuthority: "referendum",
+            },
+        ],
+    },
+    {
+        number: "II",
+        title: "Governance",
+        sections: [
+            {
+                id: "II.1",
+                title: "The Source of Authority",
+                body: "Legitimate authority in this community comes from the whole community, not from the ability to win an election. No person or group holds permanent authority here. Every decision is made by the community, in whole or in part.",
+                paramKeys: [],
+                amendAuthority: "referendum",
+            },
+            {
+                id: "II.2",
+                title: "The Assembly",
+                body: "The assembly is the highest governing body of this community. It is composed of {assemblySeatCount} members drawn by sortition from the full membership for a fixed term. Any member may be drawn. The assembly sets policy, ratifies significant decisions, and holds all other bodies accountable. When its term ends, a new assembly is drawn.",
+                paramKeys: ["assemblySeatCount"],
+                amendAuthority: "referendum",
+            },
+            {
+                id: "II.3",
+                title: "Sortition",
+                body: "Leadership roles are filled by random draw from the relevant pool. The person selected serves for a fixed term, then returns to ordinary membership. A cooling-off period follows before they may serve in the same role again. This ensures that authority circulates through the community rather than accumulating in the hands of those who seek it most.",
+                paramKeys: [],
+                amendAuthority: "referendum",
+            },
+            {
+                id: "II.4",
+                title: "Leader Pools",
+                body: "Any member may join the pool of candidates for a leadership role by declaring their willingness to serve. No campaign, no election, no endorsement is required or permitted. The pool is simply the set of people who have said: I am willing.",
+                paramKeys: [],
+                amendAuthority: "referendum",
+            },
+
+        ],
+    },
+    {
+        number: "III",
+        title: "Economics",
+        sections: [
+            {
+                id: "III.1",
+                title: "The Kin",
+                body: "The unit of account for this community is the kin. It is grounded in the most basic thing all members share: the years of their lives. One kin represents one ten-thousandth of a person-year — 10,000 kin to a year.\n\nMost currencies are backed by government decree, by gold, or by debt. The kin is backed by something more direct: the community itself and the lives of the people in it.",
+                paramKeys: [],
+                amendAuthority: "referendum",
+            },
+            {
+                id: "III.2",
+                title: "The Banks",
+                body: "This community operates two financial institutions. The Community Bank holds member accounts — it is where kin is stored, sent, and received. The Central Bank manages monetary policy — it issues new kin and applies the holding fee. All flows through both institutions are visible to every member. There are no hidden charges and no hidden balances.",
+                paramKeys: [],
+                amendAuthority: "referendum",
+            },
+            {
+                id: "III.3",
+                title: "The Holding Fee",
+                body: "To discourage hoarding and keep kin moving through the community, the Central Bank applies a monthly holding fee of {bankDemurrageRate} to all account balances above {demurrageFloor} kin. Only the portion above this floor is subject to the fee. Balances at or below {demurrageFloor} kin are never charged.",
+                paramKeys: ["bankDemurrageRate", "demurrageFloor"],
+                amendAuthority: "referendum",
+            },
+            {
+                id: "III.4",
+                title: "Community Dues",
+                body: "Each month, {communityDuesRate} of every member's primary balance above {demurrageFloor} kin is transferred to the community treasury as dues. This kin is not destroyed — it funds the shared budget we all depend on.",
+                paramKeys: ["communityDuesRate", "demurrageFloor"],
+                amendAuthority: "referendum",
+            },
+        ],
+    },
+];
+
+DEFAULT_CONSTITUTION.articles = DEFAULT_ARTICLES;
 
 // ── Constitution singleton ────────────────────────────────────────────────────
 
@@ -292,7 +413,22 @@ export class Constitution {
         this.doc = {
             ...doc,
             parameters: { ...this.doc.parameters, ...doc.parameters },
+            // Keep default articles when loading an older persisted doc that predates articles
+            articles: doc.articles?.length ? doc.articles : this.doc.articles,
         };
+    }
+
+    /** Update the prose body of a section, re-extracting its paramKeys. */
+    updateSection(sectionId: string, body: string): void {
+        for (const article of this.doc.articles) {
+            const section = article.sections.find(s => s.id === sectionId);
+            if (section) {
+                section.body = body.trim();
+                section.paramKeys = extractParamKeys(body);
+                return;
+            }
+        }
+        throw new Error(`Section "${sectionId}" not found`);
     }
 
     get version(): number       { return this.doc.version; }

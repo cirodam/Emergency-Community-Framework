@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getUnit, listRoles, listRoleTypes, listPersons, createRole, updateRole, deleteRole } from "../lib/api.js";
+    import { getUnit, listRoles, listRoleTypes, listPersons, createRole, updateRole, deleteRole, createNomination } from "../lib/api.js";
     import type { UnitDto, RoleDto, RoleTypeDto, PersonDto } from "../lib/api.js";
     import { currentPage, selectedUnitId, selectedDomainId } from "../lib/session.js";
 
@@ -27,11 +27,28 @@
     // Delete
     let deletingId: string | null = $state(null);
 
+    // Nominate for a vacant role
+    let nominatingRoleId: string | null = $state(null);
+    let nomineeId = $state("");
+    let nominationStatement = $state("");
+    let nominating = $state(false);
+    let nominationError = $state("");
+    let nominationSuccess = $state(false);
+
     // Assign member to role
     let persons: PersonDto[] = $state([]);
     let assigningRoleId: string | null = $state(null);
     let assignPersonId = $state("");
     let assignSaving = $state(false);
+
+    // Sorted role types: preferred for this unit type first, then the rest
+    const sortedRoleTypes = $derived(() => {
+        const unitType = unit?.type ?? "";
+        if (!unitType) return { preferred: [], others: roleTypes };
+        const preferred = roleTypes.filter(rt => rt.preferredUnitTypes.includes(unitType));
+        const others    = roleTypes.filter(rt => !rt.preferredUnitTypes.includes(unitType));
+        return { preferred, others };
+    });
 
     function startAssign(role: RoleDto) {
         assigningRoleId = role.id;
@@ -147,6 +164,37 @@
         }
     }
 
+    function startNominate(roleId: string) {
+        nominatingRoleId = roleId;
+        nomineeId = "";
+        nominationStatement = "";
+        nominationError = "";
+        nominationSuccess = false;
+    }
+
+    async function submitNomination(roleId: string) {
+        if (!nomineeId) { nominationError = "Please select a nominee."; return; }
+        nominating = true;
+        nominationError = "";
+        try {
+            await createNomination({ roleId, nomineeId, statement: nominationStatement });
+            nominationSuccess = true;
+            setTimeout(() => {
+                nominatingRoleId = null;
+                nominationSuccess = false;
+            }, 1500);
+        } catch (e) {
+            nominationError = e instanceof Error ? e.message : "Submission failed";
+        } finally {
+            nominating = false;
+        }
+    }
+
+    function daysUntil(iso: string | null): number | null {
+        if (!iso) return null;
+        return Math.round((new Date(iso).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    }
+
     function fmt(n: number): string {
         return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
     }
@@ -229,7 +277,55 @@
                                     <button class="assign-cancel-btn" onclick={() => assigningRoleId = null}>Cancel</button>
                                 </div>
                             {:else if !role.memberId}
-                                <button class="assign-btn" onclick={() => startAssign(role)}>+ Assign member</button>
+                                <div class="vacant-actions">
+                                    <button class="assign-btn" onclick={() => startAssign(role)}>+ Assign member</button>
+                                    {#if nominatingRoleId !== role.id}
+                                        <button class="nominate-btn" onclick={() => startNominate(role.id)}>Nominate</button>
+                                    {/if}
+                                </div>
+                            {/if}
+
+                            {#if nominatingRoleId === role.id}
+                                {#if nominationSuccess}
+                                    <p class="nomination-success">Nomination submitted!</p>
+                                {:else}
+                                    <div class="nomination-form">
+                                        <p class="nomination-label">Nominate someone for this role:</p>
+                                        <select class="assign-select" bind:value={nomineeId}>
+                                            <option value="">— select a member —</option>
+                                            {#each persons as p (p.id)}
+                                                <option value={p.id}>{p.firstName} {p.lastName}</option>
+                                            {/each}
+                                        </select>
+                                        <textarea
+                                            class="nomination-statement"
+                                            bind:value={nominationStatement}
+                                            placeholder="Why are they a good fit? (optional)"
+                                            rows="2"
+                                        ></textarea>
+                                        {#if nominationError}
+                                            <p class="nomination-error">{nominationError}</p>
+                                        {/if}
+                                        <div class="assign-row" style="margin-top:0;">
+                                            <button class="assign-save-btn" style="background:#15803d;" onclick={() => submitNomination(role.id)} disabled={nominating || !nomineeId}>
+                                                {nominating ? "…" : "Submit"}
+                                            </button>
+                                            <button class="assign-cancel-btn" onclick={() => nominatingRoleId = null}>Cancel</button>
+                                        </div>
+                                    </div>
+                                {/if}
+                            {/if}
+
+                            {#if role.memberId && role.termEndDate}
+                                {@const days = daysUntil(role.termEndDate)}
+                                {#if days !== null && days <= 60}
+                                    <div class="expiry-row">
+                                        <span class="expiry-label" class:urgent={days <= 14}>
+                                            Term ends in {days}d
+                                        </span>
+                                        <button class="nominate-btn" onclick={() => startNominate(role.id)}>Nominate replacement</button>
+                                    </div>
+                                {/if}
                             {/if}
 
                             <div class="role-footer">
@@ -281,9 +377,24 @@
                     {#if addMode === "type"}
                         <select class="form-input" bind:value={newRoleTypeId}>
                             <option value="">Select role type…</option>
-                            {#each roleTypes as rt (rt.id)}
-                                <option value={rt.id}>{rt.title} ({fmt(rt.defaultKinPerMonth)} kin/mo)</option>
-                            {/each}
+                            {#if sortedRoleTypes().preferred.length > 0}
+                                <optgroup label="Suggested for this unit">
+                                    {#each sortedRoleTypes().preferred as rt (rt.id)}
+                                        <option value={rt.id}>{rt.title} ({fmt(rt.defaultKinPerMonth)} kin/mo)</option>
+                                    {/each}
+                                </optgroup>
+                                {#if sortedRoleTypes().others.length > 0}
+                                    <optgroup label="Other roles">
+                                        {#each sortedRoleTypes().others as rt (rt.id)}
+                                            <option value={rt.id}>{rt.title} ({fmt(rt.defaultKinPerMonth)} kin/mo)</option>
+                                        {/each}
+                                    </optgroup>
+                                {/if}
+                            {:else}
+                                {#each roleTypes as rt (rt.id)}
+                                    <option value={rt.id}>{rt.title} ({fmt(rt.defaultKinPerMonth)} kin/mo)</option>
+                                {/each}
+                            {/if}
                         </select>
                     {:else}
                         <input
@@ -703,5 +814,81 @@
     @keyframes shimmer {
         0%   { background-position: 200% 0; }
         100% { background-position: -200% 0; }
+    }
+
+    .vacant-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .nominate-btn {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #15803d;
+        background: none;
+        border: 1px solid #a7f3d0;
+        border-radius: 0.375rem;
+        padding: 0.2rem 0.55rem;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .nominate-btn:hover { background: #f0fdf4; }
+
+    .nomination-form {
+        margin-top: 0.35rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+    .nomination-label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #374151;
+        margin: 0;
+    }
+    .nomination-statement {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 0.82rem;
+        font-family: inherit;
+        padding: 0.35rem 0.55rem;
+        border: 1px solid #d1fae5;
+        border-radius: 0.375rem;
+        background: #f9fafb;
+        resize: vertical;
+        min-height: 2rem;
+    }
+    .nomination-error {
+        font-size: 0.78rem;
+        color: #dc2626;
+        margin: 0;
+    }
+    .nomination-success {
+        font-size: 0.82rem;
+        color: #15803d;
+        font-weight: 600;
+        margin: 0.35rem 0 0;
+    }
+
+    .expiry-row {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-top: 0.3rem;
+        flex-wrap: wrap;
+    }
+    .expiry-label {
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #d97706;
+        background: #fef3c7;
+        border-radius: 5px;
+        padding: 0.15rem 0.4rem;
+    }
+    .expiry-label.urgent {
+        color: #dc2626;
+        background: #fee2e2;
     }
 </style>

@@ -33,3 +33,40 @@ export async function syncFederationStatus(_req: Request, res: Response): Promis
     const membership = await FederationMembershipService.getInstance().sync();
     res.json(membership ?? { status: "none" });
 }
+
+/**
+ * POST /api/federation/register
+ *
+ * Called BY a federation node to register this community as its founding member,
+ * bypassing the normal application flow.  The community verifies the claim by
+ * calling back to the federation before accepting.
+ *
+ * Body: { federationUrl, communityHandle, memberId, bankAccountId? }
+ */
+export async function registerAsFounded(req: Request, res: Response): Promise<void> {
+    const { federationUrl, communityHandle, memberId, bankAccountId } = req.body as {
+        federationUrl?:  string;
+        communityHandle?: string;
+        memberId?:        string;
+        bankAccountId?:   string | null;
+    };
+
+    if (!federationUrl || !communityHandle || !memberId) {
+        res.status(400).json({ error: "federationUrl, communityHandle, and memberId are required" });
+        return;
+    }
+
+    try {
+        const record = await FederationMembershipService.getInstance().register(
+            federationUrl,
+            communityHandle,
+            memberId,
+            bankAccountId ?? null,
+        );
+        res.json(record);
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const status = msg.includes("Already have") ? 409 : 400;
+        res.status(status).json({ error: msg });
+    }
+}

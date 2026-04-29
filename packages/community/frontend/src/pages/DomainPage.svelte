@@ -330,16 +330,10 @@
             {#if budget}
                 {#if budget.payroll.length > 0}
                     <div class="budget-group">
-                        <div class="budget-group-label">Payroll</div>
-                        {#each budget.payroll as row (row.roleId)}
-                            <div class="budget-row">
-                                <span class="budget-label">
-                                    {row.title}
-                                    {#if !row.memberId}<span class="vacant-tag">vacant</span>{/if}
-                                </span>
-                                <span class="budget-amount">{fmtKin(row.kinPerMonth)} kin/mo</span>
-                            </div>
-                        {/each}
+                        <div class="budget-row">
+                            <span class="budget-label">Payroll <span class="budget-sublabel">({budget.payroll.length} role{budget.payroll.length !== 1 ? "s" : ""})</span></span>
+                            <span class="budget-amount">{fmtKin(budget.payroll.reduce((s, r) => s + r.kinPerMonth, 0))} kin/mo</span>
+                        </div>
                     </div>
                 {/if}
 
@@ -807,6 +801,11 @@
         gap: 0.4rem;
         flex: 1;
         min-width: 0;
+    }
+    .budget-sublabel {
+        font-size: 0.78rem;
+        color: #94a3b8;
+        font-weight: 400;
     }
 
     .vacant-tag {

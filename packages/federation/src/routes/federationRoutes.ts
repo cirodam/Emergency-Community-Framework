@@ -18,6 +18,20 @@ import {
     listDomains,
     getCensusSummary,
 } from "./FederationController.js";
+import {
+    getAssembly,
+    startAssemblyTerm,
+    seatDelegate,
+    vacateSeat,
+    listMotions,
+    createMotion,
+    getMotion,
+    advanceMotion,
+    listInsuranceClaims,
+    submitInsuranceClaim,
+    getInsuranceClaim,
+    reviewInsuranceClaim,
+} from "./FederationGovernanceController.js";
 
 const router = Router();
 
@@ -49,5 +63,23 @@ router.post("/kithe/structural-aid", requireMember, structuralAidGrant);
 
 // Census — public summary only (submit is now via EcfMessage "governance.census.submit")
 router.get( "/census", getCensusSummary);
+
+// ── Assembly ───────────────────────────────────────────────────────────────
+router.get(   "/assembly",                     getAssembly);
+router.post(  "/assembly/terms",               startAssemblyTerm);
+router.post(  "/assembly/delegates",           requireMember, seatDelegate);
+router.delete("/assembly/delegates/:communityMemberId", requireMember, vacateSeat);
+
+// ── Motions ────────────────────────────────────────────────────────────────
+router.get( "/motions",     listMotions);
+router.post("/motions",     requireMember, createMotion);
+router.get( "/motions/:id", getMotion);
+router.patch("/motions/:id", requireMember, advanceMotion);
+
+// ── Health Insurance ───────────────────────────────────────────────────────
+router.get( "/insurance/claims",     listInsuranceClaims);
+router.post("/insurance/claims",     requireMember, submitInsuranceClaim);
+router.get( "/insurance/claims/:id", getInsuranceClaim);
+router.patch("/insurance/claims/:id", requireMember, reviewInsuranceClaim);
 
 export default router;

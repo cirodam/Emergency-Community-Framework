@@ -85,6 +85,17 @@ export class BankClient {
             headers: this.signedHeaders(body),
             body,
         });
+        // 409 means the owner already exists (idempotent deterministic ownerId).
+        // Fetch and return the existing record rather than failing.
+        if (res.status === 409 && options?.ownerId) {
+            const existing = await fetch(
+                `${this.baseUrl}/api/owners/${encodeURIComponent(options.ownerId)}`,
+                { headers: this.signedGetHeaders() },
+            );
+            if (existing.ok) {
+                return existing.json() as Promise<{ ownerId: string; ownerType: string; displayName: string }>;
+            }
+        }
         if (!res.ok) throw new Error(`[BankClient] createOwner(${displayName}) failed: ${res.status}`);
         return res.json() as Promise<{ ownerId: string; ownerType: string; displayName: string }>;
     }

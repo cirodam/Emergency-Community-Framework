@@ -85,7 +85,13 @@ export function requirePersonCredential(
             return;
         }
 
-        const { nodeId, publicKey } = getCommunityIdentity();
+        let nodeId: string, publicKey: string;
+        try {
+            ({ nodeId, publicKey } = getCommunityIdentity());
+        } catch {
+            res.status(503).json({ error: "Service not ready" });
+            return;
+        }
         if (!verifyPersonCredential(credential, nodeId, publicKey)) {
             res.status(401).json({ error: "Credential invalid or expired" });
             return;

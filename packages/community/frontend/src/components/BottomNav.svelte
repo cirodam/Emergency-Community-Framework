@@ -9,22 +9,23 @@
     const items: NavItem[] = [
         {
             kind: "group", id: "people", label: "People", icon: "◉",
-            activePages: ["profile", "directory", "associations", "association", "add-person", "applications"],
+            activePages: ["profile", "directory", "associations", "association", "add-person", "applications", "vacancies"],
             children: [
                 { kind: "leaf", id: "profile",      label: "Profile",      icon: "◉" },
                 { kind: "leaf", id: "directory",    label: "Directory",    icon: "⊞" },
                 { kind: "leaf", id: "associations", label: "Associations", icon: "⊟" },
                 { kind: "leaf", id: "applications", label: "Applications", icon: "◎" },
+                { kind: "leaf", id: "vacancies",    label: "Open Roles",   icon: "◈" },
             ],
         },
         {
             kind: "group", id: "governance", label: "Governance", icon: "⚖",
-            activePages: ["leadership", "budget", "proposals", "domains", "domain", "unit", "constitution"],
+            activePages: ["leadership", "assembly", "pool", "budget", "proposals", "domains", "domain", "unit", "constitution", "nominations"],
             children: [
                 { kind: "leaf", id: "leadership",   label: "Leadership",   icon: "★" },
                 { kind: "leaf", id: "budget",        label: "Budget",       icon: "⊡" },
-                { kind: "leaf", id: "proposals",     label: "Proposals",    icon: "✦" },
                 { kind: "leaf", id: "domains",       label: "Domains",      icon: "⊛" },
+                { kind: "leaf", id: "nominations",   label: "Nominations",  icon: "◇" },
                 { kind: "leaf", id: "constitution",  label: "Constitution", icon: "§" },
             ],
         },
@@ -38,12 +39,14 @@
         },
         {
             kind: "group", id: "other", label: "Other", icon: "⊙",
-            activePages: ["locations", "nodes", "how-it-works", "settings"],
+            activePages: ["locations", "nodes", "connections", "how-it-works", "settings", "growth"],
             children: [
-                { kind: "leaf", id: "locations",    label: "Locations",    icon: "⊕" },
-                { kind: "leaf", id: "nodes",        label: "Nodes",        icon: "⬡" },
-                { kind: "leaf", id: "how-it-works", label: "How It Works", icon: "⊙" },
-                { kind: "leaf", id: "settings",     label: "Settings",     icon: "⚙" },
+                { kind: "leaf", id: "locations",    label: "Locations",     icon: "⊕" },
+                { kind: "leaf", id: "nodes",        label: "Nodes",         icon: "⬡" },
+                { kind: "leaf", id: "connections",  label: "Connections",   icon: "⬡" },
+                { kind: "leaf", id: "growth",       label: "Growth Path",   icon: "⊛" },
+                { kind: "leaf", id: "how-it-works", label: "How It Works",  icon: "⊙" },
+                { kind: "leaf", id: "settings",     label: "Settings",      icon: "⚙" },
             ],
         },
     ];
@@ -65,6 +68,7 @@
     function isLeafActive(item: LeafItem): boolean {
         if (item.id === "domains")      return ["domains", "domain", "unit"].includes($currentPage);
         if (item.id === "associations") return ["associations", "association"].includes($currentPage);
+        if (item.id === "leadership")   return ["leadership", "assembly", "pool"].includes($currentPage);
         return $currentPage === item.id;
     }
 
@@ -286,8 +290,7 @@
             justify-content: flex-start;
             gap: 0.1rem;
             align-items: stretch;
-            overflow-x: visible;
-            overflow-y: auto;
+            overflow: visible;
         }
 
         /* On desktop the sub-sheet is irrelevant — hide it */

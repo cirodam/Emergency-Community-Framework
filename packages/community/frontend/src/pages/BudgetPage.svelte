@@ -384,38 +384,6 @@
     .degraded-banner strong { font-size: 0.95rem; color: #92400e; }
     .degraded-banner p { font-size: 0.85rem; color: #92400e; margin: 0.2rem 0 0; }
 
-    /* Solvency card */
-    .solvency-card {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        border-radius: 16px;
-        padding: 1rem 1.25rem;
-        margin-bottom: 1.5rem;
-        border: 1.5px solid;
-    }
-    .solvency-card.solvent      { background: #f0fdf4; border-color: #86efac; }
-    .solvency-card.bootstrapping { background: #f8fafc; border-color: #cbd5e1; }
-
-    .solvency-icon {
-        width: 2.4rem;
-        height: 2.4rem;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.1rem;
-        font-weight: 700;
-        flex-shrink: 0;
-    }
-    .solvent      .solvency-icon  { background: #dcfce7; color: #15803d; }
-    .bootstrapping .solvency-icon  { background: #e2e8f0; color: #64748b; }
-
-    .solvency-text strong { font-size: 0.95rem; display: block; margin-bottom: 0.15rem; }
-    .solvency-text p { font-size: 0.8rem; color: #64748b; margin: 0; }
-    .solvent      .solvency-text strong { color: #15803d; }
-    .bootstrapping .solvency-text strong { color: #475569; }
-
     /* Sections */
     .budget-section { margin-bottom: 1.75rem; }
 

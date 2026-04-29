@@ -9,6 +9,7 @@ import associationRoutes from "./associationRoutes.js";
 import orgRoutes from "./orgRoutes.js";
 import calendarRoutes from "./calendarRoutes.js";
 import governanceRoutes from "./governanceRoutes.js";
+import nominationRoutes from "./nominationRoutes.js";
 
 const router = Router();
 
@@ -27,5 +28,6 @@ router.use("/", associationRoutes);
 router.use("/", orgRoutes);
 router.use("/", calendarRoutes);
 router.use("/", governanceRoutes);
+router.use("/", nominationRoutes);
 
 export default router;

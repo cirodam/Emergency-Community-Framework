@@ -357,6 +357,7 @@ function toRoleTypeDto(rt: RoleType) {
         title:              rt.title,
         description:        rt.description,
         defaultKinPerMonth: rt.defaultKinPerMonth,
+        preferredUnitTypes: rt.preferredUnitTypes,
     };
 }
 

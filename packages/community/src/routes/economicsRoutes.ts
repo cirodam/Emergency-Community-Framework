@@ -15,9 +15,10 @@ router.get( "/budget",               budget.getCommunityBudget);
 router.post("/budget/simulate-step", requireSteward, budget.simulateStep);
 
 // Federation membership
-router.get( "/federation",       federation.getFederationStatus);
-router.post("/federation/apply", federation.applyToFederation);
-router.get( "/federation/sync",  federation.syncFederationStatus);
+router.get( "/federation",          federation.getFederationStatus);
+router.post("/federation/apply",    federation.applyToFederation);
+router.get( "/federation/sync",     federation.syncFederationStatus);
+router.post("/federation/register", federation.registerAsFounded);
 
 // Payment tokens — steward-only management; receive is federation-signed
 router.post(  "/payment-tokens",                  requireSteward, paymentTokens.issueToken);
