@@ -257,22 +257,11 @@
                             {#if expanded.has(domain.domainId)}
                                 <div class="domain-detail">
 
-                                    {#if domain.payroll.length > 0}
-                                        <div class="detail-heading">
-                                            Payroll
-                                            <span class="detail-sub">{fmt(domain.totals.payroll)} kin</span>
+                                    {#if domain.totals.payroll > 0}
+                                        <div class="detail-item">
+                                            <span class="detail-label">Payroll</span>
+                                            <span class="detail-amount">{fmt(domain.totals.payroll)} kin</span>
                                         </div>
-                                        {#each domain.payroll as row}
-                                            <div class="detail-item">
-                                                <span class="detail-label">
-                                                    {row.title}
-                                                    {#if !row.memberId}
-                                                        <span class="vacant-badge">vacant</span>
-                                                    {/if}
-                                                </span>
-                                                <span class="detail-amount">{fmt(row.kinPerMonth)} kin</span>
-                                            </div>
-                                        {/each}
                                     {/if}
 
                                     {#if domain.items.length > 0}
@@ -291,7 +280,7 @@
                                         {/each}
                                     {/if}
 
-                                    {#if domain.payroll.length === 0 && domain.items.length === 0}
+                                    {#if domain.totals.payroll === 0 && domain.items.length === 0}
                                         <p class="empty-detail">No roles or budget items.</p>
                                     {/if}
 

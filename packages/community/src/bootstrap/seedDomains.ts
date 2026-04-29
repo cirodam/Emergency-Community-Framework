@@ -38,6 +38,7 @@ import { TransitDomain } from "../domains/transit/TransitDomain.js";
 import { TransitUnitTemplates } from "../domains/transit/TransitUnitTemplates.js";
 import { CourierDomain } from "../domains/courier/CourierDomain.js";
 import { CourierUnitTemplates } from "../domains/courier/CourierUnitTemplates.js";
+import { CommunityRole } from "../common/CommunityRole.js";
 
 /**
  * Seed role types and register all functional domains + unit templates on first boot.
@@ -100,9 +101,11 @@ export function seedDomains(domainSvc: DomainService): void {
     }
     domainSvc.registerDomain(HealthcareDomain.getInstance());
     if (HealthcareDomain.getInstance().unitIds.length === 0) {
-        domainSvc.createUnit(
-            new FunctionalUnit("Medical Supply Office", "Manages procurement, storage, and distribution of medicines and medical supplies for the community.", "medicine-supply-office"),
-            HealthcareDomain.getInstance().id,
+        const medSupplyUnit = new FunctionalUnit("Medical Supply Office", "Manages procurement, storage, and distribution of medicines and medical supplies for the community.", "medical-supply-office");
+        domainSvc.createUnit(medSupplyUnit, HealthcareDomain.getInstance().id);
+        domainSvc.createRole(
+            new CommunityRole("Medical Supply Officer", "Oversees procurement, inventory, and distribution of medical supplies.", 3_750),
+            medSupplyUnit.id,
         );
         domainSvc.createUnit(
             new FunctionalUnit("Primary Care Clinic", "General medical care, preventive health, chronic disease management, and triage for the community.", "primary-care-clinic"),
