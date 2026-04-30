@@ -4,6 +4,8 @@ import { NodeService, NodeSigner } from "@ecf/core";
 import { Person, PersonCredential, LanguageProficiency } from "./Person.js";
 import { PersonLoader } from "./PersonLoader.js";
 import { Constitution } from "../governance/Constitution.js";
+import type { DomainService } from "../DomainService.js";
+import { AppSuspensionService } from "./AppSuspensionService.js";
 
 export interface PersonPatch {
     firstName?: string;
@@ -137,11 +139,93 @@ export class PersonService {
     // ── Credential issuance ───────────────────────────────────────────────────
 
     /**
+     * Resolve app-scoped permission levels for a person based on their current
+     * roles and pool memberships. All active members receive "member" on every
+     * app. Elevated levels are derived from held roles and pool membership.
+     *
+     * Pass the DomainService instance to avoid a circular import at module load
+     * time (DomainService → PersonService at startup).
+     */
+    resolveAppPermissions(
+        person: Person,
+        domainSvc: DomainService,
+    ): Record<string, string[]> {
+        const perms: Record<string, Set<string>> = {
+            bank:   new Set(["member"]),
+            market: new Set(["member"]),
+            mail:   new Set(["member"]),
+        };
+
+        if (this.isSteward(person)) {
+            perms.mail.add("moderator");
+        }
+
+        // Role-based permissions
+        for (const role of domainSvc.getRoles()) {
+            if (role.memberId !== person.id) continue;
+            const title = role.title.toLowerCase();
+            if (title === "teller") {
+                perms.bank.add("teller");
+            } else if (title === "marketplace coordinator") {
+                perms.market.add("coordinator");
+            } else if (title === "food supply officer") {
+                perms.market.add("coordinator");
+            } else if (title === "community kitchen director") {
+                perms.market.add("coordinator");
+            } else if (title === "liquid fuel officer") {
+                perms.market.add("coordinator");
+            } else if (title === "farm coordinator") {
+                perms.market.add("coordinator");
+            }
+        }
+
+        // Pool-based admin permissions
+        for (const pool of domainSvc.getPools()) {
+            if (!pool.hasPerson(person.id)) continue;
+            const name = pool.name.toLowerCase();
+            if (name.includes("bank")) {
+                perms.bank.add("admin");
+            } else if (name.includes("market")) {
+                perms.market.add("admin");
+            } else if (name.includes("mail")) {
+                perms.mail.add("moderator");
+            }
+        }
+
+        return Object.fromEntries(
+            Object.entries(perms).map(([app, set]) => [app, Array.from(set)]),
+        );
+    }
+
+    /**
+     * Overlay suspension state on top of derived permissions.
+     * A suspended person gets an empty permission array for that app,
+     * meaning their next credential will deny all access.
+     */
+    resolveAppPermissionsWithSuspensions(
+        person: Person,
+        domainSvc: DomainService,
+    ): Record<string, string[]> {
+        const base = this.resolveAppPermissions(person, domainSvc);
+        const suspSvc = AppSuspensionService.getInstance();
+        for (const app of Object.keys(base)) {
+            if (suspSvc.isSuspended(person.id, app)) {
+                base[app] = [];
+            }
+        }
+        return base;
+    }
+
+    /**
      * Issue or renew a PersonCredential for the given person.
      * The community's NodeSigner signs over a deterministic JSON payload
      * of the six non-signature fields. Persists the updated person record.
      */
-    issueCredential(person: Person, ttlMs: number = DEFAULT_CREDENTIAL_TTL_MS): PersonCredential {
+    issueCredential(
+        person: Person,
+        ttlMs: number = DEFAULT_CREDENTIAL_TTL_MS,
+        domainSvc?: DomainService,
+    ): PersonCredential {
         const node     = NodeService.getInstance();
         const identity = node.getIdentity();
         const signer   = this.communitySigner ?? node.getSigner();
@@ -149,6 +233,9 @@ export class PersonService {
 
         const issuedAt  = new Date().toISOString();
         const expiresAt = new Date(Date.now() + ttlMs).toISOString();
+        const appPermissions = domainSvc
+            ? this.resolveAppPermissionsWithSuspensions(person, domainSvc)
+            : { bank: ["member"], market: ["member"], mail: ["member"] };
 
         const payload = JSON.stringify({
             personId:           person.id,
@@ -158,6 +245,7 @@ export class PersonService {
             communityPublicKey,
             issuedAt,
             expiresAt,
+            appPermissions,
         });
 
         const credential: PersonCredential = {
@@ -168,6 +256,7 @@ export class PersonService {
             communityPublicKey,
             issuedAt,
             expiresAt,
+            appPermissions,
             signature:          signer.signBody(payload),
         };
 
@@ -195,6 +284,7 @@ export class PersonService {
             communityPublicKey: credential.communityPublicKey,
             issuedAt:           credential.issuedAt,
             expiresAt:          credential.expiresAt,
+            appPermissions:     credential.appPermissions ?? {},
         });
 
         return NodeSigner.verify(payload, credential.signature, communityPublicKey);

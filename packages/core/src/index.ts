@@ -37,3 +37,4 @@ export * from "./storage/DataManifest.js";
 export * from "./auth/OwnershipCertificate.js";
 export * from "./auth/CertificateAuthority.js";
 export * from "./auth/PersonCredential.js";
+export * from "./auth/AppSuspensionCache.js";

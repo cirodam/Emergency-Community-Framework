@@ -31,6 +31,17 @@ export interface PersonDto {
     isSteward: boolean;
     joinDate: string;
     hasPassword: boolean;
+    /** Present on individual GET /api/persons/:id; absent from list responses. */
+    appPermissions?: Record<string, string[]>;
+}
+
+export interface AppSuspension {
+    id: string;
+    personId: string;
+    app: string;
+    reason: string;
+    suspendedAt: string;
+    suspendedBy: string;
 }
 
 export interface ConstitutionParam {
@@ -350,6 +361,29 @@ export async function revokeSteward(personId: string): Promise<PersonDto> {
     return res.json() as Promise<PersonDto>;
 }
 
+export async function suspendFromApp(personId: string, app: string, reason: string): Promise<AppSuspension> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(personId)}/app-suspensions`, {
+        method: "POST",
+        body: JSON.stringify({ app, reason }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to suspend");
+    }
+    return res.json() as Promise<AppSuspension>;
+}
+
+export async function unsuspendFromApp(personId: string, app: string): Promise<void> {
+    const res = await apiFetch(
+        `/api/persons/${encodeURIComponent(personId)}/app-suspensions/${encodeURIComponent(app)}`,
+        { method: "DELETE" },
+    );
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to lift suspension");
+    }
+}
+
 // ── Constitution ──────────────────────────────────────────────────────────────
 
 export async function getConstitution(): Promise<ConstitutionDocument> {
@@ -513,6 +547,7 @@ export interface UnitDto {
     type: string;
     personIds: string[];
     roleIds: string[];
+    locationId: string | null;
     createdAt: string;
 }
 
@@ -614,19 +649,45 @@ export async function getUnit(id: string): Promise<UnitDto> {
     return res.json() as Promise<UnitDto>;
 }
 
+export async function updateUnit(id: string, patch: {
+    name?: string;
+    description?: string;
+    locationId?: string | null;
+}): Promise<UnitDto> {
+    const res = await apiFetch(`/api/units/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body:   JSON.stringify(patch),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to update unit");
+    }
+    return res.json() as Promise<UnitDto>;
+}
+
 // ── Roles ──────────────────────────────────────────────────────────────────────
 
+export interface ScheduleSlot {
+    /** 0 = Sunday, 1 = Monday … 6 = Saturday */
+    dayOfWeek: number;
+    /** "HH:MM" 24-hour */
+    startTime: string;
+    /** "HH:MM" 24-hour */
+    endTime: string;
+}
+
 export interface RoleDto {
-    id:            string;
-    roleTypeId:    string | null;
-    title:         string;
-    description:   string;
-    memberId:      string | null;
-    kinPerMonth:   number;
-    funded:        boolean;
-    termStartDate: string | null;
-    termEndDate:   string | null;
-    isActive:      boolean;
+    id:             string;
+    roleTypeId:     string | null;
+    title:          string;
+    description:    string;
+    memberId:       string | null;
+    kinPerMonth:    number;
+    funded:         boolean;
+    termStartDate:  string | null;
+    termEndDate:    string | null;
+    isActive:       boolean;
+    weeklySchedule: ScheduleSlot[];
 }
 
 export interface RoleTypeDto {
@@ -673,6 +734,7 @@ export async function updateRole(id: string, patch: {
     kinPerMonth?: number;
     funded?: boolean;
     memberId?: string | null;
+    weeklySchedule?: ScheduleSlot[];
 }): Promise<RoleDto> {
     const res = await apiFetch(`/api/roles/${encodeURIComponent(id)}`, {
         method: "PATCH",
@@ -1085,9 +1147,12 @@ export interface NominationDto {
     id:         string;
     createdAt:  string;
     createdBy:  string;
+    type:       "role" | "pool";
     roleId:     string;
     unitId:     string;
     domainId:   string;
+    poolId:     string | null;
+    poolName:   string | null;
     nomineeId:  string;
     statement:  string;
     status:     NominationStatus;
@@ -1134,6 +1199,22 @@ export async function createNomination(data: {
     statement: string;
 }): Promise<NominationDto> {
     const res = await apiFetch("/api/nominations", {
+        method: "POST",
+        body:   JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to submit nomination");
+    }
+    return res.json() as Promise<NominationDto>;
+}
+
+export async function createPoolNomination(data: {
+    poolId:    string;
+    nomineeId: string;
+    statement: string;
+}): Promise<NominationDto> {
+    const res = await apiFetch("/api/nominations/pool", {
         method: "POST",
         body:   JSON.stringify(data),
     });
@@ -1325,4 +1406,82 @@ export async function withdrawMotion(id: string): Promise<MotionDto> {
         throw new Error(b.error ?? "Failed to withdraw motion");
     }
     return res.json() as Promise<MotionDto>;
+}
+
+// ── Shifts ────────────────────────────────────────────────────────────────────
+
+export interface ShiftDto {
+    id:               string;
+    domainId:         string;
+    label:            string;
+    startAt:          string;
+    endAt:            string;
+    assignedPersonId: string | null;
+    note:             string | null;
+    createdBy:        string;
+    createdAt:        string;
+    isOpen:           boolean;
+}
+
+export async function listShifts(opts: {
+    domainId?: string;
+    personId?: string;
+    open?: boolean;
+    from?: string;
+    to?: string;
+} = {}): Promise<ShiftDto[]> {
+    const params = new URLSearchParams();
+    if (opts.domainId) params.set("domainId", opts.domainId);
+    if (opts.personId) params.set("personId", opts.personId);
+    if (opts.open)     params.set("open", "true");
+    if (opts.from)     params.set("from", opts.from);
+    if (opts.to)       params.set("to", opts.to);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    const res = await apiFetch(`/api/shifts${qs}`);
+    if (!res.ok) throw new Error("Failed to load shifts");
+    return res.json() as Promise<ShiftDto[]>;
+}
+
+export async function createShift(data: {
+    domainId: string;
+    label:    string;
+    startAt:  string;
+    endAt:    string;
+    note?:    string | null;
+}): Promise<ShiftDto> {
+    const res = await apiFetch("/api/shifts", {
+        method: "POST",
+        body:   JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to create shift");
+    }
+    return res.json() as Promise<ShiftDto>;
+}
+
+export async function claimShift(id: string): Promise<ShiftDto> {
+    const res = await apiFetch(`/api/shifts/${encodeURIComponent(id)}/claim`, { method: "POST" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to claim shift");
+    }
+    return res.json() as Promise<ShiftDto>;
+}
+
+export async function unclaimShift(id: string): Promise<ShiftDto> {
+    const res = await apiFetch(`/api/shifts/${encodeURIComponent(id)}/unclaim`, { method: "POST" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to unclaim shift");
+    }
+    return res.json() as Promise<ShiftDto>;
+}
+
+export async function deleteShift(id: string): Promise<void> {
+    const res = await apiFetch(`/api/shifts/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to delete shift");
+    }
 }

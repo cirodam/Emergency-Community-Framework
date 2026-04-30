@@ -1,4 +1,4 @@
-import { writable } from "svelte/store";
+import { writable, derived } from "svelte/store";
 
 export interface SessionData {
     personId:  string;
@@ -6,9 +6,10 @@ export interface SessionData {
     lastName:  string;
     handle:    string;
     token:     string;
+    appPermissions: Record<string, string[]>;
 }
 
-export type Page = "inbox" | "outbox" | "thread" | "compose";
+export type Page = "inbox" | "outbox" | "thread" | "compose" | "moderation";
 
 const SESSION_KEY = "ecf_mail_session";
 const TOKEN_KEY   = "ecf_mail_token";
@@ -47,6 +48,10 @@ function createSessionStore() {
 }
 
 export const session = createSessionStore();
+
+/** Derived: current mail permission levels. */
+const mailPerms = derived(session, s => s?.appPermissions?.["mail"] ?? []);
+export const isModerator = derived(mailPerms, p => p.includes("moderator"));
 
 // ── Page routing ──────────────────────────────────────────────────────────────
 

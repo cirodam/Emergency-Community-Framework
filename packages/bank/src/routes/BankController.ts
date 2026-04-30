@@ -185,7 +185,7 @@ export function applyDemurrage(req: Request, res: Response): void {
     }
 }
 
-function toTxDto(t: { id: string; fromAccountId: string; toAccountId: string; currency: Currency; amount: number; memo: string; timestamp: Date }) {
+function toTxDto(t: { id: string; fromAccountId: string; toAccountId: string; currency: Currency; amount: number; memo: string; timestamp: Date; reversalOf?: string }) {
     return {
         id:            t.id,
         fromAccountId: t.fromAccountId,
@@ -194,10 +194,32 @@ function toTxDto(t: { id: string; fromAccountId: string; toAccountId: string; cu
         amount:        t.amount,
         memo:          t.memo,
         timestamp:     t.timestamp,
+        reversalOf:    t.reversalOf,
     };
 }
 
 const MAX_ACCOUNTS_PER_MEMBER = 10;
+
+// GET /api/admin/accounts — requires teller or admin credential
+export function adminGetAccounts(_req: Request, res: Response): void {
+    res.json(bank().getAllAccounts().map(toAccountDto));
+}
+
+// POST /api/admin/transactions/:id/reverse — requires bank admin credential
+// Body (optional): { memo }
+export async function adminReverseTransaction(req: Request, res: Response): Promise<void> {
+    const txId = req.params.id as string;
+    const { memo } = req.body ?? {};
+    if (memo !== undefined && typeof memo !== "string") {
+        res.status(400).json({ error: "memo must be a string" }); return;
+    }
+    try {
+        const reversal = await bank().reverseTransaction(txId, memo);
+        res.status(201).json(toTxDto(reversal));
+    } catch (err) {
+        res.status(422).json({ error: (err as Error).message });
+    }
+}
 
 // POST /api/me/accounts
 // Body: { label, currency? }

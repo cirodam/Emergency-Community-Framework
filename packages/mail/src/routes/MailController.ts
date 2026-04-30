@@ -176,3 +176,38 @@ export function receiveExternalMessage(req: Request, res: Response): void {
 
     res.status(201).json({ ok: true, messageId: stored.id });
 }
+
+// ── Moderation ─────────────────────────────────────────────────────────────
+
+// POST /api/messages/:id/report
+export function reportMessage(req: Request & { personId?: string }, res: Response): void {
+    const reporterId = req.personId;
+    if (!reporterId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+    const { reason } = req.body ?? {};
+    if (typeof reason !== "string") { res.status(400).json({ error: "reason is required" }); return; }
+
+    try {
+        const report = svc().reportMessage(req.params.id as string, reporterId, reason);
+        res.status(201).json(report);
+    } catch (err) {
+        const msg = (err as Error).message;
+        res.status(msg.includes("not found") ? 404 : 422).json({ error: msg });
+    }
+}
+
+// GET /api/admin/reports
+export function adminListReports(_req: Request, res: Response): void {
+    res.json(svc().getReports());
+}
+
+// DELETE /api/admin/messages/:id
+export function adminDeleteMessage(req: Request, res: Response): void {
+    try {
+        svc().adminDeleteMessage(req.params.id as string);
+        res.status(204).end();
+    } catch (err) {
+        const msg = (err as Error).message;
+        res.status(msg.includes("not found") ? 404 : 422).json({ error: msg });
+    }
+}

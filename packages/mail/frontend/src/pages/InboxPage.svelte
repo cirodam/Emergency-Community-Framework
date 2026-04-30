@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getInbox, markRead, deleteMessage } from "../lib/api.js";
+    import { getInbox, markRead, deleteMessage, reportMessage } from "../lib/api.js";
     import type { MessageDto } from "../lib/api.js";
     import { currentPage, selectedThreadId, session } from "../lib/session.js";
 
@@ -53,6 +53,14 @@
             messages = messages.filter(m => m.id !== msg.id);
         } catch { /* ignore */ }
     }
+
+    async function flag(msg: MessageDto, e: MouseEvent) {
+        e.stopPropagation();
+        const reason = prompt("Reason for reporting (optional):") ?? "";
+        try {
+            await reportMessage(msg.id, reason);
+        } catch { /* ignore */ }
+    }
 </script>
 
 <div class="page">
@@ -92,6 +100,9 @@
                     </div>
                     <div class="row-right">
                         <span class="row-date">{formatDate(msg.sentAt)}</span>
+                        {#if msg.fromPersonId !== s.personId}
+                            <button class="flag-btn" onclick={(e) => flag(msg, e)} aria-label="Report">⚑</button>
+                        {/if}
                         <button class="delete-btn" onclick={(e) => remove(msg, e)} aria-label="Delete">✕</button>
                     </div>
                 </li>
@@ -212,6 +223,20 @@
     }
     .row:hover .delete-btn { color: #cbd5e1; }
     .delete-btn:hover { color: #dc2626 !important; }
+
+    .flag-btn {
+        background: none;
+        border: none;
+        font-size: 0.8rem;
+        color: transparent;
+        cursor: pointer;
+        padding: 0.2rem;
+        line-height: 1;
+        transition: color 0.1s;
+        flex-shrink: 0;
+    }
+    .row:hover .flag-btn { color: #d1d5db; }
+    .flag-btn:hover { color: #f59e0b !important; }
 
     /* ── States ─────────────────────────────────────────────────────────────── */
 

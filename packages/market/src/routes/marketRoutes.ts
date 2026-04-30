@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { requirePersonCredential } from "@ecf/core";
-import { getCommunityIdentity } from "../communityIdentity.js";
+import { requireAuth, requireCoordinator, requireMarketAccess } from "./middleware.js";
 import {
     listClassifieds,
     getClassified,
@@ -8,6 +7,7 @@ import {
     updateClassified,
     cancelClassified,
     claimClassified,
+    adminCancelClassified,
 } from "./ClassifiedController.js";
 import {
     listStalls,
@@ -15,6 +15,8 @@ import {
     createStall,
     updateStall,
     deleteStall,
+    adminSuspendStall,
+    adminUnsuspendStall,
 } from "./StallController.js";
 import {
     listServices,
@@ -32,36 +34,40 @@ import {
 } from "./MarketplaceController.js";
 
 const router = Router();
-const requireAuth = requirePersonCredential(getCommunityIdentity);
 
 // ── Classifieds ───────────────────────────────────────────────────────────────
 router.get(   "/classifieds",           listClassifieds);
 router.get(   "/classifieds/:id",       getClassified);
-router.post(  "/classifieds",           requireAuth, createClassified);
-router.patch( "/classifieds/:id",       requireAuth, updateClassified);
-router.delete("/classifieds/:id",       requireAuth, cancelClassified);
-router.post(  "/classifieds/:id/claim", requireAuth, claimClassified);
+router.post(  "/classifieds",           ...requireMarketAccess, createClassified);
+router.patch( "/classifieds/:id",       ...requireMarketAccess, updateClassified);
+router.delete("/classifieds/:id",       ...requireMarketAccess, cancelClassified);
+router.post(  "/classifieds/:id/claim", ...requireMarketAccess, claimClassified);
 
-// ── Stalls ────────────────────────────────────────────────────────────────────
+// ── Stalls ────────────────────────────────────────────────────────────────
 router.get(   "/stalls",     listStalls);
 router.get(   "/stalls/:id", getStall);
-router.post(  "/stalls",     requireAuth, createStall);
-router.patch( "/stalls/:id", requireAuth, updateStall);
-router.delete("/stalls/:id", requireAuth, deleteStall);
+router.post(  "/stalls",     ...requireMarketAccess, createStall);
+router.patch( "/stalls/:id", ...requireMarketAccess, updateStall);
+router.delete("/stalls/:id", ...requireMarketAccess, deleteStall);
+
+// ── Coordinator / admin routes ────────────────────────────────────────────────
+router.delete("/admin/classifieds/:id",        ...requireCoordinator, adminCancelClassified);
+router.patch( "/admin/stalls/:id/suspend",     ...requireCoordinator, adminSuspendStall);
+router.patch( "/admin/stalls/:id/unsuspend",   ...requireCoordinator, adminUnsuspendStall);
 
 // ── Services ──────────────────────────────────────────────────────────────────
 router.get(   "/services",     listServices);
 router.get(   "/services/:id", getService);
-router.post(  "/services",     requireAuth, createService);
-router.patch( "/services/:id", requireAuth, updateService);
-router.delete("/services/:id", requireAuth, deleteService);
+router.post(  "/services",     ...requireMarketAccess, createService);
+router.patch( "/services/:id", ...requireMarketAccess, updateService);
+router.delete("/services/:id", ...requireMarketAccess, deleteService);
 
 // ── Marketplaces ──────────────────────────────────────────────────────────────
 router.get(   "/marketplaces",     listMarketplaces);
 router.get(   "/marketplaces/:id", getMarketplace);
-router.post(  "/marketplaces",     requireAuth, createMarketplace);
-router.patch( "/marketplaces/:id", requireAuth, updateMarketplace);
-router.delete("/marketplaces/:id", requireAuth, deleteMarketplace);
+router.post(  "/marketplaces",     ...requireMarketAccess, createMarketplace);
+router.patch( "/marketplaces/:id", ...requireMarketAccess, updateMarketplace);
+router.delete("/marketplaces/:id", ...requireMarketAccess, deleteMarketplace);
 
 // ── Community proxy: locations ────────────────────────────────────────────────
 // The browser cannot POST directly to the community server (different origin).

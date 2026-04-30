@@ -1,6 +1,6 @@
 <script lang="ts">
     import { getUnit, listRoles, listRoleTypes, listPersons, createRole, updateRole, deleteRole, createNomination } from "../lib/api.js";
-    import type { UnitDto, RoleDto, RoleTypeDto, PersonDto } from "../lib/api.js";
+    import type { UnitDto, RoleDto, RoleTypeDto, PersonDto, ScheduleSlot } from "../lib/api.js";
     import { currentPage, selectedUnitId, selectedDomainId } from "../lib/session.js";
 
     let unit: UnitDto | null = $state(null);
@@ -40,6 +40,43 @@
     let assigningRoleId: string | null = $state(null);
     let assignPersonId = $state("");
     let assignSaving = $state(false);
+
+    // Schedule editing
+    const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    let scheduleRoleId: string | null = $state(null);
+    let editSlots: ScheduleSlot[] = $state([]);
+    let scheduleSaving = $state(false);
+    let scheduleError = $state("");
+
+    function openSchedule(role: RoleDto) {
+        scheduleRoleId = role.id;
+        editSlots = role.weeklySchedule.map(s => ({ ...s }));
+        scheduleError = "";
+    }
+
+    function closeSchedule() { scheduleRoleId = null; }
+
+    function addSlot() {
+        editSlots = [...editSlots, { dayOfWeek: 1, startTime: "09:00", endTime: "17:00" }];
+    }
+
+    function removeSlot(i: number) {
+        editSlots = editSlots.filter((_, idx) => idx !== i);
+    }
+
+    async function saveSchedule(roleId: string) {
+        scheduleSaving = true;
+        scheduleError = "";
+        try {
+            const updated = await updateRole(roleId, { weeklySchedule: editSlots });
+            roles = roles.map(r => r.id === updated.id ? updated : r);
+            scheduleRoleId = null;
+        } catch (e) {
+            scheduleError = e instanceof Error ? e.message : "Failed to save";
+        } finally {
+            scheduleSaving = false;
+        }
+    }
 
     // Sorted role types: preferred for this unit type first, then the rest
     const sortedRoleTypes = $derived(() => {
@@ -350,6 +387,54 @@
                                     </button>
                                 {/if}
                             </div>
+
+                            <!-- Schedule editor -->
+                            {#if scheduleRoleId === role.id}
+                                <div class="schedule-editor">
+                                    <div class="schedule-header">
+                                        <span class="schedule-title">Weekly schedule</span>
+                                        <button class="schedule-add-btn" onclick={addSlot}>+ Add day</button>
+                                    </div>
+                                    {#if editSlots.length === 0}
+                                        <p class="schedule-empty">No recurring shifts. Add a day above.</p>
+                                    {/if}
+                                    {#each editSlots as slot, i}
+                                        <div class="slot-row">
+                                            <select class="slot-input" bind:value={slot.dayOfWeek}>
+                                                {#each DAYS as day, idx}
+                                                    <option value={idx}>{day}</option>
+                                                {/each}
+                                            </select>
+                                            <input class="slot-input time" type="time" bind:value={slot.startTime} />
+                                            <span class="slot-sep">–</span>
+                                            <input class="slot-input time" type="time" bind:value={slot.endTime} />
+                                            <button class="slot-remove" onclick={() => removeSlot(i)}>✕</button>
+                                        </div>
+                                    {/each}
+                                    {#if scheduleError}
+                                        <p class="schedule-err">{scheduleError}</p>
+                                    {/if}
+                                    <div class="schedule-actions">
+                                        <button class="kin-save-btn" onclick={() => saveSchedule(role.id)} disabled={scheduleSaving}>
+                                            {scheduleSaving ? "Saving…" : "Save schedule"}
+                                        </button>
+                                        <button class="kin-cancel-btn" onclick={closeSchedule} disabled={scheduleSaving}>Cancel</button>
+                                    </div>
+                                </div>
+                            {:else}
+                                <div class="schedule-summary">
+                                    {#if role.weeklySchedule.length > 0}
+                                        <span class="schedule-chips">
+                                            {#each role.weeklySchedule as slot}
+                                                <span class="schedule-chip">{DAYS[slot.dayOfWeek]} {slot.startTime}–{slot.endTime}</span>
+                                            {/each}
+                                        </span>
+                                    {/if}
+                                    <button class="schedule-edit-btn" onclick={() => openSchedule(role)}>
+                                        {role.weeklySchedule.length > 0 ? "Edit schedule" : "Set schedule"}
+                                    </button>
+                                </div>
+                            {/if}
                         </div>
                     {/each}
                 </div>
@@ -891,4 +976,109 @@
         color: #dc2626;
         background: #fee2e2;
     }
+
+    /* Schedule editor */
+    .schedule-editor {
+        margin-top: 0.75rem;
+        padding: 0.75rem;
+        background: #f0fdf4;
+        border: 1px solid #a7f3d0;
+        border-radius: 8px;
+    }
+    .schedule-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    .schedule-title {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #14532d;
+    }
+    .schedule-add-btn {
+        background: transparent;
+        border: 1px dashed #a7f3d0;
+        border-radius: 5px;
+        color: #15803d;
+        font-size: 0.75rem;
+        padding: 0.2rem 0.55rem;
+        cursor: pointer;
+    }
+    .schedule-add-btn:hover { background: #d1fae5; }
+    .schedule-empty {
+        color: #9ca3af;
+        font-size: 0.78rem;
+        margin: 0 0 0.5rem;
+    }
+    .slot-row {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-bottom: 0.4rem;
+    }
+    .slot-input {
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        padding: 0.25rem 0.4rem;
+        font-size: 0.8rem;
+        font-family: inherit;
+        background: #fff;
+        color: #111827;
+    }
+    .slot-input.time { width: 6.5rem; }
+    .slot-sep { color: #9ca3af; font-size: 0.85rem; }
+    .slot-remove {
+        background: transparent;
+        border: none;
+        color: #dc2626;
+        cursor: pointer;
+        font-size: 0.75rem;
+        opacity: 0.55;
+        padding: 0.1rem 0.25rem;
+    }
+    .slot-remove:hover { opacity: 1; }
+    .schedule-err {
+        color: #dc2626;
+        font-size: 0.78rem;
+        margin: 0.25rem 0;
+    }
+    .schedule-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.4rem;
+    }
+
+    /* Schedule summary (collapsed view) */
+    .schedule-summary {
+        margin-top: 0.6rem;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+    .schedule-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+    }
+    .schedule-chip {
+        background: #d1fae5;
+        color: #065f46;
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.15rem 0.45rem;
+        border-radius: 4px;
+    }
+    .schedule-edit-btn {
+        background: transparent;
+        border: 1px solid #a7f3d0;
+        border-radius: 5px;
+        color: #15803d;
+        font-size: 0.74rem;
+        padding: 0.18rem 0.5rem;
+        cursor: pointer;
+        margin-left: auto;
+    }
+    .schedule-edit-btn:hover { background: #f0fdf4; }
 </style>

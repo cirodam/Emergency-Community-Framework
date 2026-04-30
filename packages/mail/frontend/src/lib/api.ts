@@ -99,3 +99,40 @@ export async function deleteMessage(id: string): Promise<void> {
     const res = await apiFetch(`/api/messages/${id}`, { method: "DELETE" });
     if (!res.ok) throw new Error("Failed to delete message");
 }
+
+// ── Moderation ────────────────────────────────────────────────────────────────
+
+export interface MessageReport {
+    id:         string;
+    messageId:  string;
+    reporterId: string;
+    reason:     string;
+    reportedAt: string;
+    message:    MessageDto | null;
+}
+
+export async function reportMessage(id: string, reason: string): Promise<MessageReport> {
+    const res = await apiFetch(`/api/messages/${encodeURIComponent(id)}/report`, {
+        method: "POST",
+        body:   JSON.stringify({ reason }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error ?? "Failed to report message");
+    }
+    return res.json() as Promise<MessageReport>;
+}
+
+export async function getAdminReports(): Promise<MessageReport[]> {
+    const res = await apiFetch("/api/admin/reports");
+    if (!res.ok) throw new Error("Failed to load reports");
+    return res.json() as Promise<MessageReport[]>;
+}
+
+export async function adminDeleteMessage(id: string): Promise<void> {
+    const res = await apiFetch(`/api/admin/messages/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error ?? "Failed to delete message");
+    }
+}

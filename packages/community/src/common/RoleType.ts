@@ -85,8 +85,11 @@ export const DEFAULT_ROLE_TYPES: Omit<RoleTypeData, "id">[] = [
     // Food & Agriculture
     { title: "Farmer",                   description: "Cultivates crops and manages agricultural land.",                            defaultKinPerMonth: 3_333, preferredUnitTypes: ["farm-coordination-office"] },
     { title: "Agricultural Worker",      description: "Performs hands-on field and farm labour.",                                  defaultKinPerMonth: 2_500, preferredUnitTypes: ["farm-coordination-office"] },
+    { title: "Farm Coordinator",         description: "Coordinates land allocation, planting schedules, shared equipment, and harvest logistics across community farms and individual growers.", defaultKinPerMonth: 3_750, preferredUnitTypes: ["farm-coordination-office"] },
     { title: "Baker",                    description: "Produces bread and baked goods.",                                           defaultKinPerMonth: 2_917, preferredUnitTypes: ["community-kitchen", "grain-mill"] },
     { title: "Cook",                     description: "Prepares and serves community meals.",                                      defaultKinPerMonth: 2_917, preferredUnitTypes: ["community-kitchen"] },
+    { title: "Food Supply Officer",      description: "Coordinates food procurement, storage, and distribution across the community; manages inventory and supply chain logistics.", defaultKinPerMonth: 3_750, preferredUnitTypes: ["food-supply-office"] },
+    { title: "Community Kitchen Director", description: "Oversees day-to-day operations of the community kitchen: meal planning, food safety, staff coordination, and inventory of perishables.", defaultKinPerMonth: 3_333, preferredUnitTypes: ["community-kitchen"] },
 
     // Skilled Trades
     { title: "Carpenter / Builder",      description: "Constructs and repairs buildings and structures.",                          defaultKinPerMonth: 4_167, preferredUnitTypes: [] },
@@ -94,6 +97,7 @@ export const DEFAULT_ROLE_TYPES: Omit<RoleTypeData, "id">[] = [
     { title: "Plumber",                  description: "Installs and repairs water and sanitation systems.",                        defaultKinPerMonth: 4_583, preferredUnitTypes: [] },
     { title: "Mechanic",                 description: "Maintains and repairs vehicles and machinery.",                             defaultKinPerMonth: 4_167, preferredUnitTypes: [] },
     { title: "Solar Technician",         description: "Installs and maintains solar energy systems.",                              defaultKinPerMonth: 4_583, preferredUnitTypes: ["electricity-office"] },
+    { title: "Liquid Fuel Officer",      description: "Manages procurement, storage, safety compliance, and rationed distribution of liquid fuels including biodiesel and petrol.", defaultKinPerMonth: 3_750, preferredUnitTypes: ["liquid-fuel-office"] },
 
     // Community Care & Services
     { title: "Caregiver",                description: "Provides personal care to people who need daily assistance.",               defaultKinPerMonth: 2_917, preferredUnitTypes: ["community-outreach-team"] },

@@ -8,6 +8,7 @@ import { RoleType } from "../common/RoleType.js";
 import { LeaderPool } from "../governance/LeaderPool.js";
 import type { BudgetCategory } from "../common/domain/FunctionalDomain.js";
 import { PersonService } from "../person/PersonService.js";
+import { LocationService } from "../location/LocationService.js";
 
 const svc = () => DomainService.getInstance();
 
@@ -89,6 +90,37 @@ export function deleteUnit(req: Request, res: Response): void {
     res.status(204).send();
 }
 
+// PATCH /api/units/:id
+// Body: { name?, description?, locationId? }
+export function updateUnit(req: Request, res: Response): void {
+    const unit = svc().getUnit(req.params.id as string);
+    if (!unit) { res.status(404).json({ error: "Unit not found" }); return; }
+    const { name, description, locationId } = req.body ?? {};
+    if (name !== undefined) {
+        if (typeof name !== "string" || !name.trim()) {
+            res.status(400).json({ error: "name must be a non-empty string" }); return;
+        }
+        (unit as unknown as Record<string, unknown>)["name"] = name.trim();
+    }
+    if (description !== undefined) {
+        if (typeof description !== "string") {
+            res.status(400).json({ error: "description must be a string" }); return;
+        }
+        (unit as unknown as Record<string, unknown>)["description"] = description;
+    }
+    if (locationId !== undefined) {
+        if (locationId !== null && typeof locationId !== "string") {
+            res.status(400).json({ error: "locationId must be a string or null" }); return;
+        }
+        if (locationId !== null && !LocationService.getInstance().get(locationId)) {
+            res.status(404).json({ error: "Location not found" }); return;
+        }
+        unit.locationId = locationId;
+    }
+    svc().saveUnit(unit);
+    res.json(toUnitDto(unit));
+}
+
 // GET /api/templates
 // Returns all registered unit templates (type, label, description).
 export function listTemplates(_req: Request, res: Response): void {
@@ -150,11 +182,11 @@ export function createRole(req: Request, res: Response): void {
 }
 
 // PATCH /api/roles/:id
-// Body: { memberId?, kinPerMonth?, funded?, termStartDate?, termEndDate?, title?, description? }
+// Body: { memberId?, kinPerMonth?, funded?, termStartDate?, termEndDate?, title?, description?, weeklySchedule? }
 export function updateRole(req: Request, res: Response): void {
     const role = svc().getRole(req.params.id as string);
     if (!role) { res.status(404).json({ error: "Role not found" }); return; }
-    const { memberId, kinPerMonth, funded, termStartDate, termEndDate, title, description } = req.body ?? {};
+    const { memberId, kinPerMonth, funded, termStartDate, termEndDate, title, description, weeklySchedule } = req.body ?? {};
     if (title !== undefined) {
         if (typeof title !== "string" || !title.trim()) {
             res.status(400).json({ error: "title must be a non-empty string" }); return;
@@ -177,6 +209,12 @@ export function updateRole(req: Request, res: Response): void {
     if (funded       !== undefined) role.funded       = funded;
     if (termStartDate !== undefined) role.termStartDate = termStartDate ? new Date(termStartDate) : null;
     if (termEndDate   !== undefined) role.termEndDate   = termEndDate   ? new Date(termEndDate)   : null;
+    if (weeklySchedule !== undefined) {
+        if (!Array.isArray(weeklySchedule)) {
+            res.status(400).json({ error: "weeklySchedule must be an array" }); return;
+        }
+        role.weeklySchedule = weeklySchedule;
+    }
     svc().saveRole(role);
     res.json(toRoleDto(role));
 }
@@ -332,22 +370,24 @@ function toUnitDto(u: FunctionalUnit) {
         type:        u.getType(),
         personIds:   u.personIds,
         roleIds:     u.roleIds,
+        locationId:  u.locationId,
         createdAt:   u.createdAt,
     };
 }
 
 function toRoleDto(r: CommunityRole) {
     return {
-        id:            r.id,
-        roleTypeId:    r.roleTypeId,
-        title:         r.title,
-        description:   r.description,
-        memberId:      r.memberId,
-        kinPerMonth:   r.kinPerMonth,
-        funded:        r.funded,
-        termStartDate: r.termStartDate,
-        termEndDate:   r.termEndDate,
-        isActive:      r.isActive(),
+        id:             r.id,
+        roleTypeId:     r.roleTypeId,
+        title:          r.title,
+        description:    r.description,
+        memberId:       r.memberId,
+        kinPerMonth:    r.kinPerMonth,
+        funded:         r.funded,
+        termStartDate:  r.termStartDate,
+        termEndDate:    r.termEndDate,
+        isActive:       r.isActive(),
+        weeklySchedule: r.weeklySchedule,
     };
 }
 

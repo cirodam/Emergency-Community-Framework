@@ -38,6 +38,8 @@ import { TransitDomain } from "../domains/transit/TransitDomain.js";
 import { TransitUnitTemplates } from "../domains/transit/TransitUnitTemplates.js";
 import { CourierDomain } from "../domains/courier/CourierDomain.js";
 import { CourierUnitTemplates } from "../domains/courier/CourierUnitTemplates.js";
+import { MarketDomain } from "../domains/market/MarketDomain.js";
+import { MarketUnitTemplates } from "../domains/market/MarketUnitTemplates.js";
 import { CommunityRole } from "../common/CommunityRole.js";
 
 /**
@@ -76,27 +78,41 @@ export function seedDomains(domainSvc: DomainService): void {
 
     domainSvc.registerDomain(CommunityBankDomain.getInstance());
     if (CommunityBankDomain.getInstance().unitIds.length === 0) {
-        domainSvc.createUnit(
-            new FunctionalUnit("Main Branch", "The primary branch of the community bank.", "branch"),
-            CommunityBankDomain.getInstance().id,
+        const mainBranch = new FunctionalUnit("Main Branch", "The primary branch of the community bank.", "branch");
+        domainSvc.createUnit(mainBranch, CommunityBankDomain.getInstance().id);
+        domainSvc.createRole(
+            new CommunityRole("Teller", "Assists community members with deposits, withdrawals, account inquiries, and day-to-day banking transactions at the branch.", 2_500),
+            mainBranch.id,
         );
     }
     domainSvc.registerDomain(FoodDomain.getInstance());
     if (FoodDomain.getInstance().unitIds.length === 0) {
-        domainSvc.createUnit(
-            new FunctionalUnit("Food Supply Office", "Central office coordinating food procurement, storage, and distribution for the community.", "food-supply-office"),
-            FoodDomain.getInstance().id,
+        const foodSupplyUnit = new FunctionalUnit("Food Supply Office", "Central office coordinating food procurement, storage, and distribution for the community.", "food-supply-office");
+        domainSvc.createUnit(foodSupplyUnit, FoodDomain.getInstance().id);
+        domainSvc.createRole(
+            new CommunityRole("Food Supply Officer", "Coordinates food procurement, storage, and distribution across the community; manages inventory and supply chain logistics.", 3_750),
+            foodSupplyUnit.id,
         );
-        domainSvc.createUnit(
-            new FunctionalUnit("Community Kitchen", "Shared kitchen space for food preparation and cooking. Handles raw ingredient processing, meal preparation, and food preservation for the community.", "community-kitchen"),
-            FoodDomain.getInstance().id,
+        const kitchenUnit = new FunctionalUnit("Community Kitchen", "Shared kitchen space for food preparation and cooking. Handles raw ingredient processing, meal preparation, and food preservation for the community.", "community-kitchen");
+        domainSvc.createUnit(kitchenUnit, FoodDomain.getInstance().id);
+        domainSvc.createRole(
+            new CommunityRole("Community Kitchen Director", "Oversees day-to-day operations of the community kitchen: meal planning, food safety, staff coordination, and inventory of perishables.", 3_333),
+            kitchenUnit.id,
         );
+        for (let i = 0; i < 4; i++) {
+            domainSvc.createRole(
+                new CommunityRole("Cook", "Prepares and serves community meals.", 2_917),
+                kitchenUnit.id,
+            );
+        }
     }
     domainSvc.registerDomain(AgricultureDomain.getInstance());
     if (AgricultureDomain.getInstance().unitIds.length === 0) {
-        domainSvc.createUnit(
-            new FunctionalUnit("Farm Coordination Office", "Coordinates land allocation, planting schedules, shared equipment, and harvest logistics across community farms and individual growers.", "farm-coordination-office"),
-            AgricultureDomain.getInstance().id,
+        const farmCoordUnit = new FunctionalUnit("Farm Coordination Office", "Coordinates land allocation, planting schedules, shared equipment, and harvest logistics across community farms and individual growers.", "farm-coordination-office");
+        domainSvc.createUnit(farmCoordUnit, AgricultureDomain.getInstance().id);
+        domainSvc.createRole(
+            new CommunityRole("Farm Coordinator", "Coordinates land allocation, planting schedules, shared equipment, and harvest logistics across community farms and individual growers.", 3_750),
+            farmCoordUnit.id,
         );
     }
     domainSvc.registerDomain(HealthcareDomain.getInstance());
@@ -107,17 +123,27 @@ export function seedDomains(domainSvc: DomainService): void {
             new CommunityRole("Medical Supply Officer", "Oversees procurement, inventory, and distribution of medical supplies.", 3_750),
             medSupplyUnit.id,
         );
-        domainSvc.createUnit(
-            new FunctionalUnit("Primary Care Clinic", "General medical care, preventive health, chronic disease management, and triage for the community.", "primary-care-clinic"),
-            HealthcareDomain.getInstance().id,
+        const clinicUnit = new FunctionalUnit("Primary Care Clinic", "General medical care, preventive health, chronic disease management, and triage for the community.", "primary-care-clinic");
+        domainSvc.createUnit(clinicUnit, HealthcareDomain.getInstance().id);
+        domainSvc.createRole(
+            new CommunityRole("Doctor", "Diagnoses and treats illness and injury.", 8_333),
+            clinicUnit.id,
         );
+        for (let i = 0; i < 2; i++) {
+            domainSvc.createRole(
+                new CommunityRole("Community Health Worker", "Trained lay health worker who provides health education, triage support, chronic disease monitoring, and connection to care — the front line of community health.", 3_333),
+                clinicUnit.id,
+            );
+        }
     }
     domainSvc.registerDomain(HousingDomain.getInstance());
     domainSvc.registerDomain(EnergyDomain.getInstance());
     if (EnergyDomain.getInstance().unitIds.length === 0) {
-        domainSvc.createUnit(
-            new FunctionalUnit("Liquid Fuels Office", "Manages production or procurement, storage, and rationing of liquid fuels including biodiesel and petrol.", "liquid-fuel-office"),
-            EnergyDomain.getInstance().id,
+        const liquidFuelUnit = new FunctionalUnit("Liquid Fuels Office", "Manages production or procurement, storage, and rationing of liquid fuels including biodiesel and petrol.", "liquid-fuel-office");
+        domainSvc.createUnit(liquidFuelUnit, EnergyDomain.getInstance().id);
+        domainSvc.createRole(
+            new CommunityRole("Liquid Fuel Officer", "Manages procurement, storage, safety compliance, and rationed distribution of liquid fuels including biodiesel and petrol.", 3_750),
+            liquidFuelUnit.id,
         );
     }
     domainSvc.registerDomain(CommunicationsDomain.getInstance());
@@ -137,6 +163,19 @@ export function seedDomains(domainSvc: DomainService): void {
     domainSvc.registerDomain(EnrichmentDomain.getInstance());
     domainSvc.registerDomain(TransitDomain.getInstance());
     domainSvc.registerDomain(CourierDomain.getInstance());
+    domainSvc.registerDomain(MarketDomain.getInstance());
+    if (MarketDomain.getInstance().unitIds.length === 0) {
+        const coordOffice = new FunctionalUnit(
+            "Market Coordination Office",
+            "Administers physical marketplaces: coordinates scheduling, vendor relations, and fair-exchange policies across all community market sites.",
+            "market-coordination-office",
+        );
+        domainSvc.createUnit(coordOffice, MarketDomain.getInstance().id);
+        domainSvc.createRole(
+            new CommunityRole("Marketplace Coordinator", "Manages day-to-day operations of a physical marketplace: opens and closes the site, mediates disputes, tracks vendor slots, and ensures fair exchange practices.", 3_000),
+            coordOffice.id,
+        );
+    }
 
     // Register all unit templates so POST /api/units can instantiate them by type.
     FoodUnitTemplates.register();
@@ -155,4 +194,5 @@ export function seedDomains(domainSvc: DomainService): void {
     EnrichmentUnitTemplates.register();
     TransitUnitTemplates.register();
     CourierUnitTemplates.register();
+    MarketUnitTemplates.register();
 }

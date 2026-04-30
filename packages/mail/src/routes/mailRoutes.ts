@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { requirePersonCredential } from "@ecf/core";
-import { getCommunityIdentity } from "../communityIdentity.js";
+import { requireAuth, requireModerator, requireMailAccess } from "./middleware.js";
 import {
     listThreads,
     getThread,
@@ -11,21 +10,27 @@ import {
     markRead,
     deleteMessage,
     receiveExternalMessage,
+    reportMessage,
+    adminListReports,
+    adminDeleteMessage,
 } from "./MailController.js";
 
 const router = Router();
 
-const requireAuth = requirePersonCredential(getCommunityIdentity);
+// All mail routes require authentication + not suspended
+router.get(   "/threads",                ...requireMailAccess, listThreads);
+router.get(   "/threads/:id",            ...requireMailAccess, getThread);
+router.get(   "/inbox",                  ...requireMailAccess, getInbox);
+router.get(   "/outbox",                 ...requireMailAccess, getOutbox);
+router.get(   "/unread-count",           ...requireMailAccess, getUnreadCount);
+router.post(  "/messages",               ...requireMailAccess, sendMessage);
+router.patch( "/messages/:id/read",      ...requireMailAccess, markRead);
+router.delete("/messages/:id",           ...requireMailAccess, deleteMessage);
+router.post(  "/messages/:id/report",    ...requireMailAccess, reportMessage);
 
-// All mail routes require authentication
-router.get(   "/threads",                requireAuth, listThreads);
-router.get(   "/threads/:id",            requireAuth, getThread);
-router.get(   "/inbox",                  requireAuth, getInbox);
-router.get(   "/outbox",                 requireAuth, getOutbox);
-router.get(   "/unread-count",           requireAuth, getUnreadCount);
-router.post(  "/messages",               requireAuth, sendMessage);
-router.patch( "/messages/:id/read",      requireAuth, markRead);
-router.delete("/messages/:id",           requireAuth, deleteMessage);
+// ── Moderator routes ─────────────────────────────────────────────────────────
+router.get(   "/admin/reports",          ...requireModerator, adminListReports);
+router.delete("/admin/messages/:id",     ...requireModerator, adminDeleteMessage);
 
 // Internal — cross-community delivery (called by local community server, not by persons)
 router.post("/messages/incoming", receiveExternalMessage);

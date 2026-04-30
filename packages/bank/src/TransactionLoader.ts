@@ -19,6 +19,7 @@ interface TransactionRecord {
     amount: number;
     memo: string;
     timestamp: string;
+    reversalOf?: string;
     previousHash?: string;
     hash?: string;
 }
@@ -70,6 +71,11 @@ export class TransactionLoader {
         this.getBucketStore(bucket).write(tx.id, { ...base, hash });
         this.writeChainHead(hash);
         this.updateAccountIndex(tx.fromAccountId, tx.toAccountId, bucket);
+    }
+
+    /** Return a single transaction by ID, or undefined if not found. */
+    getById(id: string): BankTransaction | undefined {
+        return this.query().find(tx => tx.id === id);
     }
 
     // ── Read ──────────────────────────────────────────────────────────────────
@@ -215,7 +221,7 @@ export class TransactionLoader {
     }
 
     private toBaseRecord(tx: BankTransaction): Omit<TransactionRecord, "previousHash" | "hash"> {
-        return {
+        const base: Omit<TransactionRecord, "previousHash" | "hash"> = {
             id:            tx.id,
             fromAccountId: tx.fromAccountId,
             toAccountId:   tx.toAccountId,
@@ -224,6 +230,8 @@ export class TransactionLoader {
             memo:          tx.memo,
             timestamp:     tx.timestamp.toISOString(),
         };
+        if (tx.reversalOf) base.reversalOf = tx.reversalOf;
+        return base;
     }
 
     private fromRecord(r: TransactionRecord): BankTransaction {
@@ -234,7 +242,8 @@ export class TransactionLoader {
             r.currency,
             r.amount,
             r.memo,
-            new Date(r.timestamp)
+            new Date(r.timestamp),
+            r.reversalOf,
         );
     }
 }

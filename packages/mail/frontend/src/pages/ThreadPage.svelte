@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getThread, sendMessage } from "../lib/api.js";
+    import { getThread, sendMessage, reportMessage } from "../lib/api.js";
     import type { MessageDto, ThreadDetail } from "../lib/api.js";
     import { currentPage, session } from "../lib/session.js";
 
@@ -70,6 +70,12 @@
         return d.toLocaleDateString([], { month: "short", day: "numeric" });
     }
 
+    async function flagMessage(msg: MessageDto) {
+        const reason = prompt("Reason for reporting (optional):") ?? "";
+        try { await reportMessage(msg.id, reason); }
+        catch { /* ignore */ }
+    }
+
     async function reply() {
         const to = otherParticipant();
         if (!to || !replyBody.trim()) return;
@@ -131,6 +137,9 @@
                         </div>
                         <div class="header-right">
                             <span class="msg-date">{isCollapsed ? formatShort(msg.sentAt) : formatFull(msg.sentAt)}</span>
+                            {#if !mine}
+                                <button class="flag-btn" onclick={(e) => { e.stopPropagation(); flagMessage(msg); }} aria-label="Report">⚑</button>
+                            {/if}
                             <span class="chevron">{isCollapsed ? "›" : "‹"}</span>
                         </div>
                     </button>
@@ -320,6 +329,18 @@
         color: #cbd5e1;
         line-height: 1;
     }
+
+    .flag-btn {
+        background: none;
+        border: none;
+        font-size: 0.8rem;
+        color: #d1d5db;
+        cursor: pointer;
+        padding: 0.15rem;
+        line-height: 1;
+        transition: color 0.1s;
+    }
+    .flag-btn:hover { color: #f59e0b; }
 
     .email-body {
         padding: 0 1rem 1rem 4rem; /* indent to align with sender name */

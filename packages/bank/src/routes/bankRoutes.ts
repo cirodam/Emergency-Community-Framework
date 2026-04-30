@@ -1,12 +1,10 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import { requirePersonCredential, verifyNodeSignature } from "@ecf/core";
+import { verifyNodeSignature } from "@ecf/core";
 import { getCommunityIdentity } from "../communityIdentity.js";
-import { createAccount, getAllAccounts, getAccounts, getAccountById, getTransactions, createTransfer, applyDemurrage, getMyAccounts, createMyAccount, deleteMyAccount, renameMyAccount, closeOwnerAccounts } from "./BankController.js";
+import { requireAuth, requireNotSuspended, requireTeller, requireBankAdmin, requireBankAccess } from "./middleware.js";
+import { createAccount, getAllAccounts, getAccounts, getAccountById, getTransactions, createTransfer, applyDemurrage, getMyAccounts, createMyAccount, deleteMyAccount, renameMyAccount, closeOwnerAccounts, adminGetAccounts, adminReverseTransaction } from "./BankController.js";
 
 const router = Router();
-
-// Middleware that verifies the Bearer PersonCredential on every authenticated route.
-const requireAuth = requirePersonCredential(getCommunityIdentity);
 
 // Middleware that verifies an x-node-signature from the owning community node.
 const requireNodeAuth = verifyNodeSignature(() => getCommunityIdentity().publicKey);
@@ -29,13 +27,19 @@ router.delete("/accounts/:ownerId/all",            requireNodeAuth, closeOwnerAc
 router.get(   "/account/:accountId",               requireAuthOrNodeSignature, getAccountById);
 router.post("/demurrage",                        requireAuthOrNodeSignature, applyDemurrage);
 
-// Member routes — require a valid community-issued credential or node signature
-router.get(   "/me/accounts",                      requireAuth, getMyAccounts);
-router.post(  "/me/accounts",                      requireAuth, createMyAccount);
-router.delete("/me/accounts/:accountId",           requireAuth, deleteMyAccount);
-router.patch( "/me/accounts/:accountId",           requireAuth, renameMyAccount);
+// Member routes — require a valid community-issued credential + not suspended
+router.get(   "/me/accounts",                      ...requireBankAccess, getMyAccounts);
+router.post(  "/me/accounts",                      ...requireBankAccess, createMyAccount);
+router.delete("/me/accounts/:accountId",           ...requireBankAccess, deleteMyAccount);
+router.patch( "/me/accounts/:accountId",           ...requireBankAccess, renameMyAccount);
 router.get(   "/accounts/:ownerId",                requireAuthOrNodeSignature, getAccounts);
 router.get(   "/accounts/:accountId/transactions", requireAuthOrNodeSignature, getTransactions);
 router.post(  "/transfers",                        requireAuthOrNodeSignature, createTransfer);
+
+// Teller routes — require bank: teller permission
+router.get(  "/admin/accounts",                    ...requireTeller, adminGetAccounts);
+
+// Bank admin routes — require bank: admin permission
+router.post( "/admin/transactions/:id/reverse",    ...requireBankAdmin, adminReverseTransaction);
 
 export default router;

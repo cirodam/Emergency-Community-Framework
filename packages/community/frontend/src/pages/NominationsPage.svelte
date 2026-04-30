@@ -129,7 +129,11 @@
                                 </div>
                             </div>
                             <div class="card-meta">
-                                {roleTitle(n.roleId)} · {unitName(n.unitId)} · {domainName(n.domainId)}
+                                {#if n.type === "pool"}
+                                    Leader Pool: {n.poolName ?? n.poolId}
+                                {:else}
+                                    {roleTitle(n.roleId)} · {unitName(n.unitId)} · {domainName(n.domainId)}
+                                {/if}
                             </div>
                             {#if n.statement}
                                 <p class="card-statement">"{n.statement}"</p>

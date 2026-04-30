@@ -146,7 +146,8 @@ export class Bank {
         fromAccountId: string,
         toAccountId: string,
         amount: number,
-        memo: string = ""
+        memo: string = "",
+        reversalOf?: string,
     ): BankTransaction {
         if (!Number.isFinite(amount) || amount <= 0) {
             throw new Error(`Transfer amount must be a finite positive number, got ${amount}`);
@@ -173,7 +174,7 @@ export class Bank {
         from.debit(amount);
         to.credit(amount);
 
-        const tx = new BankTransaction(fromAccountId, toAccountId, from.currency, amount, memo);
+        const tx = new BankTransaction(fromAccountId, toAccountId, from.currency, amount, memo, reversalOf);
         this.accountLoader?.save(from);
         this.accountLoader?.save(to);
         this.transactionLoader?.save(tx);
@@ -236,5 +237,41 @@ export class Bank {
 
     getTransactions(accountId?: string, month?: string): BankTransaction[] {
         return this.transactionLoader?.query({ accountId, month }) ?? [];
+    }
+
+    getTransaction(txId: string): BankTransaction | undefined {
+        return this.transactionLoader?.getById(txId);
+    }
+
+    /**
+     * Create a reversal transaction that exactly undoes a previous transfer.
+     * The original transaction's `to` account sends back the same amount to the
+     * `from` account. The reversal is recorded with `reversalOf` set to the
+     * original transaction ID.
+     *
+     * Throws if the transaction is not found, has already been reversed, or if
+     * either account has insufficient funds to cover the reversal.
+     */
+    reverseTransaction(txId: string, memo?: string): Promise<BankTransaction> {
+        const original = this.getTransaction(txId);
+        if (!original) throw new Error(`Transaction ${txId} not found`);
+
+        // Guard: prevent double-reversal
+        const existing = this.getTransactions().find(t => t.reversalOf === txId);
+        if (existing) throw new Error(`Transaction ${txId} has already been reversed (${existing.id})`);
+
+        const reversalMemo = memo ?? `Reversal of ${txId}`;
+
+        const result = this._txQueue.then(() =>
+            this._transferSync(
+                original.toAccountId,
+                original.fromAccountId,
+                original.amount,
+                reversalMemo,
+                txId,
+            )
+        );
+        this._txQueue = result.then(() => undefined, () => undefined);
+        return result;
     }
 }

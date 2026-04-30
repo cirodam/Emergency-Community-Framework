@@ -8,6 +8,7 @@ interface UnitRecord {
     description: string;
     personIds: string[];
     roleIds: string[];
+    locationId: string | null;
     createdAt: string;
 }
 
@@ -24,6 +25,7 @@ export class FunctionalUnitLoader extends BaseLoader<UnitRecord, FunctionalUnit>
             description: unit.description,
             personIds:   unit.personIds,
             roleIds:     unit.roleIds,
+            locationId:  unit.locationId,
             createdAt:   unit.createdAt.toISOString(),
         };
     }
@@ -31,8 +33,9 @@ export class FunctionalUnitLoader extends BaseLoader<UnitRecord, FunctionalUnit>
     protected deserialize(r: UnitRecord): FunctionalUnit {
         const unit = new FunctionalUnit(r.name, r.description, r.type, r.id);
         (unit as unknown as Record<string, unknown>)["createdAt"] = new Date(r.createdAt);
-        unit.personIds = r.personIds ?? [];
-        unit.roleIds   = r.roleIds   ?? [];
+        unit.personIds  = r.personIds  ?? [];
+        unit.roleIds    = r.roleIds    ?? [];
+        unit.locationId = r.locationId ?? null;
         return unit;
     }
 }

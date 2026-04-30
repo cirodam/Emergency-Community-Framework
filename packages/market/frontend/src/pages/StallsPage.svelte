@@ -5,12 +5,14 @@
         createStall,
         updateStall,
         deleteStall,
+        adminSuspendStall,
+        adminUnsuspendStall,
         type StallDto,
         type StallCategory,
         type MarketplaceDto,
     } from "../lib/api.js";
     import { selectedStallId, currentPage } from "../lib/nav.js";
-    import { session } from "../lib/session.js";
+    import { session, isCoordinator } from "../lib/session.js";
 
     const CATEGORIES: StallCategory[] = ["produce", "food", "clothing", "crafts", "tools", "other"];
 
@@ -119,6 +121,19 @@
             stalls = stalls.filter(s => s.id !== id);
         } catch {
             error = "Failed to delete stall";
+        }
+    }
+
+    async function handleAdminSuspend(s: StallDto) {
+        const action = s.status === "active" ? "suspend" : "unsuspend";
+        if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} this stall as coordinator?`)) return;
+        try {
+            const updated = s.status === "active"
+                ? await adminSuspendStall(s.id)
+                : await adminUnsuspendStall(s.id);
+            stalls = stalls.map(x => x.id === s.id ? updated : x);
+        } catch (e) {
+            error = e instanceof Error ? e.message : `Failed to ${action} stall`;
         }
     }
 
@@ -238,6 +253,16 @@
                             <div class="card-actions">
                                 <button onclick={() => startEdit(s)}>Edit</button>
                                 <button class="btn-danger" onclick={() => handleDelete(s.id)}>Delete</button>
+                            </div>
+                        {:else if $isCoordinator}
+                            <div class="card-actions">
+                                <button
+                                    class={s.status === "active" ? "btn-danger" : "btn-primary"}
+                                    onclick={() => handleAdminSuspend(s)}
+                                    title={s.status === "active" ? "Suspend as coordinator" : "Reactivate as coordinator"}
+                                >
+                                    {s.status === "active" ? "⚑ Suspend" : "⚑ Reactivate"}
+                                </button>
                             </div>
                         {/if}
                     {/if}

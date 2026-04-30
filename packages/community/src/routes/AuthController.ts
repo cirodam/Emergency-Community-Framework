@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { PersonService } from "../person/PersonService.js";
+import { DomainService } from "../DomainService.js";
 import { Person } from "../person/Person.js";
 
 const svc = () => PersonService.getInstance();
@@ -54,7 +55,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     const person = await svc().verifyPassword(handle, password);
     if (!person) { res.status(401).json({ error: "Invalid handle or password" }); return; }
 
-    const credential = svc().issueCredential(person);
+    const credential = svc().issueCredential(person, undefined, DomainService.getInstance());
     const token = Buffer.from(JSON.stringify(credential)).toString("base64url");
 
     res.json({ ...toPersonDto(person), token });

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { PersonService } from "../person/PersonService.js";
+import { DomainService } from "../DomainService.js";
 import { Person } from "../person/Person.js";
 
 const svc = () => PersonService.getInstance();
@@ -111,7 +112,7 @@ export function revokeSteward(req: Request, res: Response): void {
     }
 }
 
-/** Full DTO — includes phone; only used for the individual GET. */
+/** Full DTO — includes phone and appPermissions; only used for the individual GET. */
 function toDto(p: Person) {
     return {
         id:              p.id,
@@ -127,6 +128,7 @@ function toDto(p: Person) {
         languages:       p.languages,
         joinDate:        p.joinDate,
         credential:      p.credential,
+        appPermissions:  svc().resolveAppPermissionsWithSuspensions(p, DomainService.getInstance()),
     };
 }
 

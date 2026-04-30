@@ -5,10 +5,11 @@
         updateClassified,
         cancelClassified,
         claimClassified,
+        adminCancelClassified,
         type Classified,
         type ClassifiedCategory,
     } from "../lib/api.js";
-    import { session } from "../lib/session.js";
+    import { session, isCoordinator } from "../lib/session.js";
 
     const CATEGORIES: ClassifiedCategory[] = ["for-sale", "wanted", "free", "job", "notice"];
     const CATEGORY_LABELS: Record<ClassifiedCategory, string> = {
@@ -107,6 +108,16 @@
             items = items.map(c => c.id === id ? updated : c);
         } catch {
             error = "Failed to cancel";
+        }
+    }
+
+    async function handleAdminRemove(id: string) {
+        if (!confirm("Remove this listing as coordinator? This cannot be undone.")) return;
+        try {
+            const updated = await adminCancelClassified(id);
+            items = items.map(c => c.id === id ? updated : c);
+        } catch (e) {
+            error = e instanceof Error ? e.message : "Failed to remove listing";
         }
     }
 
@@ -230,6 +241,9 @@
                             {#if myId === c.posterId}
                                 <button class="action-btn" onclick={() => startEdit(c)}>Edit</button>
                                 <button class="action-btn danger" onclick={() => handleCancel(c.id)}>Cancel listing</button>
+                            {/if}
+                            {#if $isCoordinator && myId !== c.posterId}
+                                <button class="action-btn danger" onclick={() => handleAdminRemove(c.id)} title="Remove as coordinator">⚑ Remove</button>
                             {/if}
                         </div>
                     {/if}

@@ -7,6 +7,7 @@
     import SendPage     from "./pages/SendPage.svelte";
     import HistoryPage  from "./pages/HistoryPage.svelte";
     import SettingsPage from "./pages/SettingsPage.svelte";
+    import AdminPage    from "./pages/AdminPage.svelte";
     import BottomNav    from "./components/BottomNav.svelte";
 
     // If the URL contains a fresh #session= fragment, any existing sessionStorage
@@ -43,12 +44,20 @@
                     if (attempt < 4) await new Promise(res => setTimeout(res, 1000));
                 }
                 const primary = accounts.find(a => a.label === "primary") ?? accounts[0];
+                // Decode appPermissions from the credential token (base64url JSON)
+                let appPermissions: Record<string, string[]> = {};
+                try {
+                    const credJson = atob(payload.token.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.token.length / 4) * 4, "="));
+                    const cred = JSON.parse(credJson) as { appPermissions?: Record<string, string[]> };
+                    appPermissions = cred.appPermissions ?? {};
+                } catch { /* token not decodeable — no elevated perms */ }
                 const data: SessionData = {
                     personId:         payload.id,
                     handle:           payload.handle,
                     displayName:      `${payload.firstName} ${payload.lastName}`,
                     token:            payload.token,
                     primaryAccountId: primary?.accountId ?? "",
+                    appPermissions,
                 };
                 session.login(data);
                 // Strip the hash so it's not accidentally reused or visible
@@ -98,6 +107,8 @@
             <HistoryPage />
         {:else if $currentPage === "settings"}
             <SettingsPage />
+        {:else if $currentPage === "admin"}
+            <AdminPage />
         {/if}
     </main>
     <BottomNav />

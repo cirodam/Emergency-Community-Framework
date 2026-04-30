@@ -86,3 +86,21 @@ export function deleteStall(req: Request & { personId?: string }, res: Response)
     if (!deleted) { res.status(404).json({ error: "Stall not found" }); return; }
     res.status(204).send();
 }
+
+// PATCH /api/admin/stalls/:id/suspend — coordinator/admin: suspend any stall
+export function adminSuspendStall(req: Request, res: Response): void {
+    try {
+        res.json(svc().adminSetStatus(req.params.id as string, "inactive"));
+    } catch (err) {
+        res.status(404).json({ error: (err as Error).message });
+    }
+}
+
+// PATCH /api/admin/stalls/:id/unsuspend — coordinator/admin: reactivate any stall
+export function adminUnsuspendStall(req: Request, res: Response): void {
+    try {
+        res.json(svc().adminSetStatus(req.params.id as string, "active"));
+    } catch (err) {
+        res.status(404).json({ error: (err as Error).message });
+    }
+}

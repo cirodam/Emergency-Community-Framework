@@ -1,5 +1,15 @@
 import { randomUUID } from "crypto";
 
+/** A recurring weekly time block attached to a role. */
+export interface ScheduleSlot {
+    /** 0 = Sunday, 1 = Monday … 6 = Saturday */
+    dayOfWeek: number;
+    /** "HH:MM" 24-hour local time */
+    startTime: string;
+    /** "HH:MM" 24-hour local time */
+    endTime: string;
+}
+
 export class CommunityRole {
     readonly id: string;
     title: string;
@@ -11,6 +21,7 @@ export class CommunityRole {
     termEndDate: Date | null;
     kinPerMonth: number;
     funded: boolean;
+    weeklySchedule: ScheduleSlot[];
 
     constructor(title: string, description: string = "", kinPerMonth: number = 0, roleTypeId: string | null = null) {
         this.id = randomUUID();
@@ -21,7 +32,8 @@ export class CommunityRole {
         this.memberId = null;
         this.termStartDate = null;
         this.termEndDate = null;
-        this.funded = kinPerMonth > 0;
+        this.funded         = kinPerMonth > 0;
+        this.weeklySchedule = [];
     }
 
     isActive(): boolean {

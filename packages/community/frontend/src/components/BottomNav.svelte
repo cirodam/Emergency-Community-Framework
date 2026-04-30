@@ -9,24 +9,31 @@
     const items: NavItem[] = [
         {
             kind: "group", id: "people", label: "People", icon: "◉",
-            activePages: ["profile", "directory", "associations", "association", "add-person", "applications", "vacancies"],
+            activePages: ["profile", "directory", "associations", "association", "add-person", "applications"],
             children: [
                 { kind: "leaf", id: "profile",      label: "Profile",      icon: "◉" },
                 { kind: "leaf", id: "directory",    label: "Directory",    icon: "⊞" },
                 { kind: "leaf", id: "associations", label: "Associations", icon: "⊟" },
                 { kind: "leaf", id: "applications", label: "Applications", icon: "◎" },
-                { kind: "leaf", id: "vacancies",    label: "Open Roles",   icon: "◈" },
             ],
         },
         {
             kind: "group", id: "governance", label: "Governance", icon: "⚖",
-            activePages: ["leadership", "assembly", "pool", "budget", "proposals", "domains", "domain", "unit", "constitution", "nominations"],
+            activePages: ["leadership", "assembly", "pool", "budget", "proposals", "domains", "domain", "unit", "constitution"],
             children: [
                 { kind: "leaf", id: "leadership",   label: "Leadership",   icon: "★" },
                 { kind: "leaf", id: "budget",        label: "Budget",       icon: "⊡" },
                 { kind: "leaf", id: "domains",       label: "Domains",      icon: "⊛" },
-                { kind: "leaf", id: "nominations",   label: "Nominations",  icon: "◇" },
                 { kind: "leaf", id: "constitution",  label: "Constitution", icon: "§" },
+            ],
+        },
+        {
+            kind: "group", id: "jobs", label: "Jobs", icon: "◈",
+            activePages: ["vacancies", "nominations", "schedule"],
+            children: [
+                { kind: "leaf", id: "vacancies",    label: "Open Roles",   icon: "◈" },
+                { kind: "leaf", id: "nominations",  label: "Nominations",  icon: "◇" },
+                { kind: "leaf", id: "schedule",     label: "Schedule",     icon: "⊞" },
             ],
         },
         {

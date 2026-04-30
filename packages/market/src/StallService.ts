@@ -81,4 +81,13 @@ export class StallService {
         this.loader.delete(id);
         return true;
     }
+
+    /** Set stall status without ownership check. For use by coordinators/admins. */
+    adminSetStatus(id: string, status: StallStatus): Stall {
+        const s = this.stalls.get(id);
+        if (!s) throw new Error(`Stall ${id} not found`);
+        s.status = status;
+        this.loader.save(s);
+        return s;
+    }
 }

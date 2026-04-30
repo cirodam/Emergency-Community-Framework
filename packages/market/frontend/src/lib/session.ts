@@ -1,4 +1,4 @@
-import { writable } from "svelte/store";
+import { writable, derived } from "svelte/store";
 
 export interface SessionData {
     personId:  string;
@@ -6,6 +6,7 @@ export interface SessionData {
     lastName:  string;
     handle:    string;
     token:     string;
+    appPermissions: Record<string, string[]>;
 }
 
 const SESSION_KEY = "ecf_market_session";
@@ -45,3 +46,8 @@ function createSessionStore() {
 }
 
 export const session = createSessionStore();
+
+/** Derived: current market permission levels. */
+const marketPerms = derived(session, s => s?.appPermissions?.["market"] ?? []);
+export const isCoordinator  = derived(marketPerms, p => p.includes("coordinator") || p.includes("admin"));
+export const isMarketAdmin  = derived(marketPerms, p => p.includes("admin"));

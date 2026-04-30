@@ -38,6 +38,7 @@ export interface TransactionDto {
     amount: number;
     memo: string;
     timestamp: string;
+    reversalOf?: string;
 }
 
 // ── Accounts ──────────────────────────────────────────────────────────────────
@@ -120,6 +121,26 @@ export async function sendTransfer(
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Transfer failed");
+    }
+    return res.json() as Promise<TransactionDto>;
+}
+
+// ── Admin (teller / bank-admin) ───────────────────────────────────────────────
+
+export async function getAdminAccounts(): Promise<AccountDto[]> {
+    const res = await apiFetch("/api/admin/accounts");
+    if (!res.ok) throw new Error("Failed to load accounts");
+    return res.json() as Promise<AccountDto[]>;
+}
+
+export async function adminReverseTransaction(txId: string, memo?: string): Promise<TransactionDto> {
+    const res = await apiFetch(`/api/admin/transactions/${encodeURIComponent(txId)}/reverse`, {
+        method: "POST",
+        body: JSON.stringify({ memo }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Reversal failed");
     }
     return res.json() as Promise<TransactionDto>;
 }

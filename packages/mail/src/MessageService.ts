@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { Message } from "./Message.js";
 import { MessageReceipt } from "./MessageReceipt.js";
+import { MessageReport } from "./MessageReport.js";
 import { Thread } from "./Thread.js";
 import { MessageLoader } from "./MessageLoader.js";
 
@@ -10,6 +11,7 @@ export class MessageService {
     private messages: Map<string, Message>        = new Map();
     private receipts: Map<string, MessageReceipt> = new Map();
     private threads:  Map<string, Thread>          = new Map();
+    private reports:  Map<string, MessageReport>  = new Map();
 
     static getInstance(): MessageService {
         if (!MessageService.instance) MessageService.instance = new MessageService();
@@ -22,6 +24,7 @@ export class MessageService {
         for (const t of loader.loadAllThreads())  this.threads.set(t.id, t);
         for (const m of loader.loadAllMessages()) this.messages.set(m.id, m);
         for (const r of loader.loadAllReceipts()) this.receipts.set(r.id, r);
+        for (const r of loader.loadAllReports())  this.reports.set(r.id, r);
 
         // ── Migration: convert legacy single-recipient messages ────────────
         // Old Message had toPersonId / readAt / deletedBySender / deletedByRecipient.
@@ -297,5 +300,51 @@ export class MessageService {
 
     getThread(id: string): Thread | undefined {
         return this.threads.get(id);
+    }
+
+    // ── Moderation ─────────────────────────────────────────────────────────
+
+    /** Report a message for moderation review. Idempotent per reporter+message. */
+    reportMessage(messageId: string, reporterId: string, reason: string): MessageReport {
+        const msg = this.messages.get(messageId);
+        if (!msg) throw new Error("Message not found");
+        // Prevent duplicate reports from the same person
+        const existing = [...this.reports.values()].find(
+            r => r.messageId === messageId && r.reporterId === reporterId,
+        );
+        if (existing) return existing;
+        const report: MessageReport = {
+            id:         randomUUID(),
+            messageId,
+            reporterId,
+            reason:     reason.trim() || "(no reason given)",
+            reportedAt: new Date().toISOString(),
+        };
+        this.reports.set(report.id, report);
+        this.loader.saveReport(report);
+        return report;
+    }
+
+    /** Return all reports (most recent first), enriched with the message body for moderator display. */
+    getReports(): Array<MessageReport & { message: Message | null }> {
+        return [...this.reports.values()]
+            .sort((a, b) => b.reportedAt.localeCompare(a.reportedAt))
+            .map(r => ({ ...r, message: this.messages.get(r.messageId) ?? null }));
+    }
+
+    /** Hard-delete a message and all its receipts/reports. For moderator use only. */
+    adminDeleteMessage(messageId: string): void {
+        const msg = this.messages.get(messageId);
+        if (!msg) throw new Error("Message not found");
+        this.messages.delete(messageId);
+        this.loader.deleteMessage(messageId);
+        // Remove receipts from memory (receipts on disk remain but message is gone)
+        for (const [rid, r] of this.receipts) {
+            if (r.messageId === messageId) this.receipts.delete(rid);
+        }
+        // Remove reports from memory
+        for (const [rid, r] of this.reports) {
+            if (r.messageId === messageId) this.reports.delete(rid);
+        }
     }
 }

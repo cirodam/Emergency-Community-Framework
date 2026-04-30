@@ -33,3 +33,7 @@ export type { SocialInsuranceBankRecord } from "./domains/social_insurance/Socia
 
 export { PaymentTokenService } from "./PaymentTokenService.js";
 
+export { Shift } from "./shift/Shift.js";
+export { ShiftLoader } from "./shift/ShiftLoader.js";
+export { ShiftService } from "./shift/ShiftService.js";
+

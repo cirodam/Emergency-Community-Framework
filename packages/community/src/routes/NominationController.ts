@@ -9,13 +9,19 @@ type AuthedRequest = Request & { personId?: string };
 const svc = () => NominationService.getInstance();
 
 function toDto(n: Nomination) {
+    const poolName = n.poolId
+        ? (DomainService.getInstance().getPool(n.poolId)?.name ?? null)
+        : null;
     return {
         id:         n.id,
         createdAt:  n.createdAt.toISOString(),
         createdBy:  n.createdBy,
+        type:       n.type,
         roleId:     n.roleId,
         unitId:     n.unitId,
         domainId:   n.domainId,
+        poolId:     n.poolId,
+        poolName,
         nomineeId:  n.nomineeId,
         statement:  n.statement,
         status:     n.status,
@@ -38,6 +44,39 @@ export function listVacancies(_req: Request, res: Response): void {
 export function listExpiring(req: Request, res: Response): void {
     const days = parseInt(req.query.days as string) || 60;
     res.json(svc().getExpiring(days));
+}
+
+// POST /api/nominations/pool
+// Body: { poolId, nomineeId, statement }
+export function createPoolNomination(req: AuthedRequest, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Authentication required" }); return; }
+
+    const { poolId, nomineeId, statement } = req.body ?? {};
+
+    if (typeof poolId !== "string" || !poolId.trim()) {
+        res.status(400).json({ error: "poolId is required" }); return;
+    }
+    if (typeof nomineeId !== "string" || !nomineeId.trim()) {
+        res.status(400).json({ error: "nomineeId is required" }); return;
+    }
+
+    const domainSvc = DomainService.getInstance();
+    if (!domainSvc.getPool(poolId)) {
+        res.status(404).json({ error: "Pool not found" }); return;
+    }
+    if (!PersonService.getInstance().get(nomineeId)) {
+        res.status(404).json({ error: "Nominee not found" }); return;
+    }
+
+    const n = Nomination.forPool(
+        personId,
+        poolId,
+        nomineeId,
+        typeof statement === "string" ? statement.trim() : "",
+    );
+    svc().create(n);
+    res.status(201).json(toDto(n));
 }
 
 // POST /api/nominations
@@ -93,12 +132,19 @@ export function confirmNomination(req: AuthedRequest, res: Response): void {
     const n = svc().confirm(req.params.id as string, personId);
     if (!n) { res.status(404).json({ error: "Nomination not found or already resolved" }); return; }
 
-    // If confirmed, assign nominee to the role
     const domainSvc = DomainService.getInstance();
-    const role = domainSvc.getRole(n.roleId);
-    if (role) {
-        role.memberId = n.nomineeId;
-        domainSvc.saveRole(role);
+    if (n.type === "pool" && n.poolId) {
+        const pool = domainSvc.getPool(n.poolId);
+        if (pool) {
+            pool.addPerson(n.nomineeId);
+            domainSvc.savePool(pool);
+        }
+    } else {
+        const role = domainSvc.getRole(n.roleId);
+        if (role) {
+            role.memberId = n.nomineeId;
+            domainSvc.saveRole(role);
+        }
     }
 
     res.json(toDto(n));

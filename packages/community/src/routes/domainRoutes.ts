@@ -19,6 +19,7 @@ router.delete("/domains/:id/budget/items/:itemId",  requireAuth, domains.removeB
 router.get(   "/units",     domains.listUnits);
 router.get(   "/units/:id", domains.getUnit);
 router.post(  "/units",     requireAuth, domains.createUnit);
+router.patch( "/units/:id", requireAuth, domains.updateUnit);
 router.delete("/units/:id", requireAuth, domains.deleteUnit);
 
 // Unit templates

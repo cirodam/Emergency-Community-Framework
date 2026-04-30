@@ -207,3 +207,13 @@ export async function claimClassified(
 
     res.json(svc().markClosed(c.id, claimantId));
 }
+
+// DELETE /api/admin/classifieds/:id — coordinator/admin: cancel any listing
+export function adminCancelClassified(req: Request, res: Response): void {
+    try {
+        res.json(ClassifiedService.getInstance().adminCancel(req.params.id as string));
+    } catch (err) {
+        const msg = (err as Error).message;
+        res.status(msg.includes("not found") ? 404 : 422).json({ error: msg });
+    }
+}

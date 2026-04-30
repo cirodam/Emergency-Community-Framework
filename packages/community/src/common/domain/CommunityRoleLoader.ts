@@ -1,5 +1,6 @@
 import { BaseLoader } from "@ecf/core";
 import { CommunityRole } from "../CommunityRole.js";
+import type { ScheduleSlot } from "../CommunityRole.js";
 
 interface RoleRecord {
     id: string;
@@ -10,8 +11,7 @@ interface RoleRecord {
     kinPerMonth: number;
     funded: boolean;
     termStartDate: string | null;
-    termEndDate: string | null;
-}
+    termEndDate: string | null;    weeklySchedule: ScheduleSlot[];}
 
 export class CommunityRoleLoader extends BaseLoader<RoleRecord, CommunityRole> {
     protected serialize(role: CommunityRole): RoleRecord {
@@ -25,6 +25,7 @@ export class CommunityRoleLoader extends BaseLoader<RoleRecord, CommunityRole> {
             funded:        role.funded,
             termStartDate: role.termStartDate?.toISOString() ?? null,
             termEndDate:   role.termEndDate?.toISOString()   ?? null,
+            weeklySchedule: role.weeklySchedule,
         };
     }
 
@@ -35,6 +36,7 @@ export class CommunityRoleLoader extends BaseLoader<RoleRecord, CommunityRole> {
         role.funded        = r.funded;
         role.termStartDate = r.termStartDate ? new Date(r.termStartDate) : null;
         role.termEndDate   = r.termEndDate   ? new Date(r.termEndDate)   : null;
+        role.weeklySchedule = r.weeklySchedule ?? [];
         return role;
     }
 }

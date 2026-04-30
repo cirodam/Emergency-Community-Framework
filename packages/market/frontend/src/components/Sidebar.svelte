@@ -1,6 +1,6 @@
 <script lang="ts">
     import { currentPage } from "../lib/nav.js";
-    import { session } from "../lib/session.js";
+    import { session, isCoordinator } from "../lib/session.js";
     import AppSwitcher from "./AppSwitcher.svelte";
 
     const items = [
@@ -45,6 +45,7 @@
                 <div class="user-meta">
                     <span class="user-name">{$session.firstName} {$session.lastName}</span>
                     <span class="user-handle">@{$session.handle}</span>
+                    {#if $isCoordinator}<span class="role-badge">Coordinator</span>{/if}
                 </div>
             </div>
             <button class="signout-btn" onclick={() => session.logout()}>Sign out</button>
@@ -172,6 +173,17 @@
     }
 
     .user-handle { font-size: 0.72rem; color: #94a3b8; }
+
+    .role-badge {
+        font-size: 0.65rem;
+        font-weight: 600;
+        color: #15803d;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 0.25rem;
+        padding: 0.05rem 0.35rem;
+        width: fit-content;
+    }
 
     .signout-btn {
         width: 100%;

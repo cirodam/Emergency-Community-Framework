@@ -49,6 +49,10 @@ import { seedDomains } from "./bootstrap/seedDomains.js";
 import { registerMonetaryHandlers } from "./bootstrap/registerMonetaryHandlers.js";
 import { NominationLoader } from "./nomination/NominationLoader.js";
 import { NominationService } from "./nomination/NominationService.js";
+import { ShiftLoader } from "./shift/ShiftLoader.js";
+import { ShiftService } from "./shift/ShiftService.js";
+import { AppSuspensionLoader } from "./person/AppSuspensionLoader.js";
+import { AppSuspensionService } from "./person/AppSuspensionService.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -142,7 +146,9 @@ async function main(): Promise<void> {
     const personLoader = new PersonLoader(resolve(DATA_DIR, "persons"));
     PersonService.getInstance().init(personLoader);
     PersonService.getInstance().setCommunitySigner(communitySigner);
-
+    // ── App suspensions ────────────────────────────────────────────────
+    const suspensionLoader = new AppSuspensionLoader(resolve(DATA_DIR, "persons"));
+    AppSuspensionService.getInstance().init(suspensionLoader);
     // ── Member applications ────────────────────────────────────────────────
     const appLoader = new MemberApplicationLoader(resolve(DATA_DIR, "applications"));
     MemberApplicationService.getInstance().init(appLoader);
@@ -231,6 +237,10 @@ async function main(): Promise<void> {
     // ── Nominations ────────────────────────────────────────────────────────
     const nominationLoader = new NominationLoader(resolve(DATA_DIR, "nominations"));
     NominationService.getInstance().init(nominationLoader);
+
+    // ── Shifts ─────────────────────────────────────────────────────────────
+    const shiftLoader = new ShiftLoader(resolve(DATA_DIR, "shifts"));
+    ShiftService.getInstance().init(shiftLoader);
 
     // ── Monetary institutions (non-fatal — bank may be unreachable) ────────
     const bank = new BankClient(BANK_URL, body => communitySigner.signBody(body));

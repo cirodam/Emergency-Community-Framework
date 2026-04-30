@@ -19,6 +19,7 @@ export interface PersonCredential {
     communityPublicKey: string; // hex SPKI DER — used by verifiers
     issuedAt: string;           // ISO 8601
     expiresAt: string;          // ISO 8601
+    appPermissions: Record<string, string[]>; // e.g. { bank: ["teller"], market: ["coordinator"] }
     signature: string;          // hex Ed25519, signed by the community node
 }
 
@@ -32,6 +33,7 @@ function credentialPayload(c: PersonCredential): string {
         communityPublicKey: c.communityPublicKey,
         issuedAt:           c.issuedAt,
         expiresAt:          c.expiresAt,
+        appPermissions:     c.appPermissions,
     });
 }
 
@@ -97,8 +99,40 @@ export function requirePersonCredential(
             return;
         }
 
-        (req as Request & { credential: PersonCredential; personId: string }).credential = credential;
-        (req as Request & { credential: PersonCredential; personId: string }).personId = credential.personId;
+        (req as AuthedRequest).credential = credential;
+        (req as AuthedRequest).personId   = credential.personId;
+        next();
+    };
+}
+
+/**
+ * Express request after `requirePersonCredential` has run.
+ * Use this type in downstream handlers for typed access to the credential.
+ */
+export type AuthedRequest = Request & {
+    credential: PersonCredential;
+    personId: string;
+};
+
+/**
+ * Express middleware factory for app-scoped permission checks.
+ *
+ * Must be used **after** `requirePersonCredential` in the middleware chain.
+ *
+ * @param app   The app key to check (e.g. `"bank"`, `"market"`, `"mail"`).
+ * @param level The permission level required (e.g. `"teller"`, `"admin"`).
+ *
+ * @example
+ * router.get("/admin/accounts", requirePersonCredential(getIdentity), requireAppPermission("bank", "admin"), handler);
+ */
+export function requireAppPermission(app: string, level: string): RequestHandler {
+    return (req: Request, res: Response, next: NextFunction): void => {
+        const credential = (req as AuthedRequest).credential;
+        const perms = credential?.appPermissions?.[app] ?? [];
+        if (!perms.includes(level)) {
+            res.status(403).json({ error: `${level} permission required for ${app}` });
+            return;
+        }
         next();
     };
 }

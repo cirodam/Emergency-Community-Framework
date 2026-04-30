@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getPool, listPersons, listMotions, markMotionDiscussed, recordMotionOutcome } from "../lib/api.js";
+    import { getPool, listPersons, listMotions, markMotionDiscussed, recordMotionOutcome, createPoolNomination } from "../lib/api.js";
     import type { PoolDto, PersonDto, MotionDto, MotionOutcome } from "../lib/api.js";
     import { currentPage, selectedPoolId, session, selectedMotionId } from "../lib/session.js";
 
@@ -13,6 +13,28 @@
     let outcomingId   = $state<string | null>(null);
     let outcomeChoice = $state<MotionOutcome>("passed");
     let outcomeNote   = $state("");
+
+    let nominating     = $state(false);
+    let nomineeId      = $state("");
+    let nomineeStmt    = $state("");
+    let nominateError  = $state("");
+    let nominateSaving = $state(false);
+
+    async function doNominate() {
+        if (!nomineeId || !pool) return;
+        nominateSaving = true;
+        nominateError = "";
+        try {
+            await createPoolNomination({ poolId: pool.id, nomineeId, statement: nomineeStmt.trim() });
+            nominating = false;
+            nomineeId = "";
+            nomineeStmt = "";
+        } catch (e) {
+            nominateError = e instanceof Error ? e.message : "Failed";
+        } finally {
+            nominateSaving = false;
+        }
+    }
 
     const isSteward = $derived(($session as any)?.isSteward ?? false);
     const poolId = $derived($selectedPoolId);
@@ -103,6 +125,29 @@
                 </div>
             {/each}
         </div>
+    {/if}
+
+    {#if !loading && !error && isSteward && pool}
+        {#if nominating}
+            <div class="nominate-form">
+                <select class="nominate-select" bind:value={nomineeId}>
+                    <option value="">— select person —</option>
+                    {#each persons.filter(p => !pool!.personIds.includes(p.id)) as p (p.id)}
+                        <option value={p.id}>{p.firstName} {p.lastName}</option>
+                    {/each}
+                </select>
+                <input class="nominate-input" placeholder="Statement (optional)" bind:value={nomineeStmt} />
+                {#if nominateError}<p class="nominate-error">{nominateError}</p>{/if}
+                <div class="nominate-actions">
+                    <button class="btn-sm btn-primary-sm" onclick={doNominate} disabled={!nomineeId || nominateSaving}>
+                        {nominateSaving ? "Submitting…" : "Nominate"}
+                    </button>
+                    <button class="btn-sm" onclick={() => { nominating = false; nominateError = ""; }}>Cancel</button>
+                </div>
+            </div>
+        {:else}
+            <button class="nominate-btn" onclick={() => nominating = true}>＋ Nominate to pool</button>
+        {/if}
     {/if}
 
     <!-- Docket -->
@@ -259,4 +304,39 @@
 
     .resolved-details { font-size: 0.8rem; color: #64748b; }
     .resolved-details summary { cursor: pointer; padding: 0.3rem 0; font-weight: 600; }
+
+    .nominate-btn {
+        background: transparent;
+        border: 1px dashed #86efac;
+        border-radius: 6px;
+        color: #15803d;
+        font-size: 0.8rem;
+        padding: 0.35rem 0.8rem;
+        cursor: pointer;
+        align-self: flex-start;
+    }
+    .nominate-btn:hover { background: #f0fdf4; }
+
+    .nominate-form {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        padding: 0.9rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .nominate-select, .nominate-input {
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        padding: 0.4rem 0.6rem;
+        font-size: 0.875rem;
+        font-family: inherit;
+        background: #fff;
+        color: #111827;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .nominate-error { font-size: 0.8rem; color: #dc2626; margin: 0; }
+    .nominate-actions { display: flex; gap: 0.5rem; }
 </style>

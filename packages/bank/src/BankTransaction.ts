@@ -10,13 +10,16 @@ export class BankTransaction {
     readonly amount: number;
     readonly memo: string;
     readonly timestamp: Date;
+    /** ID of the original transaction this record reverses, if applicable. */
+    readonly reversalOf?: string;
 
     constructor(
         fromAccountId: string,
         toAccountId: string,
         currency: Currency,
         amount: number,
-        memo: string = ""
+        memo: string = "",
+        reversalOf?: string,
     ) {
         this.id = randomUUID();
         this.fromAccountId = fromAccountId;
@@ -25,6 +28,7 @@ export class BankTransaction {
         this.amount = amount;
         this.memo = memo;
         this.timestamp = new Date();
+        if (reversalOf) (this as unknown as Record<string, unknown>)["reversalOf"] = reversalOf;
     }
 
     /**
@@ -38,12 +42,14 @@ export class BankTransaction {
         currency: Currency,
         amount: number,
         memo: string,
-        timestamp: Date
+        timestamp: Date,
+        reversalOf?: string,
     ): BankTransaction {
         const tx = new BankTransaction(fromAccountId, toAccountId, currency, amount, memo);
         const t = tx as unknown as Record<string, unknown>;
         t["id"] = id;
         t["timestamp"] = timestamp;
+        if (reversalOf) t["reversalOf"] = reversalOf;
         return tx;
     }
 }

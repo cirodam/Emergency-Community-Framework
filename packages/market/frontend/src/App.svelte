@@ -23,12 +23,20 @@
             try {
                 const raw     = decodeURIComponent(atob(hash.slice("#session=".length)));
                 const payload = JSON.parse(raw) as { token: string; id: string; firstName: string; lastName: string; handle: string };
+                // Decode appPermissions from the credential token (base64url JSON)
+                let appPermissions: Record<string, string[]> = {};
+                try {
+                    const credJson = atob(payload.token.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.token.length / 4) * 4, "="));
+                    const cred = JSON.parse(credJson) as { appPermissions?: Record<string, string[]> };
+                    appPermissions = cred.appPermissions ?? {};
+                } catch { /* no elevated perms */ }
                 const data: SessionData = {
                     personId:  payload.id,
                     firstName: payload.firstName,
                     lastName:  payload.lastName,
                     handle:    payload.handle,
                     token:     payload.token,
+                    appPermissions,
                 };
                 session.login(data);
                 history.replaceState(null, "", window.location.pathname + window.location.search);

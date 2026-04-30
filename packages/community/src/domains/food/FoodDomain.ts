@@ -19,7 +19,7 @@ export class FoodDomain extends FunctionalDomain {
 
     private constructor() {
         super(
-            "Food",
+            "Food Security",
             "Coordinates community food processing and preparation, including communal kitchens and grain milling.",
             FOOD_DOMAIN_ID,
         );

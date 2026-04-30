@@ -1,13 +1,19 @@
 <script lang="ts">
-    import { currentPage, session, type Page } from "../lib/session.js";
+    import { currentPage, session, isTeller, type Page } from "../lib/session.js";
     import AppSwitcher from "./AppSwitcher.svelte";
 
     interface NavItem { id: Page; label: string; icon: string; }
 
-    const items: NavItem[] = [
+    const baseItems: NavItem[] = [
         { id: "accounts", label: "Accounts", icon: "◈" },
         { id: "settings", label: "Settings", icon: "⚙" },
     ];
+
+    const items = $derived(
+        $isTeller
+            ? [...baseItems, { id: "admin" as Page, label: "Admin", icon: "⚑" }]
+            : baseItems
+    );
 
     const initials = $derived(
         $session ? $session.displayName.split(" ").map(w => w[0]).slice(0, 2).join("") : ""

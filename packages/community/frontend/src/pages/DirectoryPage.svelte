@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { listPersons, setPassword, grantSteward, revokeSteward } from "../lib/api.js";
+    import { listPersons, getPerson, setPassword, grantSteward, revokeSteward, suspendFromApp, unsuspendFromApp } from "../lib/api.js";
     import type { PersonDto } from "../lib/api.js";
     import { session, currentPage } from "../lib/session.js";
 
@@ -10,12 +10,20 @@
 
     // ── Expand / reset state ───────────────────────────────────────────────────
     let expandedId: string | null = $state(null);
+    let expandedDetail: PersonDto | null = $state(null);
+    let detailLoading = $state(false);
     let newPass    = $state("");
     let resetError = $state("");
-    let resetOk    = $state(false);
+    let resetOk    = false;
     let resetting  = $state(false);
     let stewardError = $state("");
     let stewardWorking = $state(false);
+
+    // ── Suspension state ───────────────────────────────────────────────────────
+    let suspendingApp: string | null = $state(null);
+    let suspendReason = $state("");
+    let suspendWorking = $state(false);
+    let suspendError = $state("");
 
     async function load() {
         loading = true;
@@ -42,12 +50,22 @@
             : members
     );
 
-    function toggleExpand(id: string) {
-        expandedId = expandedId === id ? null : id;
+    async function toggleExpand(id: string) {
+        const newId = expandedId === id ? null : id;
+        expandedId = newId;
+        expandedDetail = null;
         newPass    = "";
         resetError = "";
         resetOk    = false;
         stewardError = "";
+        suspendingApp = null;
+        suspendReason = "";
+        suspendError  = "";
+        if (newId) {
+            detailLoading = true;
+            try { expandedDetail = await getPerson(newId); } catch { /* keep null */ }
+            finally { detailLoading = false; }
+        }
     }
 
     async function doResetPassword(personId: string) {
@@ -85,6 +103,31 @@
             stewardError = e instanceof Error ? e.message : "Failed to revoke stewardship";
         } finally {
             stewardWorking = false;
+        }
+    }
+
+    async function doSuspend(personId: string, app: string) {
+        suspendWorking = true; suspendError = "";
+        try {
+            await suspendFromApp(personId, app, suspendReason);
+            expandedDetail = await getPerson(personId);
+            suspendingApp = null; suspendReason = "";
+        } catch (e) {
+            suspendError = e instanceof Error ? e.message : "Failed to suspend";
+        } finally {
+            suspendWorking = false;
+        }
+    }
+
+    async function doUnsuspend(personId: string, app: string) {
+        suspendWorking = true; suspendError = "";
+        try {
+            await unsuspendFromApp(personId, app);
+            expandedDetail = await getPerson(personId);
+        } catch (e) {
+            suspendError = e instanceof Error ? e.message : "Failed to lift suspension";
+        } finally {
+            suspendWorking = false;
         }
     }
 </script>
@@ -134,9 +177,66 @@
 
                     {#if expandedId === m.id}
                         <div class="member-detail">
-                            {#if m.phone}
+                            {#if expandedDetail?.phone}
+                                <p class="detail-phone">📞 {expandedDetail.phone}</p>
+                            {:else if m.phone}
                                 <p class="detail-phone">📞 {m.phone}</p>
                             {/if}
+
+                            {#if expandedDetail?.appPermissions}
+                                <div class="app-perms-section">
+                                    <p class="reset-label">App Access</p>
+                                    {#each Object.entries(expandedDetail.appPermissions) as [app, perms]}
+                                        <div class="app-perm-row">
+                                            <span class="app-name">{app}</span>
+                                            <div class="perm-badges">
+                                                {#if perms.length === 0}
+                                                    <span class="badge perm-suspended">Suspended</span>
+                                                {:else}
+                                                    {#each perms as p}
+                                                        <span class="badge perm-{p}">{p}</span>
+                                                    {/each}
+                                                {/if}
+                                            </div>
+                                            {#if $session?.isSteward && m.id !== $session.personId}
+                                                {#if perms.length === 0}
+                                                    <button
+                                                        class="btn-lift"
+                                                        onclick={() => doUnsuspend(m.id, app)}
+                                                        disabled={suspendWorking}
+                                                    >{suspendWorking ? "…" : "Lift"}</button>
+                                                {:else if suspendingApp === app}
+                                                    <div class="suspend-confirm">
+                                                        <input
+                                                            class="suspend-reason"
+                                                            bind:value={suspendReason}
+                                                            placeholder="Reason (optional)"
+                                                        />
+                                                        <button
+                                                            class="btn-suspend-confirm"
+                                                            onclick={() => doSuspend(m.id, app)}
+                                                            disabled={suspendWorking}
+                                                        >{suspendWorking ? "…" : "Confirm"}</button>
+                                                        <button
+                                                            class="btn-cancel"
+                                                            onclick={() => { suspendingApp = null; suspendReason = ""; }}
+                                                        >Cancel</button>
+                                                    </div>
+                                                {:else}
+                                                    <button
+                                                        class="btn-suspend"
+                                                        onclick={() => { suspendingApp = app; suspendReason = ""; }}
+                                                    >Suspend</button>
+                                                {/if}
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                    {#if suspendError}<p class="reset-error">{suspendError}</p>{/if}
+                                </div>
+                            {:else if detailLoading}
+                                <p class="detail-loading">Loading…</p>
+                            {/if}
+
                             {#if $session?.isSteward}
                                 <div class="reset-section">
                                     <p class="reset-label">Reset password</p>
@@ -410,4 +510,111 @@
     .btn-steward-revoke:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .count { text-align: center; font-size: 0.8rem; color: #94a3b8; margin-top: 0.75rem; }
+
+    /* ── App permissions ── */
+    .app-perms-section { margin-bottom: 0.75rem; }
+
+    .app-perm-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.3rem 0;
+        flex-wrap: wrap;
+    }
+
+    .app-name {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #475569;
+        width: 3.5rem;
+        flex-shrink: 0;
+        text-transform: capitalize;
+    }
+
+    .perm-badges { display: flex; gap: 0.3rem; flex-wrap: wrap; flex: 1; }
+
+    .badge.perm-member     { background: #f1f5f9; color: #64748b; }
+    .badge.perm-teller     { background: #dbeafe; color: #1d4ed8; }
+    .badge.perm-coordinator{ background: #ede9fe; color: #7c3aed; }
+    .badge.perm-admin      { background: #fef3c7; color: #d97706; }
+    .badge.perm-moderator  { background: #d1fae5; color: #065f46; }
+    .badge.perm-suspended  { background: #fee2e2; color: #b91c1c; }
+
+    .btn-suspend {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.2rem 0.6rem;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        background: #fee2e2;
+        color: #b91c1c;
+        transition: background 0.15s;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .btn-suspend:hover { background: #fecaca; }
+
+    .btn-lift {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.2rem 0.6rem;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        background: #d1fae5;
+        color: #065f46;
+        transition: background 0.15s;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .btn-lift:hover:not(:disabled) { background: #a7f3d0; }
+    .btn-lift:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .suspend-confirm {
+        display: flex;
+        gap: 0.4rem;
+        align-items: center;
+        flex-wrap: wrap;
+        flex: 1;
+    }
+
+    .suspend-reason {
+        flex: 1;
+        min-width: 8rem;
+        padding: 0.25rem 0.5rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-family: inherit;
+        outline: none;
+    }
+    .suspend-reason:focus { border-color: #b91c1c; }
+
+    .btn-suspend-confirm {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.25rem 0.6rem;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        background: #b91c1c;
+        color: #fff;
+        white-space: nowrap;
+    }
+    .btn-suspend-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-cancel {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.25rem 0.6rem;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        background: #f1f5f9;
+        color: #64748b;
+        white-space: nowrap;
+    }
+
+    .detail-loading { font-size: 0.82rem; color: #94a3b8; margin: 0 0 0.75rem; }
 </style>

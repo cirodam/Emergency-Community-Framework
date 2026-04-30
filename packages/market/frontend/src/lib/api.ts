@@ -353,3 +353,31 @@ export async function createCommunityLocation(data: {
     return res.json() as Promise<CommunityLocationDto>;
 }
 
+// ── Coordinator / admin ───────────────────────────────────────────────────────
+
+export async function adminCancelClassified(id: string): Promise<Classified> {
+    const res = await apiFetch(`/api/admin/classifieds/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to remove classified");
+    }
+    return res.json() as Promise<Classified>;
+}
+
+export async function adminSuspendStall(id: string): Promise<StallDto> {
+    const res = await apiFetch(`/api/admin/stalls/${encodeURIComponent(id)}/suspend`, { method: "PATCH" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to suspend stall");
+    }
+    return res.json() as Promise<StallDto>;
+}
+
+export async function adminUnsuspendStall(id: string): Promise<StallDto> {
+    const res = await apiFetch(`/api/admin/stalls/${encodeURIComponent(id)}/unsuspend`, { method: "PATCH" });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to unsuspend stall");
+    }
+    return res.json() as Promise<StallDto>;
+}

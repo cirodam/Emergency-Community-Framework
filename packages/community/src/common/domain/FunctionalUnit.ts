@@ -19,6 +19,7 @@ export class FunctionalUnit implements IEconomicActor {
 
     roleIds: string[] = [];
     personIds: string[] = [];
+    locationId: string | null = null;
 
     constructor(name: string, description: string = "", type: string = "unit", id?: string) {
         this.id = id ?? randomUUID();

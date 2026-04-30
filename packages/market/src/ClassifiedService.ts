@@ -87,6 +87,17 @@ export class ClassifiedService {
         return c;
     }
 
+    /** Cancel any listing regardless of ownership. For use by coordinators/admins. */
+    adminCancel(id: string): Classified {
+        const c = this.classifieds.get(id);
+        if (!c) throw new Error(`Classified ${id} not found`);
+        if (c.status !== "open") throw new Error("Classified is no longer open");
+        c.status    = "cancelled";
+        c.updatedAt = new Date().toISOString();
+        this.loader.save(c);
+        return c;
+    }
+
     markClosed(id: string, counterpartyId: string): Classified {
         const c = this.classifieds.get(id);
         if (!c)               throw new Error(`Classified ${id} not found`);

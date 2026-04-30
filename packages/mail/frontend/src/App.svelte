@@ -3,11 +3,12 @@
     import { session } from "./lib/session.js";
     import type { SessionData } from "./lib/session.js";
     import { currentPage, selectedThreadId } from "./lib/session.js";
-    import InboxPage    from "./pages/InboxPage.svelte";
-    import OutboxPage   from "./pages/OutboxPage.svelte";
-    import ThreadPage   from "./pages/ThreadPage.svelte";
-    import ComposePage  from "./pages/ComposePage.svelte";
-    import Sidebar      from "./components/Sidebar.svelte";
+    import InboxPage      from "./pages/InboxPage.svelte";
+    import OutboxPage     from "./pages/OutboxPage.svelte";
+    import ThreadPage     from "./pages/ThreadPage.svelte";
+    import ComposePage    from "./pages/ComposePage.svelte";
+    import ModerationPage from "./pages/ModerationPage.svelte";
+    import Sidebar        from "./components/Sidebar.svelte";
 
     let ready = $state(false);
 
@@ -22,12 +23,20 @@
             try {
                 const raw     = decodeURIComponent(atob(hash.slice("#session=".length)));
                 const payload = JSON.parse(raw) as { token: string; id: string; firstName: string; lastName: string; handle: string };
+                // Decode appPermissions from the credential token (base64url JSON)
+                let appPermissions: Record<string, string[]> = {};
+                try {
+                    const credJson = atob(payload.token.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.token.length / 4) * 4, "="));
+                    const cred = JSON.parse(credJson) as { appPermissions?: Record<string, string[]> };
+                    appPermissions = cred.appPermissions ?? {};
+                } catch { /* no elevated perms */ }
                 const data: SessionData = {
                     personId:  payload.id,
                     firstName: payload.firstName,
                     lastName:  payload.lastName,
                     handle:    payload.handle,
                     token:     payload.token,
+                    appPermissions,
                 };
                 session.login(data);
                 history.replaceState(null, "", window.location.pathname + window.location.search);
@@ -73,6 +82,8 @@
                 <ThreadPage threadId={$selectedThreadId} />
             {:else if $currentPage === "compose"}
                 <ComposePage />
+            {:else if $currentPage === "moderation"}
+                <ModerationPage />
             {:else}
                 <InboxPage />
             {/if}

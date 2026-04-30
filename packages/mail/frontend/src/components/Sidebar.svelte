@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { currentPage, selectedThreadId, session } from "../lib/session.js";
+    import { currentPage, selectedThreadId, session, isModerator } from "../lib/session.js";
     import { getUnreadCount } from "../lib/api.js";
     import { onMount } from "svelte";
     import AppSwitcher from "./AppSwitcher.svelte";
@@ -50,6 +50,15 @@
         >
             <span class="folder-icon">Sent</span>
         </button>
+        {#if $isModerator}
+            <button
+                class="folder-btn"
+                class:active={active === "moderation"}
+                onclick={() => currentPage.go("moderation")}
+            >
+                <span class="folder-icon">⚑ Moderation</span>
+            </button>
+        {/if}
     </nav>
 
     <div class="sidebar-footer">
