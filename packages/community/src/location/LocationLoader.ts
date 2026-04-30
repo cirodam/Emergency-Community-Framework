@@ -1,4 +1,4 @@
-import { FileStore } from "@ecf/core";
+import { BaseLoader } from "@ecf/core";
 import { Location } from "./Location.js";
 
 interface LocationRecord {
@@ -11,15 +11,9 @@ interface LocationRecord {
     createdAt:   string;
 }
 
-export class LocationLoader {
-    private readonly store: FileStore;
-
-    constructor(dataDir: string) {
-        this.store = new FileStore(dataDir);
-    }
-
-    save(loc: Location): void {
-        const record: LocationRecord = {
+export class LocationLoader extends BaseLoader<LocationRecord, Location> {
+    protected serialize(loc: Location): LocationRecord {
+        return {
             id:          loc.id,
             name:        loc.name,
             address:     loc.address,
@@ -28,11 +22,10 @@ export class LocationLoader {
             description: loc.description,
             createdAt:   loc.createdAt.toISOString(),
         };
-        this.store.write(loc.id, record);
     }
 
-    loadAll(): Location[] {
-        return this.store.readAll<LocationRecord>().map(r => new Location(
+    protected deserialize(r: LocationRecord): Location {
+        return new Location(
             r.name,
             r.address,
             r.lat  ?? null,
@@ -40,10 +33,6 @@ export class LocationLoader {
             r.description ?? "",
             r.id,
             new Date(r.createdAt),
-        ));
-    }
-
-    delete(id: string): boolean {
-        return this.store.delete(id);
+        );
     }
 }

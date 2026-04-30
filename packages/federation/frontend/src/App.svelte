@@ -6,8 +6,10 @@
         getAssembly, startAssemblyTerm,
         listFederationMotions,
         listInsuranceClaims, submitInsuranceClaim, reviewInsuranceClaim,
+        getClearingBalances,
         type MemberDto, type EconomicsDto, type ApplicationDto, type FederationConfig,
         type AssemblyTerm, type FederationMotionDto, type InsuranceClaimDto,
+        type CommunityBalanceEntry, type ClearingBalancesDto,
     } from "./lib/api.js";
 
     // ── Setup (first-time, no community configured) ────────────────────────
@@ -127,6 +129,23 @@
             assemblyError = e instanceof Error ? e.message : "Failed to start term";
         } finally {
             startingTerm = false;
+        }
+    }
+
+    // ── Clearing data ───────────────────────────────────────────────────────
+    let clearingData    = $state<ClearingBalancesDto | null>(null);
+    let clearingError   = $state("");
+    let clearingLoading = $state(false);
+
+    async function loadClearing() {
+        clearingLoading = true;
+        clearingError   = "";
+        try {
+            clearingData = await getClearingBalances();
+        } catch (e) {
+            clearingError = e instanceof Error ? e.message : "Load failed";
+        } finally {
+            clearingLoading = false;
         }
     }
 
@@ -332,6 +351,9 @@
             <button class="nav-item" class:active={currentPage === "domains"} onclick={() => { currentPage = "domains"; loadDomains(); }}>
                 <span>✚</span> Domains
             </button>
+            <button class="nav-item" class:active={currentPage === "clearing"} onclick={() => { currentPage = "clearing"; loadClearing(); }}>
+                <span>⇄</span> Clearing
+            </button>
         </nav>
 
         <div class="sidebar-footer">
@@ -450,7 +472,6 @@
                     </div>
                 {/each}
             {/if}
-        {/if}
 
         <!-- ── Assembly ── -->
         {:else if currentPage === "assembly"}
@@ -637,6 +658,94 @@
                     {/if}
                 </div>
             </div>
+
+        <!-- ── Clearing ── -->
+        {:else if currentPage === "clearing"}
+            <div class="page-header">
+                <h1>Clearing House</h1>
+                <button class="btn-ghost" onclick={loadClearing}>↻ Refresh</button>
+            </div>
+
+            {#if clearingError}
+                <div class="error-banner">{clearingError}</div>
+            {/if}
+
+            {#if clearingLoading}
+                <p class="empty">Loading…</p>
+            {:else if clearingData}
+                <!-- Pool summary -->
+                <div class="stat-row">
+                    <div class="stat-card">
+                        <span class="label">Structural Aid Pool</span>
+                        <span class="value">
+                            {clearingData.clearingHouse.structuralAidBalance !== null
+                                ? clearingData.clearingHouse.structuralAidBalance.toLocaleString()
+                                : "—"} <small>kithe</small>
+                        </span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">Solidarity Pool</span>
+                        <span class="value">
+                            {clearingData.clearingHouse.solidarityPoolBalance !== null
+                                ? clearingData.clearingHouse.solidarityPoolBalance.toLocaleString()
+                                : "—"} <small>kithe</small>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Community balances table -->
+                <div class="section-card">
+                    <h2 class="section-title">Community Accounts</h2>
+                    {#if clearingData.communities.length === 0}
+                        <p class="empty">No member communities.</p>
+                    {:else}
+                        <table class="clearing-table">
+                            <thead>
+                                <tr>
+                                    <th>Community</th>
+                                    <th class="num">Balance</th>
+                                    <th class="num">Credit Line</th>
+                                    <th class="num">Position</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each clearingData.communities.slice().sort((a, b) => (b.balance ?? 0) - (a.balance ?? 0)) as c (c.memberId)}
+                                    {@const position = c.balance !== null ? c.balance : null}
+                                    {@const isDeficit = position !== null && position < 0}
+                                    {@const isSurplus = position !== null && position > c.creditLineKin}
+                                    <tr class:deficit={isDeficit} class:surplus={isSurplus}>
+                                        <td>
+                                            <span class="comm-name">{c.name}</span>
+                                            <span class="mono comm-handle">@{c.handle}</span>
+                                            {#if c.isFounder}<span class="founder-badge">founder</span>{/if}
+                                        </td>
+                                        <td class="num">
+                                            {c.balance !== null ? c.balance.toLocaleString() : "—"}
+                                        </td>
+                                        <td class="num">
+                                            {c.creditLineKin > 0 ? `±${c.creditLineKin.toLocaleString()}` : "—"}
+                                        </td>
+                                        <td class="num pos-cell">
+                                            {#if position === null}
+                                                —
+                                            {:else if isDeficit}
+                                                <span class="pos-deficit">▼ {Math.abs(position).toLocaleString()}</span>
+                                            {:else if isSurplus}
+                                                <span class="pos-surplus">▲ {(position - c.creditLineKin).toLocaleString()} over limit</span>
+                                            {:else}
+                                                <span class="pos-ok">✓ within limits</span>
+                                            {/if}
+                                        </td>
+                                    </tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    {/if}
+                </div>
+            {:else}
+                <p class="empty">Click Refresh to load balances.</p>
+            {/if}
+
         {/if}
 
     </main>
@@ -844,7 +953,40 @@
         vertical-align: middle;
     }
 
+    /* ── Clearing table ────────────────────────────────────────────────────── */
+
+    .clearing-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+    }
+    .clearing-table th {
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        padding: 0.5rem 0.75rem;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    .clearing-table td {
+        padding: 0.7rem 0.75rem;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+    }
+    .clearing-table th.num,
+    .clearing-table td.num { text-align: right; }
+    .clearing-table tr.deficit td { background: #fff5f5; }
+    .clearing-table tr.surplus td { background: #fffbeb; }
+    .comm-name  { font-weight: 600; display: block; }
+    .comm-handle { color: #64748b; display: block; font-size: 0.8rem; }
+    .pos-deficit { color: #b91c1c; font-weight: 600; }
+    .pos-surplus { color: #b45309; font-weight: 600; }
+    .pos-ok      { color: #15803d; }
+
     /* ── Application cards ─────────────────────────────────────────────────── */
+
 
     .app-card {
         background: #fff;

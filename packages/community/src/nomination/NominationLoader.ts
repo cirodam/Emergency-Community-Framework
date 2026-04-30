@@ -1,4 +1,4 @@
-import { FileStore } from "@ecf/core";
+import { BaseLoader } from "@ecf/core";
 import { Nomination, NominationStatus } from "./Nomination.js";
 
 interface NominationRecord {
@@ -15,15 +15,9 @@ interface NominationRecord {
     resolvedBy: string | null;
 }
 
-export class NominationLoader {
-    private readonly store: FileStore;
-
-    constructor(dataDir: string) {
-        this.store = new FileStore(dataDir);
-    }
-
-    save(n: Nomination): void {
-        const record: NominationRecord = {
+export class NominationLoader extends BaseLoader<NominationRecord, Nomination> {
+    protected serialize(n: Nomination): NominationRecord {
+        return {
             id:         n.id,
             createdAt:  n.createdAt.toISOString(),
             createdBy:  n.createdBy,
@@ -36,14 +30,9 @@ export class NominationLoader {
             resolvedAt: n.resolvedAt?.toISOString() ?? null,
             resolvedBy: n.resolvedBy,
         };
-        this.store.write(n.id, record);
     }
 
-    loadAll(): Nomination[] {
-        return this.store.readAll<NominationRecord>().map(r => this.fromRecord(r));
-    }
-
-    private fromRecord(r: NominationRecord): Nomination {
+    protected deserialize(r: NominationRecord): Nomination {
         const n = new Nomination(r.createdBy, r.roleId, r.unitId, r.domainId, r.nomineeId, r.statement, r.id);
         (n as unknown as Record<string, unknown>)["createdAt"]  = new Date(r.createdAt);
         (n as unknown as Record<string, unknown>)["status"]     = r.status;

@@ -24,6 +24,7 @@ export { messageRouter } from "./network/networkRoutes.js";
 
 // storage
 export * from "./storage/FileStore.js";
+export * from "./storage/BaseLoader.js";
 export * from "./storage/DataManifest.js";
 
 // auth

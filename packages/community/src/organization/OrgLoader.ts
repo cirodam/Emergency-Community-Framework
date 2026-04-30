@@ -1,4 +1,4 @@
-import { FileStore } from "@ecf/core";
+import { BaseLoader } from "@ecf/core";
 import { Organization } from "./Organization.js";
 
 interface OrgRecord {
@@ -14,16 +14,10 @@ interface OrgRecord {
     publicKeyHex:  string;
 }
 
-export class OrgLoader {
-    private readonly store: FileStore;
-
-    constructor(dataDir: string) {
-        this.store = new FileStore(dataDir);
-    }
-
-    save(org: Organization): void {
+export class OrgLoader extends BaseLoader<OrgRecord, Organization> {
+    protected serialize(org: Organization): OrgRecord {
         const { privateKeyDer, publicKeyHex } = org.getKeypairForPersistence();
-        const record: OrgRecord = {
+        return {
             id:          org.id,
             handle:      org.handle,
             name:        org.name,
@@ -35,14 +29,7 @@ export class OrgLoader {
             privateKeyDer,
             publicKeyHex,
         };
-        this.store.write(org.id, record);
     }
 
-    loadAll(): Organization[] {
-        return this.store.readAll<OrgRecord>().map(r => Organization.restore(r));
-    }
-
-    delete(id: string): boolean {
-        return this.store.delete(id);
-    }
+    protected deserialize(r: OrgRecord): Organization { return Organization.restore(r); }
 }

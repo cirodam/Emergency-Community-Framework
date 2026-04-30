@@ -1,20 +1,11 @@
-import { FileStore } from "@ecf/core";
+import { BaseLoader } from "@ecf/core";
 import { FederationAssemblyTerm, type FederationAssemblyTermData } from "./FederationAssemblyTerm.js";
 
-export class FederationAssemblyTermLoader {
-    private store: FileStore;
+export class FederationAssemblyTermLoader extends BaseLoader<FederationAssemblyTermData, FederationAssemblyTerm> {
+    protected serialize(term: FederationAssemblyTerm): FederationAssemblyTermData   { return term.toData(); }
+    protected deserialize(d: FederationAssemblyTermData): FederationAssemblyTerm { return FederationAssemblyTerm.fromData(d); }
 
-    constructor(dataDir: string) {
-        this.store = new FileStore(dataDir);
-    }
-
-    save(term: FederationAssemblyTerm): void {
-        this.store.write(term.id, term.toData());
-    }
-
-    loadAll(): FederationAssemblyTerm[] {
-        return this.store.readAll<FederationAssemblyTermData>()
-            .map(d => FederationAssemblyTerm.fromData(d))
-            .sort((a, b) => b.termNumber - a.termNumber);
+    override loadAll(): FederationAssemblyTerm[] {
+        return super.loadAll().sort((a, b) => b.termNumber - a.termNumber);
     }
 }

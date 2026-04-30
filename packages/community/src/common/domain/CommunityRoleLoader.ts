@@ -1,4 +1,4 @@
-import { FileStore } from "@ecf/core";
+import { BaseLoader } from "@ecf/core";
 import { CommunityRole } from "../CommunityRole.js";
 
 interface RoleRecord {
@@ -13,15 +13,9 @@ interface RoleRecord {
     termEndDate: string | null;
 }
 
-export class CommunityRoleLoader {
-    private readonly store: FileStore;
-
-    constructor(dataDir: string) {
-        this.store = new FileStore(dataDir);
-    }
-
-    save(role: CommunityRole): void {
-        const record: RoleRecord = {
+export class CommunityRoleLoader extends BaseLoader<RoleRecord, CommunityRole> {
+    protected serialize(role: CommunityRole): RoleRecord {
+        return {
             id:            role.id,
             title:         role.title,
             description:   role.description,
@@ -32,18 +26,9 @@ export class CommunityRoleLoader {
             termStartDate: role.termStartDate?.toISOString() ?? null,
             termEndDate:   role.termEndDate?.toISOString()   ?? null,
         };
-        this.store.write(role.id, record);
     }
 
-    loadAll(): CommunityRole[] {
-        return this.store.readAll<RoleRecord>().map(r => this.fromRecord(r));
-    }
-
-    delete(id: string): boolean {
-        return this.store.delete(id);
-    }
-
-    private fromRecord(r: RoleRecord): CommunityRole {
+    protected deserialize(r: RoleRecord): CommunityRole {
         const role = new CommunityRole(r.title, r.description, r.kinPerMonth, r.roleTypeId ?? null);
         (role as unknown as Record<string, unknown>)["id"] = r.id;
         role.memberId      = r.memberId;

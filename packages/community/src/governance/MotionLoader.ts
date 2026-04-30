@@ -1,19 +1,7 @@
-import { FileStore } from "@ecf/core";
+import { BaseLoader } from "@ecf/core";
 import { Motion, type MotionData } from "./Motion.js";
 
-export class MotionLoader {
-    private store: FileStore;
-
-    constructor(dataDir: string) {
-        this.store = new FileStore(dataDir);
-    }
-
-    save(motion: Motion): void {
-        this.store.write(motion.id, motion.toData());
-    }
-
-    loadAll(): Motion[] {
-        const records = this.store.readAll<MotionData>();
-        return records.map(d => Motion.fromData(d));
-    }
+export class MotionLoader extends BaseLoader<MotionData, Motion> {
+    protected serialize(m: Motion): MotionData   { return m.toData(); }
+    protected deserialize(d: MotionData): Motion { return Motion.fromData(d); }
 }

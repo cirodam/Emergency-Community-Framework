@@ -1,22 +1,7 @@
-import { FileStore } from "@ecf/core";
+import { BaseLoader } from "@ecf/core";
 import { Classified } from "./Classified.js";
 
-export class ClassifiedLoader {
-    private readonly store: FileStore;
-
-    constructor(dataDir: string) {
-        this.store = new FileStore(dataDir);
-    }
-
-    save(c: Classified): void {
-        this.store.write(c.id, c);
-    }
-
-    loadAll(): Classified[] {
-        return this.store.readAll<Classified>();
-    }
-
-    delete(id: string): void {
-        this.store.delete(id);
-    }
+export class ClassifiedLoader extends BaseLoader<Classified, Classified> {
+    protected serialize(c: Classified): Classified { return c; }
+    protected deserialize(d: Classified): Classified { return d; }
 }

@@ -17,6 +17,7 @@ import {
     getBudget,
     listDomains,
     getCensusSummary,
+    getClearingBalances,
 } from "./FederationController.js";
 import {
     getAssembly,
@@ -75,6 +76,9 @@ router.get( "/motions",     listMotions);
 router.post("/motions",     requireMember, createMotion);
 router.get( "/motions/:id", getMotion);
 router.patch("/motions/:id", requireMember, advanceMotion);
+
+// ── Clearing ──────────────────────────────────────────────────────────────
+router.get("/clearing/balances", getClearingBalances);
 
 // ── Health Insurance ───────────────────────────────────────────────────────
 router.get( "/insurance/claims",     listInsuranceClaims);

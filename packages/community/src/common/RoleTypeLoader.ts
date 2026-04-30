@@ -1,22 +1,7 @@
-import { FileStore } from "@ecf/core";
+import { BaseLoader } from "@ecf/core";
 import { RoleType, type RoleTypeData } from "./RoleType.js";
 
-export class RoleTypeLoader {
-    private readonly store: FileStore;
-
-    constructor(dataDir: string) {
-        this.store = new FileStore(dataDir);
-    }
-
-    save(roleType: RoleType): void {
-        this.store.write(roleType.id, roleType.toData());
-    }
-
-    loadAll(): RoleType[] {
-        return this.store.readAll<RoleTypeData>().map(RoleType.restore);
-    }
-
-    delete(id: string): boolean {
-        return this.store.delete(id);
-    }
+export class RoleTypeLoader extends BaseLoader<RoleTypeData, RoleType> {
+    protected serialize(r: RoleType): RoleTypeData   { return r.toData(); }
+    protected deserialize(d: RoleTypeData): RoleType { return RoleType.restore(d); }
 }

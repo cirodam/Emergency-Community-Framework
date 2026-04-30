@@ -372,3 +372,30 @@ export async function reviewInsuranceClaim(
     }
     return res.json() as Promise<InsuranceClaimDto>;
 }
+
+// ── Clearing ──────────────────────────────────────────────────────────────────
+
+export interface CommunityBalanceEntry {
+    memberId:      string;
+    name:          string;
+    handle:        string;
+    url:           string;
+    bankAccountId: string | null;
+    balance:       number | null;
+    creditLineKin: number;
+    isFounder:     boolean;
+}
+
+export interface ClearingBalancesDto {
+    communities: CommunityBalanceEntry[];
+    clearingHouse: {
+        structuralAidBalance:  number | null;
+        solidarityPoolBalance: number | null;
+    };
+}
+
+export async function getClearingBalances(): Promise<ClearingBalancesDto> {
+    const res = await apiFetch("/api/clearing/balances");
+    if (!res.ok) throw new Error("Could not load clearing balances");
+    return res.json() as Promise<ClearingBalancesDto>;
+}

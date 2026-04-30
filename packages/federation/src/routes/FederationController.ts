@@ -576,3 +576,55 @@ export async function handleBankTransferRoute(
 
     return { ok: true, community: address.community, amount };
 }
+
+// ── Clearing ──────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/clearing/balances
+ * Public — community accounts have no privacy expectation within the federation.
+ *
+ * Returns each member community's kithe balance in the federation clearing
+ * account, together with their credit line so the UI can show surplus/deficit.
+ * Also returns clearing-house pool balances for operator transparency.
+ */
+export async function getClearingBalances(_req: Request, res: Response): Promise<void> {
+    const members = FederationMemberService.getInstance().getAll();
+    const b = bank();
+
+    const communities = await Promise.all(
+        members.map(async (m) => {
+            let balance: number | null = null;
+            if (m.bankAccountId) {
+                const acct = await b.getAccountById(m.bankAccountId).catch(() => undefined);
+                balance = acct?.amount ?? null;
+            }
+            return {
+                memberId:      m.id,
+                name:          m.name,
+                handle:        m.handle,
+                url:           m.url,
+                bankAccountId: m.bankAccountId,
+                balance,
+                creditLineKin: m.creditLineKin,
+                isFounder:     m.isFounder,
+            };
+        })
+    );
+
+    const ch = FederationClearingHouse.getInstance();
+    let structuralAidBalance:  number | null = null;
+    let solidarityPoolBalance: number | null = null;
+    if (ch.isReady()) {
+        const [sa, sp] = await Promise.all([
+            b.getAccountById(ch.structuralAidAccountId).catch(() => undefined),
+            b.getAccountById(ch.solidarityPoolAccountId).catch(() => undefined),
+        ]);
+        structuralAidBalance  = sa?.amount ?? null;
+        solidarityPoolBalance = sp?.amount ?? null;
+    }
+
+    res.json({
+        communities,
+        clearingHouse: { structuralAidBalance, solidarityPoolBalance },
+    });
+}
