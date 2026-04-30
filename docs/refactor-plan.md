@@ -39,7 +39,7 @@ export class MotionLoader extends BaseLoader<MotionData, Motion> {
 
 ---
 
-## Step 2 — Assembly motion (clerk path only)
+## Step 2 — Assembly motion (clerk path only) ✅ DONE
 
 **Problem:** `FederationMotion` and community `Motion` (assembly/leader-pool body)
 have identical state machines for the clerk path:
@@ -72,7 +72,7 @@ Community referendum path stays in `Motion` only — federation has no referendu
 
 ---
 
-## Step 3 — AssemblyTerm
+## Step 3 — AssemblyTerm ✅ DONE
 
 **Problem:** `FederationAssemblyTerm` and the community assembly term (implicit in
 `MotionService` + `LeaderPool`) share the same structure:
@@ -108,7 +108,7 @@ At federation level `delegateHandle` is the nominated person from that community
 
 ---
 
-## Step 4 — MemberApplication base
+## Step 4 — MemberApplication base ✅ DONE
 
 **Problem:** The application flow (`pending → under_review → approved → rejected`)
 exists in three packages:
@@ -144,7 +144,7 @@ export abstract class BaseApplication<TApplicant> {
 
 ---
 
-## Step 5 — FunctionalDomain + DomainService base
+## Step 5 — FunctionalDomain + DomainService base ✅ DONE
 
 **Problem:** `FunctionalDomain` and `DomainService` exist in community, federation,
 and commonwealth with the same `registerDomain()`, `listDomains()`, `getDomainById()`
@@ -182,7 +182,7 @@ export class BaseDomainService<T extends BaseFunctionalDomain> {
 
 ---
 
-## Step 6 — BaseDemurrageScheduler
+## Step 6 — BaseDemurrageScheduler ✅ DONE
 
 **Problem:** `FederationDemurrageScheduler` and `CommonwealthDemurrageScheduler`
 are nearly identical: periodic sweep, apply surplus demurrage to clearing accounts,

@@ -1,3 +1,4 @@
+import { BaseDomainService } from "@ecf/core";
 import { CommonwealthFunctionalDomain } from "./CommonwealthFunctionalDomain.js";
 
 /**
@@ -5,26 +6,13 @@ import { CommonwealthFunctionalDomain } from "./CommonwealthFunctionalDomain.js"
  *
  * Domains are code-defined singletons registered at startup.
  */
-export class CommonwealthDomainService {
+export class CommonwealthDomainService extends BaseDomainService<CommonwealthFunctionalDomain> {
     private static instance: CommonwealthDomainService;
-    private domains: Map<string, CommonwealthFunctionalDomain> = new Map();
 
-    private constructor() {}
+    private constructor() { super(); }
 
     static getInstance(): CommonwealthDomainService {
         if (!CommonwealthDomainService.instance) CommonwealthDomainService.instance = new CommonwealthDomainService();
         return CommonwealthDomainService.instance;
-    }
-
-    registerDomain(domain: CommonwealthFunctionalDomain): void {
-        this.domains.set(domain.id, domain);
-    }
-
-    getDomain(id: string): CommonwealthFunctionalDomain | undefined {
-        return this.domains.get(id);
-    }
-
-    getDomains(): CommonwealthFunctionalDomain[] {
-        return Array.from(this.domains.values());
     }
 }

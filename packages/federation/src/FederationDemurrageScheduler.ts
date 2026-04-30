@@ -1,3 +1,4 @@
+import { BaseDemurrageScheduler } from "@ecf/core";
 import { FederationClearingHouse } from "./domains/central_bank/FederationClearingHouse.js";
 import { FederationTreasury } from "./domains/treasury/FederationTreasury.js";
 import { FederationConstitution } from "./governance/FederationConstitution.js";
@@ -19,42 +20,10 @@ import { FederationMemberService } from "./FederationMemberService.js";
  * The charge is mild enough that a community earning a healthy surplus is
  * never punished; only indefinite hoarding is discouraged.
  */
-export class FederationDemurrageScheduler {
-    private timer: ReturnType<typeof setInterval> | null = null;
+export class FederationDemurrageScheduler extends BaseDemurrageScheduler {
+    protected readonly logTag = "FederationDemurrageScheduler";
 
-    start(): void {
-        // Run once on startup (catches the case where the server was down on the 1st)
-        this._runIfDue().catch(err =>
-            console.error("[FederationDemurrageScheduler] startup check failed:", err),
-        );
-
-        // Check once per hour — fire on the 1st of each month
-        this.timer = setInterval(() => {
-            this._runIfDue().catch(err =>
-                console.error("[FederationDemurrageScheduler] sweep failed:", err),
-            );
-        }, 60 * 60 * 1_000);
-    }
-
-    stop(): void {
-        if (this.timer) { clearInterval(this.timer); this.timer = null; }
-    }
-
-    private _lastRunMonth: string | null = null;
-
-    private async _runIfDue(): Promise<void> {
-        const now = new Date();
-        // Only run on the 1st of the month (UTC)
-        if (now.getUTCDate() !== 1) return;
-
-        const monthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-        if (this._lastRunMonth === monthKey) return;
-        this._lastRunMonth = monthKey;
-
-        await this._sweep(monthKey);
-    }
-
-    private async _sweep(monthKey: string): Promise<void> {
+    protected async _sweep(monthKey: string): Promise<void> {
         const ch = FederationClearingHouse.getInstance();
         if (!ch.isReady()) {
             console.warn("[FederationDemurrageScheduler] clearing house not ready, skipping sweep");

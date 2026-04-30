@@ -3,6 +3,7 @@ import {
     type CommonwealthApplication,
     type ApplicationStatus,
 } from "./CommonwealthApplication.js";
+import { advanceApplication } from "@ecf/core";
 import type { CommonwealthApplicationLoader } from "./CommonwealthApplicationLoader.js";
 
 export class CommonwealthApplicationService {
@@ -91,26 +92,7 @@ export class CommonwealthApplicationService {
     ): CommonwealthApplication {
         const app = this.applications.get(id);
         if (!app) throw new Error(`Application ${id} not found`);
-
-        const allowed: Record<ApplicationStatus, ApplicationStatus[]> = {
-            draft:        ["submitted"],
-            submitted:    ["under_review"],
-            under_review: ["approved", "rejected"],
-            approved:     [],
-            rejected:     [],
-        };
-
-        if (!allowed[app.status].includes(status)) {
-            throw new Error(
-                `Cannot transition application from "${app.status}" to "${status}"`,
-            );
-        }
-
-        app.status     = status;
-        app.reviewedAt = new Date().toISOString();
-        app.reviewNote = reviewNote;
-        if (memberId) app.memberId = memberId;
-
+        advanceApplication(app, status, reviewNote, memberId);
         this.loader.save(app);
         return app;
     }

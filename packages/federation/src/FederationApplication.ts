@@ -1,14 +1,9 @@
 import { randomUUID } from "crypto";
+import { type BaseApplication, type ApplicationStatus } from "@ecf/core";
 
-export type ApplicationStatus =
-    | "draft"
-    | "submitted"
-    | "under_review"
-    | "approved"
-    | "rejected";
+export type { ApplicationStatus };
 
-export interface FederationApplication {
-    id:                 string;
+export interface FederationApplication extends BaseApplication {
     communityName:      string;
     communityHandle:    string;   // URL-safe, unique within this federation
     communityNodeId:    string;
@@ -19,12 +14,6 @@ export interface FederationApplication {
     communityEntityId:  string;
     /** Routing priority for this node (1 = preferred). */
     communityPriority:  number;
-    status:             ApplicationStatus;
-    submittedAt:        string;       // ISO 8601
-    reviewedAt:         string | null;
-    reviewNote:         string | null;
-    /** Set when status transitions to "approved". */
-    memberId:           string | null;
     /**
      * Number of residents the community reported at application time.
      * Used to compute the initial credit line on approval.

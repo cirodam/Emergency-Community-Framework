@@ -1,14 +1,9 @@
 import { randomUUID } from "crypto";
+import { type BaseApplication, type ApplicationStatus } from "@ecf/core";
 
-export type ApplicationStatus =
-    | "draft"
-    | "submitted"
-    | "under_review"
-    | "approved"
-    | "rejected";
+export type { ApplicationStatus };
 
-export interface CommonwealthApplication {
-    id:                   string;
+export interface CommonwealthApplication extends BaseApplication {
     federationName:       string;
     federationHandle:     string;
     federationNodeId:     string;
@@ -19,11 +14,6 @@ export interface CommonwealthApplication {
     federationEntityId:   string;
     /** Routing priority for this node (1 = preferred). */
     federationPriority:   number;
-    status:               ApplicationStatus;
-    submittedAt:          string;
-    reviewedAt:           string | null;
-    reviewNote:           string | null;
-    memberId:             string | null;
     /**
      * Total population across all member communities at application time.
      * Used to compute the initial credit line on approval.

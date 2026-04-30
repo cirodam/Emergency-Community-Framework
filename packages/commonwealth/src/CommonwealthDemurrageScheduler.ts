@@ -1,3 +1,4 @@
+import { BaseDemurrageScheduler } from "@ecf/core";
 import { CommonwealthClearingHouse } from "./domains/central_bank/CommonwealthClearingHouse.js";
 import { CommonwealthTreasury } from "./domains/treasury/CommonwealthTreasury.js";
 import { CommonwealthConstitution } from "./governance/CommonwealthConstitution.js";
@@ -11,39 +12,10 @@ import { CommonwealthMemberService } from "./CommonwealthMemberService.js";
  * balance exceeds (creditLineKin × surplusThresholdMultiple), then immediately
  * redistributes the solidarity pool to federations in deficit.
  */
-export class CommonwealthDemurrageScheduler {
-    private timer: ReturnType<typeof setInterval> | null = null;
+export class CommonwealthDemurrageScheduler extends BaseDemurrageScheduler {
+    protected readonly logTag = "CommonwealthDemurrageScheduler";
 
-    start(): void {
-        this._runIfDue().catch(err =>
-            console.error("[CommonwealthDemurrageScheduler] startup check failed:", err),
-        );
-
-        this.timer = setInterval(() => {
-            this._runIfDue().catch(err =>
-                console.error("[CommonwealthDemurrageScheduler] sweep failed:", err),
-            );
-        }, 60 * 60 * 1_000);
-    }
-
-    stop(): void {
-        if (this.timer) { clearInterval(this.timer); this.timer = null; }
-    }
-
-    private _lastRunMonth: string | null = null;
-
-    private async _runIfDue(): Promise<void> {
-        const now = new Date();
-        if (now.getUTCDate() !== 1) return;
-
-        const monthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-        if (this._lastRunMonth === monthKey) return;
-        this._lastRunMonth = monthKey;
-
-        await this._sweep(monthKey);
-    }
-
-    private async _sweep(monthKey: string): Promise<void> {
+    protected async _sweep(monthKey: string): Promise<void> {
         const ch = CommonwealthClearingHouse.getInstance();
         if (!ch.isReady()) {
             console.warn("[CommonwealthDemurrageScheduler] clearing house not ready, skipping sweep");

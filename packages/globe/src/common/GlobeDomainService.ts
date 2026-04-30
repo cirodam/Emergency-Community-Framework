@@ -1,3 +1,4 @@
+import { BaseDomainService } from "@ecf/core";
 import { GlobeFunctionalDomain } from "./GlobeFunctionalDomain.js";
 
 /**
@@ -5,26 +6,13 @@ import { GlobeFunctionalDomain } from "./GlobeFunctionalDomain.js";
  *
  * Domains are code-defined singletons registered at startup.
  */
-export class GlobeDomainService {
+export class GlobeDomainService extends BaseDomainService<GlobeFunctionalDomain> {
     private static instance: GlobeDomainService;
-    private domains: Map<string, GlobeFunctionalDomain> = new Map();
 
-    private constructor() {}
+    private constructor() { super(); }
 
     static getInstance(): GlobeDomainService {
         if (!GlobeDomainService.instance) GlobeDomainService.instance = new GlobeDomainService();
         return GlobeDomainService.instance;
-    }
-
-    registerDomain(domain: GlobeFunctionalDomain): void {
-        this.domains.set(domain.id, domain);
-    }
-
-    getDomain(id: string): GlobeFunctionalDomain | undefined {
-        return this.domains.get(id);
-    }
-
-    getDomains(): GlobeFunctionalDomain[] {
-        return Array.from(this.domains.values());
     }
 }

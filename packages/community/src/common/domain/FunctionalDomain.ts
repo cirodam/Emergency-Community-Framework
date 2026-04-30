@@ -1,5 +1,4 @@
-import { randomUUID } from "crypto";
-import { IEconomicActor } from "@ecf/core";
+import { BaseFunctionalDomain, IEconomicActor } from "@ecf/core";
 
 export type BudgetCategory = "supplies" | "equipment" | "services" | "other";
 
@@ -28,22 +27,12 @@ export interface BudgetItem {
  * Payroll and budget logic live in DomainService, which holds the flat registries
  * for all roles and units and can resolve IDs to objects.
  */
-export abstract class FunctionalDomain implements IEconomicActor {
-    readonly id: string;
-    readonly name: string;
-    readonly description: string;
-
+export abstract class FunctionalDomain extends BaseFunctionalDomain implements IEconomicActor {
     unitIds: string[] = [];
     budgetItems: BudgetItem[] = [];
 
     /** The leader pool that governs this domain (if any). */
     poolId: string | null = null;
-
-    constructor(name: string, description: string = "", id?: string) {
-        this.id = id ?? randomUUID();
-        this.name = name;
-        this.description = description;
-    }
 
     getId(): string { return this.id; }
     getDisplayName(): string { return this.name; }

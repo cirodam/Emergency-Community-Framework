@@ -1,4 +1,17 @@
-import { randomUUID } from "crypto";
+import {
+    AssemblyMotion,
+    AssemblyMotionData,
+    type MotionStage,
+    type MotionOutcome,
+    type VoteThresholdKey,
+} from "@ecf/core";
+
+// Re-export under the original names so existing consumers keep working.
+export type FederationReferendumStage  = "draft" | "deliberating" | "voting" | "resolved";
+export type FederationClerkStage       = "proposed" | "discussed" | "voted" | "resolved";
+export type FederationMotionStage      = MotionStage;
+export type FederationMotionOutcome    = MotionOutcome;
+export type FederationVoteThresholdKey = VoteThresholdKey;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -9,17 +22,6 @@ import { randomUUID } from "crypto";
  * any other string — the ID of a domain council.
  */
 export type FederationMotionBody = "referendum" | "assembly" | string;
-
-export type FederationReferendumStage = "draft" | "deliberating" | "voting" | "resolved";
-export type FederationClerkStage      = "proposed" | "discussed" | "voted" | "resolved";
-export type FederationMotionStage     = FederationReferendumStage | FederationClerkStage;
-
-export type FederationMotionOutcome = "passed" | "failed" | "withdrawn" | "referred";
-
-export type FederationVoteThresholdKey =
-    | "thresholdSimpleMajority"
-    | "thresholdSupermajority"
-    | "thresholdNearConsensus";
 
 export interface FederationMotionComment {
     id:              string;
@@ -40,53 +42,14 @@ export interface FederationMotionVote {
     votedAt:           string;
 }
 
-export interface FederationMotionData {
-    id:                    string;
-    body:                  FederationMotionBody;
-    stage:                 FederationMotionStage;
-    title:                 string;
-    description:           string;
-    proposerMemberId:      string;
-    proposerHandle:        string;
-    createdAt:             string;
-    deliberationStartedAt: string | null;
-    votingOpensAt:         string | null;
-    votingClosesAt:        string | null;
-    thresholdKey:          FederationVoteThresholdKey | null;
-    votes:                 FederationMotionVote[];
-    comments:              FederationMotionComment[];
-    outcome:               FederationMotionOutcome | null;
-    outcomeNote:           string;
-    resolvedAt:            string | null;
-    referredToId:          string | null;
-    parentId:              string | null;
-    pendingAmendmentIds:   string[];
+export interface FederationMotionData extends AssemblyMotionData<FederationMotionVote, FederationMotionComment> {
+    proposerMemberId: string;
 }
 
 // ── Class ─────────────────────────────────────────────────────────────────────
 
-export class FederationMotion {
-    readonly id:               string;
-    readonly body:             FederationMotionBody;
+export class FederationMotion extends AssemblyMotion<FederationMotionVote, FederationMotionComment> {
     readonly proposerMemberId: string;
-    readonly proposerHandle:   string;
-    readonly title:            string;
-    readonly description:      string;
-    readonly createdAt:        string;
-    readonly parentId:         string | null;
-
-    stage:                 FederationMotionStage;
-    deliberationStartedAt: string | null          = null;
-    votingOpensAt:         string | null          = null;
-    votingClosesAt:        string | null          = null;
-    thresholdKey:          FederationVoteThresholdKey | null = null;
-    votes:                 FederationMotionVote[] = [];
-    comments:              FederationMotionComment[] = [];
-    outcome:               FederationMotionOutcome | null = null;
-    outcomeNote:           string                 = "";
-    resolvedAt:            string | null          = null;
-    referredToId:          string | null          = null;
-    pendingAmendmentIds:   string[]               = [];
 
     constructor(opts: {
         body:             FederationMotionBody;
@@ -98,26 +61,8 @@ export class FederationMotion {
         id?:              string;
         createdAt?:       string;
     }) {
-        this.id               = opts.id       ?? randomUUID();
-        this.body             = opts.body;
-        this.title            = opts.title;
-        this.description      = opts.description;
+        super(opts);
         this.proposerMemberId = opts.proposerMemberId;
-        this.proposerHandle   = opts.proposerHandle;
-        this.parentId         = opts.parentId ?? null;
-        this.createdAt        = opts.createdAt ?? new Date().toISOString();
-        this.stage            = opts.body === "referendum" ? "draft" : "proposed";
-    }
-
-    get isReferendum(): boolean { return this.body === "referendum"; }
-    get isResolved(): boolean   { return this.stage === "resolved"; }
-
-    get approvalCount(): number {
-        return this.votes.filter(v => v.vote === "approve").length;
-    }
-
-    get rejectionCount(): number {
-        return this.votes.filter(v => v.vote === "reject").length;
     }
 
     hasVoted(communityMemberId: string): boolean {
@@ -125,28 +70,7 @@ export class FederationMotion {
     }
 
     toData(): FederationMotionData {
-        return {
-            id:                    this.id,
-            body:                  this.body,
-            stage:                 this.stage,
-            title:                 this.title,
-            description:           this.description,
-            proposerMemberId:      this.proposerMemberId,
-            proposerHandle:        this.proposerHandle,
-            createdAt:             this.createdAt,
-            deliberationStartedAt: this.deliberationStartedAt,
-            votingOpensAt:         this.votingOpensAt,
-            votingClosesAt:        this.votingClosesAt,
-            thresholdKey:          this.thresholdKey,
-            votes:                 this.votes,
-            comments:              this.comments,
-            outcome:               this.outcome,
-            outcomeNote:           this.outcomeNote,
-            resolvedAt:            this.resolvedAt,
-            referredToId:          this.referredToId,
-            parentId:              this.parentId,
-            pendingAmendmentIds:   this.pendingAmendmentIds,
-        };
+        return { ...this.baseData(), proposerMemberId: this.proposerMemberId };
     }
 
     static fromData(d: FederationMotionData): FederationMotion {
@@ -160,18 +84,8 @@ export class FederationMotion {
             parentId:         d.parentId,
             createdAt:        d.createdAt,
         });
-        m.stage                 = d.stage;
-        m.deliberationStartedAt = d.deliberationStartedAt;
-        m.votingOpensAt         = d.votingOpensAt;
-        m.votingClosesAt        = d.votingClosesAt;
-        m.thresholdKey          = d.thresholdKey;
-        m.votes                 = d.votes;
-        m.comments              = d.comments;
-        m.outcome               = d.outcome;
-        m.outcomeNote           = d.outcomeNote;
-        m.resolvedAt            = d.resolvedAt;
-        m.referredToId          = d.referredToId;
-        m.pendingAmendmentIds   = d.pendingAmendmentIds;
+        m.restoreBase(d);
         return m;
     }
 }
+

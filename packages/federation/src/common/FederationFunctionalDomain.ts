@@ -1,3 +1,5 @@
+import { BaseFunctionalDomain } from "@ecf/core";
+
 /**
  * Base class for all federation-level functional domains.
  *
@@ -6,14 +8,4 @@
  * federation domains manage specific institutional entities directly rather
  * than template-instantiated units.
  */
-export abstract class FederationFunctionalDomain {
-    readonly id: string;
-    readonly name: string;
-    readonly description: string;
-
-    constructor(name: string, description: string, id: string) {
-        this.id          = id;
-        this.name        = name;
-        this.description = description;
-    }
-}
+export abstract class FederationFunctionalDomain extends BaseFunctionalDomain {}

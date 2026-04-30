@@ -1,3 +1,4 @@
+import { BaseDomainService } from "@ecf/core";
 import { FederationFunctionalDomain } from "./FederationFunctionalDomain.js";
 
 /**
@@ -7,26 +8,13 @@ import { FederationFunctionalDomain } from "./FederationFunctionalDomain.js";
  * Unlike the community DomainService, there is no unit/role/pool sub-system —
  * each federation domain manages its own entity types directly.
  */
-export class FederationDomainService {
+export class FederationDomainService extends BaseDomainService<FederationFunctionalDomain> {
     private static instance: FederationDomainService;
-    private domains: Map<string, FederationFunctionalDomain> = new Map();
 
-    private constructor() {}
+    private constructor() { super(); }
 
     static getInstance(): FederationDomainService {
         if (!FederationDomainService.instance) FederationDomainService.instance = new FederationDomainService();
         return FederationDomainService.instance;
-    }
-
-    registerDomain(domain: FederationFunctionalDomain): void {
-        this.domains.set(domain.id, domain);
-    }
-
-    getDomain(id: string): FederationFunctionalDomain | undefined {
-        return this.domains.get(id);
-    }
-
-    getDomains(): FederationFunctionalDomain[] {
-        return Array.from(this.domains.values());
     }
 }
