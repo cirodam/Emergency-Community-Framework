@@ -2,6 +2,8 @@
 
 Software infrastructure for community-run mutual aid economies.
 
+![Screenshot](docs/images/screenshot1.png)
+
 ## The idea
 
 When formal economies fail — or for the billions of people they never served — communities don't stop having needs, and people don't stop being willing to work. What breaks down is the infrastructure for finding each other and keeping track.
