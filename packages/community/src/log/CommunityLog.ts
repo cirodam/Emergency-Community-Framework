@@ -13,7 +13,12 @@ export type CommunityLogType =
     | "pool-created"
     | "assembly-drawn"
     | "bylaw-created"
-    | "bylaw-amended";
+    | "bylaw-amended"
+    | "role-type-added"
+    | "role-type-removed"
+    | "unit-type-added"
+    | "unit-type-removed"
+    | "unit-deployed";
 
 export interface CommunityLogEntry {
     id:          string;

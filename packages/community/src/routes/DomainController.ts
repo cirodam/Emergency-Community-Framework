@@ -132,6 +132,19 @@ export function listTemplates(_req: Request, res: Response): void {
     res.json(templates);
 }
 
+// GET /api/unit-types
+// Returns all unit types (built-ins + custom DB-persisted), with a custom flag.
+export function listUnitTypes(_req: Request, res: Response): void {
+    const customSet = new Set(svc().getUnitTypes().map(u => u.type));
+    const types = UnitTemplateRegistry.getAll().map(t => ({
+        type:        t.type,
+        label:       t.label,
+        description: t.description,
+        custom:      customSet.has(t.type),
+    }));
+    res.json(types);
+}
+
 // ── Roles ─────────────────────────────────────────────────────────────────────
 
 // GET /api/roles

@@ -35,5 +35,16 @@ export class CommunicationsUnitTemplates {
                 "postal-service",
             ),
         });
+
+        UnitTemplateRegistry.register({
+            type:        "telecommunications-office",
+            label:       "Telecommunications Office",
+            description: "Manages telephone and voice communication infrastructure — including landlines, VoIP systems, satellite uplinks, and emergency radio relay — connecting the community internally and to the wider federation.",
+            factory: () => new FunctionalUnit(
+                "Telecommunications Office",
+                "Manages telephone and voice communication infrastructure — including landlines, VoIP systems, satellite uplinks, and emergency radio relay — connecting the community internally and to the wider federation.",
+                "telecommunications-office",
+            ),
+        });
     }
 }

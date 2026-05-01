@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { getConstitution, listPersons, listPools, listNominations, listBylaws } from "../lib/api.js";
-    import type { ConstitutionDocument, PersonDto, PoolDto, NominationDto, BylawDto } from "../lib/api.js";
+    import { getConstitution, listPersons, listPools, listNominations, listBylaws, listRoleTypes, listUnitTypes, listDomains } from "../lib/api.js";
+    import type { ConstitutionDocument, PersonDto, PoolDto, NominationDto, BylawDto, RoleTypeDto, UnitTypeDto, DomainDto } from "../lib/api.js";
 
     let {
         kind,
@@ -12,10 +12,13 @@
 
     // Lazy-loaded reference data
     let constitution = $state<ConstitutionDocument | null>(null);
-    let persons      = $state<PersonDto[]>([]);
-    let pools        = $state<PoolDto[]>([]);
-    let nominations  = $state<NominationDto[]>([]);
-    let bylaws       = $state<BylawDto[]>([]);
+    let persons      = $state([] as PersonDto[]);
+    let pools        = $state([] as PoolDto[]);
+    let nominations  = $state([] as NominationDto[]);
+    let bylaws       = $state([] as BylawDto[]);
+    let roleTypes    = $state([] as RoleTypeDto[]);
+    let unitTypes    = $state([] as UnitTypeDto[]);
+    let domains      = $state([] as DomainDto[]);
 
     $effect(() => {
         if (kind === "amend-constitution" && !constitution) {
@@ -26,8 +29,16 @@
             listPools().then(p => { pools = p; }).catch(() => {});
         } else if (kind === "accept-nomination" && !nominations.length) {
             listNominations().then(ns => { nominations = ns.filter(n => n.status === "pending"); }).catch(() => {});
-        } else if ((kind === "amend-bylaw") && !bylaws.length) {
+        } else if (kind === "amend-bylaw" && !bylaws.length) {
             listBylaws().then(b => { bylaws = b; }).catch(() => {});
+        } else if (kind === "remove-role-type" && !roleTypes.length) {
+            listRoleTypes().then(r => { roleTypes = r; }).catch(() => {});
+        } else if (kind === "remove-unit-type" && !unitTypes.length) {
+            listUnitTypes().then(u => { unitTypes = u; }).catch(() => {});
+        } else if (kind === "deploy-unit") {
+            if (!roleTypes.length) listRoleTypes().then(r => { roleTypes = r; }).catch(() => {});
+            if (!unitTypes.length) listUnitTypes().then(u => { unitTypes = u; }).catch(() => {});
+            if (!domains.length)   listDomains().then(d => { domains = d; }).catch(() => {});
         }
     });
 
@@ -45,6 +56,36 @@
     let bylawTitle    = $state("");
     let bylawPreamble = $state("");
     let bylawId       = $state("");
+
+    // add-role-type fields
+    let rtTitle     = $state("");
+    let rtDesc      = $state("");
+    let rtKin       = $state("");
+
+    // remove-role-type fields
+    let selectedRoleTypeId = $state("");
+
+    // add-unit-type fields
+    let utType  = $state("");
+    let utLabel = $state("");
+    let utDesc  = $state("");
+
+    // remove-unit-type fields
+    let selectedUnitType = $state("");
+
+    // deploy-unit fields
+    let deployDomainId   = $state("");
+    let deployUnitType   = $state("");
+    let deployUnitName   = $state("");
+    let deployUnitDesc   = $state("");
+    let deployRoles      = $state([] as Array<{ roleTypeId: string; count: number; kinOverride: string }>);
+
+    function addDeployRoleSlot() {
+        deployRoles = [...deployRoles, { roleTypeId: "", count: 1, kinOverride: "" }];
+    }
+    function removeDeployRoleSlot(i: number) {
+        deployRoles = deployRoles.filter((_, idx) => idx !== i);
+    }
 
     // schedule-community-event fields
     let evtTitle            = $state("");
@@ -113,6 +154,42 @@
             payload = bylawId
                 ? { bylawId, ...(bylawTitle.trim() ? { title: bylawTitle.trim() } : {}), ...(bylawPreamble.trim() ? { preamble: bylawPreamble.trim() } : {}) }
                 : {};
+        } else if (kind === "add-role-type") {
+            const title = rtTitle.trim();
+            if (!title) { payload = {}; return; }
+            const kin = rtKin.trim() ? Number(rtKin.trim()) : 0;
+            payload = {
+                title,
+                ...(rtDesc.trim() ? { description: rtDesc.trim() } : {}),
+                ...(kin > 0       ? { defaultKinPerMonth: kin }     : {}),
+            };
+        } else if (kind === "remove-role-type") {
+            payload = selectedRoleTypeId ? { roleTypeId: selectedRoleTypeId } : {};
+        } else if (kind === "add-unit-type") {
+            const type  = utType.trim().toLowerCase().replace(/\s+/g, "-");
+            const label = utLabel.trim();
+            if (!type || !label) { payload = {}; return; }
+            payload = { type, label, description: utDesc.trim() };
+        } else if (kind === "remove-unit-type") {
+            payload = selectedUnitType ? { unitType: selectedUnitType } : {};
+        } else if (kind === "deploy-unit") {
+            if (!deployDomainId || !deployUnitType) { payload = {}; return; }
+            const validRoles = deployRoles
+                .filter(s => s.roleTypeId)
+                .map(s => ({
+                    roleTypeId: s.roleTypeId,
+                    count:      Math.max(1, s.count),
+                    ...(s.kinOverride.trim() && !isNaN(Number(s.kinOverride))
+                        ? { kinPerMonth: Number(s.kinOverride) }
+                        : {}),
+                }));
+            payload = {
+                domainId: deployDomainId,
+                unitType: deployUnitType,
+                ...(deployUnitName.trim() ? { name:        deployUnitName.trim() } : {}),
+                ...(deployUnitDesc.trim() ? { description: deployUnitDesc.trim() } : {}),
+                ...(validRoles.length     ? { roles: validRoles }                  : {}),
+            };
         } else {
             payload = {};
         }
@@ -256,6 +333,74 @@
         <input class="input" type="text" placeholder="New title (leave blank to keep current)" bind:value={bylawTitle} />
         <textarea class="input textarea" placeholder="New preamble (leave blank to keep current)" bind:value={bylawPreamble} rows="3"></textarea>
     {/if}
+{:else if kind === "add-role-type"}
+    <input class="input" type="text" placeholder="Role title * (e.g. Nurse Practitioner)" bind:value={rtTitle} />
+    <textarea class="input textarea" placeholder="Description (optional)" bind:value={rtDesc} rows="2"></textarea>
+    <input class="input" type="number" placeholder="Default kin / month (0 = unpaid)" bind:value={rtKin} min="0" />
+{:else if kind === "remove-role-type"}
+    {#if !roleTypes.length}
+        <p class="hint">Loading role types…</p>
+    {:else}
+        <select class="input select" bind:value={selectedRoleTypeId}>
+            <option value="">— choose role type —</option>
+            {#each roleTypes as rt (rt.id)}
+                <option value={rt.id}>{rt.title} ({rt.defaultKinPerMonth} kin/mo)</option>
+            {/each}
+        </select>
+    {/if}
+{:else if kind === "add-unit-type"}
+    <input class="input" type="text" placeholder="Type identifier * (kebab-case, e.g. compost-facility)" bind:value={utType} />
+    <input class="input" type="text" placeholder="Display label * (e.g. Compost Facility)" bind:value={utLabel} />
+    <textarea class="input textarea" placeholder="Description (optional)" bind:value={utDesc} rows="2"></textarea>
+{:else if kind === "remove-unit-type"}
+    {#if !unitTypes.length}
+        <p class="hint">Loading unit types…</p>
+    {:else}
+        <select class="input select" bind:value={selectedUnitType}>
+            <option value="">— choose custom unit type —</option>
+            {#each unitTypes.filter(u => u.custom) as u (u.type)}
+                <option value={u.type}>{u.label} ({u.type})</option>
+            {/each}
+        </select>
+        {#if !unitTypes.some(u => u.custom)}
+            <p class="hint">No custom unit types in the bank yet.</p>
+        {/if}
+    {/if}
+{:else if kind === "deploy-unit"}
+    {#if !domains.length || !unitTypes.length}
+        <p class="hint">Loading…</p>
+    {:else}
+        <select class="input select" bind:value={deployDomainId}>
+            <option value="">— choose domain —</option>
+            {#each domains as d (d.id)}
+                <option value={d.id}>{d.name}</option>
+            {/each}
+        </select>
+        <select class="input select" bind:value={deployUnitType}>
+            <option value="">— choose unit type —</option>
+            {#each unitTypes as u (u.type)}
+                <option value={u.type}>{u.label}{u.custom ? " ★" : ""}</option>
+            {/each}
+        </select>
+        <input class="input" type="text" placeholder="Custom name (leave blank for default)" bind:value={deployUnitName} />
+        <textarea class="input textarea" placeholder="Custom description (optional)" bind:value={deployUnitDesc} rows="2"></textarea>
+
+        <p class="field-label" style="margin-top:0.5rem">Role slots</p>
+        {#each deployRoles as slot, i}
+            <div class="row role-row">
+                <select class="input select" bind:value={slot.roleTypeId}>
+                    <option value="">— role type —</option>
+                    {#each roleTypes as rt (rt.id)}
+                        <option value={rt.id}>{rt.title}</option>
+                    {/each}
+                </select>
+                <input class="input count-input" type="number" min="1" placeholder="×" bind:value={slot.count} />
+                <input class="input kin-input" type="number" min="0" placeholder="kin/mo" bind:value={slot.kinOverride} />
+                <button type="button" class="remove-slot-btn" onclick={() => removeDeployRoleSlot(i)}>✕</button>
+            </div>
+        {/each}
+        <button type="button" class="add-slot-btn" onclick={addDeployRoleSlot}>+ Add role slot</button>
+    {/if}
 {/if}
 
 <style>
@@ -278,4 +423,28 @@
     .field-check { flex-direction: row; align-items: center; gap: 0.35rem; flex: 0 0 auto; padding-bottom: 0.45rem; }
     .field-check input { width: auto; }
     .field-label { font-size: 0.75rem; font-weight: 600; color: #374151; }
+    .role-row { align-items: center; }
+    .count-input { flex: 0 0 4rem; }
+    .kin-input   { flex: 0 0 6rem; }
+    .remove-slot-btn {
+        flex: 0 0 auto;
+        background: none;
+        border: none;
+        color: #dc2626;
+        cursor: pointer;
+        font-size: 0.85rem;
+        padding: 0.2rem 0.3rem;
+        line-height: 1;
+    }
+    .add-slot-btn {
+        margin-top: 0.25rem;
+        padding: 0.35rem 0.75rem;
+        border: 1px dashed #94a3b8;
+        border-radius: 0.5rem;
+        background: none;
+        color: #475569;
+        cursor: pointer;
+        font-size: 0.8rem;
+    }
+    .add-slot-btn:hover { border-color: #16a34a; color: #16a34a; }
 </style>

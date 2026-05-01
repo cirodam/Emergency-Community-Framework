@@ -837,6 +837,19 @@ export async function listRoleTypes(): Promise<RoleTypeDto[]> {
     return res.json() as Promise<RoleTypeDto[]>;
 }
 
+export interface UnitTypeDto {
+    type:        string;
+    label:       string;
+    description: string;
+    custom:      boolean;
+}
+
+export async function listUnitTypes(): Promise<UnitTypeDto[]> {
+    const res = await fetch("/api/unit-types");
+    if (!res.ok) throw new Error("Failed to load unit types");
+    return res.json() as Promise<UnitTypeDto[]>;
+}
+
 export async function createRole(payload: {
     unitId: string;
     title?: string;
@@ -1541,7 +1554,12 @@ export type CommunityLogType =
     | "pool-created"
     | "assembly-drawn"
     | "bylaw-created"
-    | "bylaw-amended";
+    | "bylaw-amended"
+    | "role-type-added"
+    | "role-type-removed"
+    | "unit-type-added"
+    | "unit-type-removed"
+    | "unit-deployed";
 
 export interface CommunityLogEntry {
     id:         string;

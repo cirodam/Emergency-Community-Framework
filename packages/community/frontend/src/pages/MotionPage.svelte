@@ -233,33 +233,31 @@
             <p class="error-msg">{actionError}</p>
         {/if}
 
-        <!-- Comments (referenda only) -->
-        {#if isReferendum}
-            <hr class="divider" />
-            <h2 class="section-heading">Discussion</h2>
+        <!-- Comments (all motions) -->
+        <hr class="divider" />
+        <h2 class="section-heading">Discussion</h2>
 
-            {#if motion.comments.length === 0}
-                <p class="empty-msg">No comments yet. Start the discussion.</p>
-            {:else}
-                {#each motion.comments as c (c.id)}
-                    <div class="comment">
-                        <div class="comment-header">
-                            <span class="comment-author">{c.authorHandle}</span>
-                            <span class="comment-date">{formatDate(c.createdAt)}</span>
-                        </div>
-                        <p class="comment-body">{c.body}</p>
+        {#if motion.comments.length === 0}
+            <p class="empty-msg">No comments yet. Start the discussion.</p>
+        {:else}
+            {#each motion.comments as c (c.id)}
+                <div class="comment">
+                    <div class="comment-header">
+                        <span class="comment-author">{c.authorHandle}</span>
+                        <span class="comment-date">{formatDate(c.createdAt)}</span>
                     </div>
-                {/each}
-            {/if}
-
-            {#if me && motion.stage !== "resolved"}
-                <div class="comment-form">
-                    <textarea class="input textarea" placeholder="Add a comment…" bind:value={commentText} rows="3"></textarea>
-                    <button class="btn-primary" onclick={doComment} disabled={commenting || !commentText.trim()}>
-                        {commenting ? "Posting…" : "Post"}
-                    </button>
+                    <p class="comment-body">{c.body}</p>
                 </div>
-            {/if}
+            {/each}
+        {/if}
+
+        {#if me && motion.stage !== "resolved" && motion.stage !== "draft"}
+            <div class="comment-form">
+                <textarea class="input textarea" placeholder="Add a comment…" bind:value={commentText} rows="3"></textarea>
+                <button class="btn-primary" onclick={doComment} disabled={commenting || !commentText.trim()}>
+                    {commenting ? "Posting…" : "Post"}
+                </button>
+            </div>
         {/if}
 
         <!-- Vote list (collapsed / expandable could be added; showing flat for now) -->

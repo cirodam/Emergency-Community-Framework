@@ -175,6 +175,11 @@ export class CommunityDb {
                 data TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS unit_types (
+                id   TEXT PRIMARY KEY,
+                data TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS functional_domain_states (
                 id   TEXT PRIMARY KEY,
                 data TEXT NOT NULL

@@ -12,6 +12,14 @@ It gives communities a banking system, a market, a mail system, and a shared bud
 
 Communities can federate — joining together into networks so that trade and mutual aid can flow across a wider circle. The architecture scales from a neighborhood to a city to a globe, with each layer accountable to the one above it.
 
+## Principles
+
+**A person's worth isn't tied to their productivity.**
+Children, elders, the sick, the grieving, the person between jobs — they are members of the community, not liabilities. An economy that only values people for what they produce has already failed most of them.
+
+**An economy exists to meet people's needs. If it doesn't do that, what's the point.**
+Not to grow. Not to attract investment. Not to balance a budget. The only measure that matters is whether people are fed, housed, cared for, and able to live with dignity. Everything else is bookkeeping.
+
 ## Inspirations
 
 **Great Depression-era mutual aid societies** — Fraternal orders and community lodges ran their own insurance, healthcare, and unemployment support through member dues and solidarity. They worked because membership was real: you were vouched in, you had obligations, and the community was the safety net. They collapsed not from failure but because the New Deal nationalized their function.

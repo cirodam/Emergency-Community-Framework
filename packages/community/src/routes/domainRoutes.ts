@@ -23,7 +23,8 @@ router.patch( "/units/:id", ...requireSteward, domains.updateUnit);
 router.delete("/units/:id", ...requireSteward, domains.deleteUnit);
 
 // Unit templates
-router.get("/templates", domains.listTemplates);
+router.get("/templates",   domains.listTemplates);
+router.get("/unit-types",  domains.listUnitTypes);
 
 // Roles
 router.get(   "/roles",     domains.listRoles);

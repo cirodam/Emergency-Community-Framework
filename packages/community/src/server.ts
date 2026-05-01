@@ -21,6 +21,7 @@ import { CalendarService } from "./calendar/CalendarService.js";
 import { LocationLoader } from "./location/LocationLoader.js";
 import { LocationService } from "./location/LocationService.js";
 import { RoleTypeLoader } from "./common/RoleTypeLoader.js";
+import { UnitTypeLoader } from "./common/domain/UnitTypeLoader.js";
 import { CommunityRoleLoader } from "./common/domain/CommunityRoleLoader.js";
 import { FunctionalUnitLoader } from "./common/domain/FunctionalUnitLoader.js";
 import { FunctionalDomainLoader } from "./common/domain/FunctionalDomainLoader.js";
@@ -235,6 +236,9 @@ async function main(): Promise<void> {
     // ── Role type bank ─────────────────────────────────────────────────────
     const roleTypeLoader = new RoleTypeLoader();
     domainSvc.initRoleTypes(roleTypeLoader);
+
+    // ── Unit type bank ─────────────────────────────────────────────────────
+    domainSvc.initUnitTypes(new UnitTypeLoader());
 
     seedDomains(domainSvc);
 

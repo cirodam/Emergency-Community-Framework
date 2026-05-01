@@ -7,6 +7,9 @@ import { CommunityRole } from "./common/CommunityRole.js";
 import { CommunityRoleLoader } from "./common/domain/CommunityRoleLoader.js";
 import { RoleType } from "./common/RoleType.js";
 import { RoleTypeLoader } from "./common/RoleTypeLoader.js";
+import { UnitType } from "./common/domain/UnitType.js";
+import { UnitTypeLoader } from "./common/domain/UnitTypeLoader.js";
+import { UnitTemplateRegistry } from "./common/domain/UnitTemplateRegistry.js";
 import { LeaderPool } from "./governance/LeaderPool.js";
 import { LeaderPoolLoader } from "./governance/LeaderPoolLoader.js";
 import { BankClient } from "@ecf/core";
@@ -26,13 +29,15 @@ export class DomainService {
     private units:     Map<string, FunctionalUnit>   = new Map();
     private roles:     Map<string, CommunityRole>    = new Map();
     private roleTypes: Map<string, RoleType>         = new Map();
+    private unitTypes: Map<string, UnitType>         = new Map();
     private pools:     Map<string, LeaderPool>       = new Map();
 
-    private domainLoader:   FunctionalDomainLoader | null = null;
-    private unitLoader:     FunctionalUnitLoader   | null = null;
-    private roleLoader:     CommunityRoleLoader    | null = null;
-    private roleTypeLoader: RoleTypeLoader         | null = null;
-    private poolLoader:     LeaderPoolLoader       | null = null;
+    private domainLoader:    FunctionalDomainLoader | null = null;
+    private unitLoader:      FunctionalUnitLoader   | null = null;
+    private roleLoader:      CommunityRoleLoader    | null = null;
+    private roleTypeLoader:  RoleTypeLoader         | null = null;
+    private unitTypeLoader:  UnitTypeLoader         | null = null;
+    private poolLoader:      LeaderPoolLoader       | null = null;
 
     private initialized = false;
 
@@ -206,6 +211,51 @@ export class DomainService {
         if (!this.roleTypes.has(id)) return false;
         this.roleTypes.delete(id);
         this.roleTypeLoader?.delete(id);
+        return true;
+    }
+
+    // ── Unit Types (the bank) ─────────────────────────────────────────────────
+
+    initUnitTypes(loader: UnitTypeLoader): void {
+        this.unitTypeLoader = loader;
+        for (const ut of loader.loadAll()) {
+            this.unitTypes.set(ut.type, ut);
+            UnitTemplateRegistry.register({
+                type:        ut.type,
+                label:       ut.label,
+                description: ut.description,
+                factory:     () => new FunctionalUnit(ut.label, ut.description, ut.type),
+            });
+        }
+        logger.info(`[DomainService] loaded ${this.unitTypes.size} custom unit type(s)`);
+    }
+
+    getUnitType(type: string): UnitType | undefined { return this.unitTypes.get(type); }
+    getUnitTypes(): UnitType[] { return Array.from(this.unitTypes.values()); }
+
+    /** True if the type exists either as a DB-persisted custom type or a built-in template. */
+    hasUnitTypeWithType(type: string): boolean {
+        return this.unitTypes.has(type) || !!UnitTemplateRegistry.get(type);
+    }
+
+    createUnitType(ut: UnitType): void {
+        this.assertInit();
+        this.unitTypes.set(ut.type, ut);
+        this.unitTypeLoader?.save(ut);
+        UnitTemplateRegistry.register({
+            type:        ut.type,
+            label:       ut.label,
+            description: ut.description,
+            factory:     () => new FunctionalUnit(ut.label, ut.description, ut.type),
+        });
+    }
+
+    deleteUnitType(type: string): boolean {
+        this.assertInit();
+        const ut = this.unitTypes.get(type);
+        if (!ut) return false;
+        this.unitTypes.delete(type);
+        this.unitTypeLoader?.deleteById(ut.id);
         return true;
     }
 
