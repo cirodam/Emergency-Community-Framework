@@ -33,8 +33,8 @@ This is not a novel idea. Many local exchange trading systems (LETS) and time ba
 Because the money supply tracks population, the central bank is necessarily in the business of tracking demographics. The two are inseparable.
 
 **Who counts:**
-- Every active community member counts toward the supply target
-- Retired members, suspended members, and dependents who are not yet members do not count for issuance (though births generate a one-time birth grant)
+- Every enrolled community member — active, retired, or suspended — has kin issued on their behalf every year on their birthday. Most of it goes to the social insurance pool, not to the member's account directly. Kin accrues with age regardless of a member's status within the community.
+- Dependents who have not yet been enrolled as members do not receive annual issuances, but their birth triggers a one-time birth grant.
 
 **Age matters:**
 - Issuance is proportional to age in years. A 40-year-old joining the community brings 40 × kinPerPersonYear in accumulated life into the supply — a join endowment. A newborn brings a birth grant.
