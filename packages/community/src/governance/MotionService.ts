@@ -4,6 +4,7 @@ import { MotionLoader } from "./MotionLoader.js";
 import { Constitution } from "./Constitution.js";
 import { PersonService } from "../person/PersonService.js";
 import { effectRegistry } from "./EffectRegistry.js";
+import { CommunityLogService } from "../log/CommunityLogService.js";
 
 /** How long a referendum motion sits in deliberation before voting may open. */
 const DEFAULT_DELIBERATION_DAYS = 3;
@@ -195,6 +196,11 @@ export class MotionService {
 
         if (outcome === "passed") effectRegistry.dispatch(m);
         this.loader.save(m);
+        try {
+            const logSvc = CommunityLogService.getInstance();
+            if (outcome === "passed")    logSvc.write("motion-passed",    `Motion passed: ${m.title}`, { refId: m.id });
+            else if (outcome === "failed") logSvc.write("motion-failed",  `Motion failed: ${m.title}`, { refId: m.id });
+        } catch { /* log service may not be initialised in tests */ }
         return m;
     }
 
@@ -230,6 +236,11 @@ export class MotionService {
         m.outcomeNote = `Resolved at deadline. ${m.approvalCount}/${totalMembers} approved (needed ${needed}).`;
         if (m.outcome === "passed") effectRegistry.dispatch(m);
         this.loader.save(m);
+        try {
+            const logSvc = CommunityLogService.getInstance();
+            if (m.outcome === "passed") logSvc.write("motion-passed", `Motion passed: ${m.title}`, { refId: m.id });
+            else                        logSvc.write("motion-failed", `Motion failed: ${m.title}`, { refId: m.id });
+        } catch { /* log service may not be initialised in tests */ }
     }
 
     private checkReferendumResolution(m: Motion): void {
@@ -244,6 +255,7 @@ export class MotionService {
             m.outcomeNote = `Passed with ${m.approvalCount}/${totalMembers} approvals.`;
             effectRegistry.dispatch(m);
             this.loader.save(m);
+            try { CommunityLogService.getInstance().write("motion-passed", `Motion passed: ${m.title}`, { refId: m.id }); } catch { /* */ }
             return;
         }
 
@@ -255,6 +267,7 @@ export class MotionService {
             m.resolvedAt = new Date().toISOString();
             m.outcomeNote = `Rejected with ${m.rejectionCount}/${totalMembers} rejections.`;
             this.loader.save(m);
+            try { CommunityLogService.getInstance().write("motion-failed", `Motion failed: ${m.title}`, { refId: m.id }); } catch { /* */ }
         }
     }
 

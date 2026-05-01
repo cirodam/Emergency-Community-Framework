@@ -9,9 +9,10 @@
     const items: NavItem[] = [
         {
             kind: "group", id: "calendar", label: "Calendar", icon: "⊞",
-            activePages: ["schedule"],
+            activePages: ["schedule", "calendar"],
             children: [
-                { kind: "leaf", id: "schedule", label: "Schedule", icon: "⊞" },
+                { kind: "leaf", id: "schedule", label: "Work Schedule", icon: "⊞" },
+                { kind: "leaf", id: "calendar", label: "Events",        icon: "◷" },
             ],
         },
         {
@@ -51,8 +52,9 @@
         },
         {
             kind: "group", id: "other", label: "Other", icon: "⊙",
-            activePages: ["locations", "nodes", "connections", "how-it-works", "settings", "growth"],
+            activePages: ["locations", "nodes", "connections", "how-it-works", "settings", "growth", "timeline"],
             children: [
+                { kind: "leaf", id: "timeline",     label: "Timeline",      icon: "◷" },
                 { kind: "leaf", id: "locations",    label: "Locations",     icon: "⊕" },
                 { kind: "leaf", id: "nodes",        label: "Nodes",         icon: "⬡" },
                 { kind: "leaf", id: "connections",  label: "Connections",   icon: "⬡" },

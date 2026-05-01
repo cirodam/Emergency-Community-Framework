@@ -35,5 +35,16 @@ export class HealthcareUnitTemplates {
                 "dental-clinic",
             ),
         });
+
+        UnitTemplateRegistry.register({
+            type:        "mobile-clinic",
+            label:       "Mobile Clinic",
+            description: "A vehicle-based or deployable clinic that brings primary care, wound management, and triage directly to members who cannot easily travel — covering remote households, worksites, temporary camps, or emergency zones.",
+            factory: () => new FunctionalUnit(
+                "Mobile Clinic",
+                "A vehicle-based or deployable clinic that brings primary care, wound management, and triage directly to members who cannot easily travel — covering remote households, worksites, temporary camps, or emergency zones.",
+                "mobile-clinic",
+            ),
+        });
     }
 }

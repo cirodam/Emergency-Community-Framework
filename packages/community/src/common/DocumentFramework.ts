@@ -33,6 +33,12 @@ export interface GoverningDocument {
     articles:  DocumentArticle[];
     adoptedAt: string;
     version:   number;
+    /**
+     * null = assembly-scope (universal).
+     * A pool/domain id = this bylaw belongs to that body and may only be
+     * created or amended by a motion from that body (or the assembly).
+     */
+    scope:     string | null;
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────

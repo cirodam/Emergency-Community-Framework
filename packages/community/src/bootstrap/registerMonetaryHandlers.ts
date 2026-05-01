@@ -6,6 +6,7 @@ import { CentralBank } from "../domains/central_bank/CentralBank.js";
 import { SocialInsuranceBank } from "../domains/social_insurance/SocialInsuranceBank.js";
 import { CommunityTreasury } from "../domains/community_treasury/CommunityTreasury.js";
 import { Constitution } from "../governance/Constitution.js";
+import { CommunityLogService } from "../log/CommunityLogService.js";
 
 /**
  * Register all monetary event handlers and periodic schedulers.
@@ -27,6 +28,7 @@ export function registerMonetaryHandlers(bank: BankClient): void {
         try {
             const memberAccount = await bank.openAccount(person.id, displayName, "kin");
             logger.info(`[community] opened bank account for @${person.handle}`);
+            try { CommunityLogService.getInstance().write("member-joined", `${person.firstName} ${person.lastName} joined the community`, { actorId: person.id, refId: person.id }); } catch { /* */ }
 
             if (!centralBank.isReady() || !siBank.isReady() || !treasury.isReady()) {
                 logger.warn(`[community] monetary institutions not ready — skipping issuance for @${person.handle}`);
@@ -138,6 +140,7 @@ export function registerMonetaryHandlers(bank: BankClient): void {
             // All balances are now zero — close the accounts
             await bank.closeAccounts(person.id);
             logger.info(`[community] closed bank accounts for @${person.handle}`);
+            try { CommunityLogService.getInstance().write("member-discharged", `${person.firstName} ${person.lastName} left the community`, { actorId: person.id, refId: person.id }); } catch { /* */ }
         } catch (err) {
             logger.warn(`[community] discharge handler failed for @${person.handle}: ${(err as Error).message}`);
         }
@@ -202,6 +205,7 @@ export function registerMonetaryHandlers(bank: BankClient): void {
             [centralBank.issuanceAccountId, siBank.poolAccountId],
         ).then(({ count }) => {
             logger.info(`[community] community dues collected from ${count} accounts`);
+            try { CommunityLogService.getInstance().write("dues-collected", `Monthly dues collected from ${count} accounts`); } catch { /* */ }
         }).catch(err => {
             logger.error({ err }, "[community] community dues collection failed");
         });

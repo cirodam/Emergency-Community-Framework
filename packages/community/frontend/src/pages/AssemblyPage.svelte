@@ -1,18 +1,23 @@
 <script lang="ts">
-    import { listPersons, listMotions, createMotion, listMotionEffects, markMotionDiscussed, recordMotionOutcome } from "../lib/api.js";
-    import type { PersonDto, MotionDto, MotionOutcome, MotionEffectKind } from "../lib/api.js";
+    import { getAssembly, drawAssembly, clearAssembly, listMotions, createMotion, listMotionEffects, markMotionDiscussed, recordMotionOutcome } from "../lib/api.js";
+    import type { AssemblyDto, AssemblySlimPerson, MotionDto, MotionOutcome, MotionEffectKind } from "../lib/api.js";
     import { currentPage, session, selectedMotionId } from "../lib/session.js";
     import EffectPayloadForm from "../components/EffectPayloadForm.svelte";
 
-    // TODO: replace with a real assembly endpoint once the backend exposes one
-    let members: PersonDto[] = $state([]);
-    let motions: MotionDto[] = $state([]);
-    let loading = $state(true);
-    let error   = $state("");
+    let assembly  = $state<AssemblyDto | null>(null);
+    let motions   = $state<MotionDto[]>([]);
+    let loading   = $state(true);
+    let error     = $state("");
     let docketError = $state("");
 
+    // Draw form
+    let showDraw   = $state(false);
+    let drawDate   = $state(new Date().toISOString().slice(0, 10));
+    let drawing    = $state(false);
+    let drawError  = $state("");
+
     // Outcome form state
-    let outcomingId = $state<string | null>(null);
+    let outcomingId   = $state<string | null>(null);
     let outcomeChoice = $state<MotionOutcome>("passed");
     let outcomeNote   = $state("");
 
@@ -22,7 +27,7 @@
     let addMotionDesc  = $state("");
     let addingMotion   = $state(false);
     let addMotionError = $state("");
-    let effectKinds    = $state<MotionEffectKind[]>([]);
+    let effectKinds    = $state([] as MotionEffectKind[]);
     let selectedKind   = $state("");
     let effectPayload  = $state<Record<string, unknown>>({});
 
@@ -54,22 +59,36 @@
     const isSteward = $derived(($session as any)?.isSteward ?? false);
 
     async function load() {
-        loading = true;
-        error = "";
+        loading = true; error = "";
         try {
-            // Placeholder: show all persons until a real assembly draw is implemented
-            [members, motions] = await Promise.all([
-                listPersons(),
+            [assembly, motions] = await Promise.all([
+                getAssembly(),
                 listMotions({ body: "assembly" }),
             ]);
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to load assembly";
-        } finally {
-            loading = false;
-        }
+        } finally { loading = false; }
     }
 
     $effect(() => { load(); });
+
+    async function doDraw() {
+        drawing = true; drawError = "";
+        try {
+            assembly = await drawAssembly(drawDate || undefined);
+            showDraw = false;
+        } catch (e) {
+            drawError = e instanceof Error ? e.message : "Failed to draw assembly";
+        } finally { drawing = false; }
+    }
+
+    async function doClear() {
+        if (!confirm("Clear the current assembly term?")) return;
+        try {
+            await clearAssembly();
+            assembly = assembly ? { ...assembly, termStartDate: null, seated: [] } : null;
+        } catch (e) { /* ignore */ }
+    }
 
     const activeMotions   = $derived(motions.filter(m => m.stage !== "resolved"));
     const resolvedMotions = $derived(motions.filter(m => m.stage === "resolved"));
@@ -95,6 +114,23 @@
             outcomingId = null; outcomeNote = "";
         } catch (e) { docketError = e instanceof Error ? e.message : "Failed"; }
     }
+
+    /** Build the full seat array — seated members first, then nulls for vacancies. */
+    function buildSeats(a: AssemblyDto): (AssemblySlimPerson | null)[] {
+        const seats: (AssemblySlimPerson | null)[] = [];
+        for (let i = 0; i < a.seats; i++) {
+            seats.push(a.seated[i] ?? null);
+        }
+        return seats;
+    }
+
+    function initials(p: AssemblySlimPerson): string {
+        return (p.firstName[0] ?? "") + (p.lastName[0] ?? "");
+    }
+
+    function formatDate(iso: string): string {
+        return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+    }
 </script>
 
 <div class="page">
@@ -105,24 +141,82 @@
     </div>
 
     {#if loading}
-        {#each [1, 2, 3] as _}
-            <div class="skeleton"></div>
-        {/each}
+        <div class="skeleton" style="height:8rem"></div>
+        {#each [1, 2] as _}<div class="skeleton"></div>{/each}
     {:else if error}
         <p class="error-msg">{error}</p>
-    {:else if members.length === 0}
-        <p class="empty-msg">No assembly members this term.</p>
-    {:else}
-        <div class="member-list">
-            {#each members as person (person.id)}
-                <div class="member-card">
-                    <span class="member-name">{person.firstName} {person.lastName}</span>
-                    {#if person.handle}
-                        <span class="member-handle">@{person.handle}</span>
-                    {/if}
-                </div>
+    {:else if assembly}
+
+        <!-- Term info bar -->
+        <div class="term-bar">
+            <div class="term-stat">
+                <span class="term-label">Seats</span>
+                <span class="term-value">{assembly.seats}</span>
+            </div>
+            <div class="term-stat">
+                <span class="term-label">Fraction</span>
+                <span class="term-value">{(assembly.fraction * 100).toFixed(1)}%</span>
+            </div>
+            <div class="term-stat">
+                <span class="term-label">Population</span>
+                <span class="term-value">{assembly.population}</span>
+            </div>
+            <div class="term-stat">
+                <span class="term-label">Term</span>
+                <span class="term-value">{assembly.termMonths} mo</span>
+            </div>
+        </div>
+
+        {#if assembly.termStartDate}
+            <p class="term-since">Term began {formatDate(assembly.termStartDate)} · {assembly.seated.length} of {assembly.seats} filled</p>
+        {:else}
+            <p class="term-since no-term">No term drawn yet.</p>
+        {/if}
+
+        <!-- Seat grid -->
+        <div class="seat-grid" aria-label="Assembly seats">
+            {#each buildSeats(assembly) as seat, i (i)}
+                {#if seat}
+                    <div
+                        class="seat filled"
+                        title="{seat.firstName} {seat.lastName} (@{seat.handle})"
+                        aria-label="{seat.firstName} {seat.lastName}"
+                    >
+                        <span class="seat-initials">{initials(seat)}</span>
+                    </div>
+                {:else}
+                    <div class="seat vacant" aria-label="Vacant seat {i + 1}">
+                        <span class="seat-vacant-dot"></span>
+                    </div>
+                {/if}
             {/each}
         </div>
+
+        <!-- Steward draw controls -->
+        {#if isSteward}
+            <div class="steward-bar">
+                {#if !showDraw}
+                    <button class="btn-sm btn-primary-sm" onclick={() => { showDraw = true; drawError = ""; }}>Draw new term</button>
+                    {#if assembly.termStartDate}
+                        <button class="btn-sm btn-danger-sm" onclick={doClear}>Clear term</button>
+                    {/if}
+                {:else}
+                    <div class="draw-form">
+                        <label class="draw-label">
+                            Term start date
+                            <input class="input-sm" type="date" bind:value={drawDate} />
+                        </label>
+                        {#if drawError}<p class="add-error">{drawError}</p>{/if}
+                        <div class="draw-actions">
+                            <button class="btn-sm btn-primary-sm" onclick={doDraw} disabled={drawing}>
+                                {drawing ? "Drawing…" : "Confirm draw"}
+                            </button>
+                            <button class="btn-sm" onclick={() => showDraw = false}>Cancel</button>
+                        </div>
+                    </div>
+                {/if}
+            </div>
+        {/if}
     {/if}
 
     <!-- Docket -->
@@ -226,57 +320,73 @@
     .page-header { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.25rem; }
 
     .back-btn {
-        background: none;
-        border: none;
-        color: #16a34a;
-        font-size: 0.875rem;
-        font-weight: 600;
-        cursor: pointer;
-        padding: 0;
-        text-align: left;
-        margin-bottom: 0.25rem;
+        background: none; border: none; color: #16a34a; font-size: 0.875rem;
+        font-weight: 600; cursor: pointer; padding: 0; text-align: left; margin-bottom: 0.25rem;
     }
 
-    .page-title {
-        font-size: 1.3rem;
-        font-weight: 700;
-        color: #0f172a;
-        margin: 0;
+    .page-title { font-size: 1.3rem; font-weight: 700; color: #0f172a; margin: 0; }
+    .page-sub   { font-size: 0.82rem; color: #64748b; margin: 0; }
+
+    /* ── Term info ─────────────────────────────────────────────────────────────── */
+    .term-bar {
+        display: flex; gap: 0.5rem; flex-wrap: wrap;
+        background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 0.75rem;
+        padding: 0.75rem 1rem;
+    }
+    .term-stat { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 3.5rem; }
+    .term-label { font-size: 0.65rem; color: #4ade80; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+    .term-value { font-size: 1.1rem; font-weight: 800; color: #15803d; }
+
+    .term-since { font-size: 0.78rem; color: #64748b; margin: -0.25rem 0 0; }
+    .term-since.no-term { color: #94a3b8; font-style: italic; }
+
+    /* ── Seat grid ─────────────────────────────────────────────────────────────── */
+    .seat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr));
+        gap: 0.4rem;
     }
 
-    .page-sub {
-        font-size: 0.82rem;
-        color: #64748b;
-        margin: 0;
-    }
-
-    .member-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-
-    .member-card {
+    .seat {
+        aspect-ratio: 1;
+        border-radius: 0.5rem;
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        padding: 0.85rem 1.1rem;
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
-        gap: 1rem;
+        justify-content: center;
+        cursor: default;
+        transition: transform 0.12s;
     }
 
-    .member-name {
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: #0f172a;
+    .seat.filled {
+        background: #16a34a;
+        color: #fff;
+        box-shadow: 0 1px 3px rgba(22,163,74,0.25);
+    }
+    .seat.filled:hover { transform: scale(1.12); box-shadow: 0 3px 8px rgba(22,163,74,0.35); }
+
+    .seat.vacant {
+        background: #f1f5f9;
+        border: 1px dashed #cbd5e1;
     }
 
-    .member-handle {
-        font-size: 0.78rem;
-        color: #64748b;
+    .seat-initials { font-size: 0.7rem; font-weight: 800; letter-spacing: -0.03em; user-select: none; }
+
+    .seat-vacant-dot {
+        width: 0.4rem; height: 0.4rem;
+        border-radius: 50%;
+        background: #cbd5e1;
     }
+
+    /* ── Steward draw bar ────────────────────────────────────────────────────── */
+    .steward-bar { display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap; }
+
+    .draw-form {
+        display: flex; flex-direction: column; gap: 0.5rem;
+        background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem;
+        padding: 0.9rem 1rem; width: 100%;
+    }
+    .draw-label { font-size: 0.78rem; font-weight: 600; color: #334155; display: flex; flex-direction: column; gap: 0.25rem; }
+    .draw-actions { display: flex; gap: 0.4rem; }
 
     .skeleton {
         height: 3.5rem;
@@ -316,6 +426,7 @@
         border-radius: 0.4rem; color: #15803d; font-size: 0.75rem; font-weight: 600; cursor: pointer;
     }
     .btn-primary-sm { background: #16a34a; color: #fff; border-color: #16a34a; }
+    .btn-danger-sm  { background: #fef2f2; border-color: #fca5a5; color: #dc2626; }
     .input-sm {
         padding: 0.3rem 0.55rem; border: 1px solid #e2e8f0; border-radius: 0.4rem;
         font-size: 0.8rem; background: #fff; outline: none; font-family: inherit;
@@ -327,14 +438,8 @@
     .docket-header { display: flex; align-items: center; justify-content: space-between; }
 
     .btn-add {
-        background: transparent;
-        border: 1px dashed #86efac;
-        border-radius: 6px;
-        color: #15803d;
-        font-size: 0.78rem;
-        font-weight: 600;
-        padding: 0.25rem 0.65rem;
-        cursor: pointer;
+        background: transparent; border: 1px dashed #86efac; border-radius: 6px;
+        color: #15803d; font-size: 0.78rem; font-weight: 600; padding: 0.25rem 0.65rem; cursor: pointer;
     }
     .btn-add:hover { background: #f0fdf4; }
 

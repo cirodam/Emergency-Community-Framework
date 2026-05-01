@@ -1,25 +1,32 @@
 import { Request, Response } from "express";
-import { CalendarService } from "../calendar/CalendarService.js";
+import { CalendarService, type CalendarOccurrence } from "../calendar/CalendarService.js";
 import { CalendarEvent } from "../calendar/CalendarEvent.js";
 
 const svc = () => CalendarService.getInstance();
 
-function toDto(event: CalendarEvent) {
+function toDto(event: CalendarEvent, occ?: Pick<CalendarOccurrence, "startAt" | "endAt" | "occurrenceDate">) {
     return {
-        id:            event.id,
-        title:         event.title,
-        description:   event.description,
-        location:      event.location,
-        startAt:       event.startAt,
-        endAt:         event.endAt,
-        allDay:        event.allDay,
-        cancelledAt:   event.cancelledAt,
-        organizerId:   event.organizerId,
-        organizerType: event.organizerType,
-        createdBy:     event.createdBy,
-        createdAt:     event.createdAt,
-        rsvps:         event.rsvps,
+        id:               event.id,
+        title:            event.title,
+        description:      event.description,
+        location:         event.location,
+        startAt:          occ?.startAt        ?? event.startAt,
+        endAt:            occ?.endAt          ?? event.endAt,
+        allDay:           event.allDay,
+        cancelledAt:      event.cancelledAt,
+        organizerId:      event.organizerId,
+        organizerType:    event.organizerType,
+        createdBy:        event.createdBy,
+        createdAt:        event.createdAt,
+        rsvps:            event.rsvps,
+        recurrence:       event.recurrence,
+        recurrenceEndsAt: event.recurrenceEndsAt,
+        occurrenceDate:   occ?.occurrenceDate ?? null,
     };
+}
+
+function occurrenceToDto(occ: CalendarOccurrence) {
+    return toDto(occ.event, occ);
 }
 
 // GET /api/calendar
@@ -28,14 +35,14 @@ export function listEvents(req: Request, res: Response): void {
     const { from, to, upcoming } = req.query as Record<string, string | undefined>;
     if (upcoming) {
         const limit = parseInt(upcoming, 10);
-        res.json(svc().upcoming(isNaN(limit) ? undefined : limit).map(toDto));
+        res.json(svc().upcoming(isNaN(limit) ? undefined : limit).map(occurrenceToDto));
         return;
     }
     if (from && to) {
-        res.json(svc().inRange(from, to).map(toDto));
+        res.json(svc().inRange(from, to).map(occurrenceToDto));
         return;
     }
-    res.json(svc().getAll().map(toDto));
+    res.json(svc().getAll().map(e => toDto(e)));
 }
 
 // GET /api/calendar/:id
@@ -46,9 +53,9 @@ export function getEvent(req: Request, res: Response): void {
 }
 
 // POST /api/calendar
-// Body: { title, startAt, organizerId, organizerType, endAt?, allDay?, description?, location? }
+// Body: { title, startAt, organizerId, organizerType, endAt?, allDay?, description?, location?, recurrence?, recurrenceEndsAt? }
 export function createEvent(req: Request, res: Response): void {
-    const { title, startAt, organizerId, organizerType, endAt, allDay, description, location } = req.body ?? {};
+    const { title, startAt, organizerId, organizerType, endAt, allDay, description, location, recurrence, recurrenceEndsAt } = req.body ?? {};
     if (typeof title !== "string" || !title.trim()) {
         res.status(400).json({ error: "title is required" }); return;
     }
@@ -61,12 +68,16 @@ export function createEvent(req: Request, res: Response): void {
     if (organizerType !== "person" && organizerType !== "org") {
         res.status(400).json({ error: "organizerType must be 'person' or 'org'" }); return;
     }
+    const validRecurrence = ["daily", "weekly", "biweekly", "monthly", "yearly", null, undefined];
+    if (!validRecurrence.includes(recurrence)) {
+        res.status(400).json({ error: "recurrence must be daily|weekly|biweekly|monthly|yearly or null" }); return;
+    }
 
     // createdBy comes from the authenticated person credential
     const createdBy: string = (req as typeof req & { personId?: string }).personId ?? organizerId;
 
     try {
-        const event = svc().create({ title, startAt, createdBy, organizerId, organizerType, endAt, allDay, description, location });
+        const event = svc().create({ title, startAt, createdBy, organizerId, organizerType, endAt, allDay, description, location, recurrence: recurrence ?? null, recurrenceEndsAt: recurrenceEndsAt ?? null });
         res.status(201).json(toDto(event));
     } catch (err) {
         res.status(400).json({ error: (err as Error).message });

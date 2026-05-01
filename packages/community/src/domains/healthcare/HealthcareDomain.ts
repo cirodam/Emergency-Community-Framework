@@ -56,6 +56,7 @@ export interface HealthcareStaffingHeuristic {
  *   - medicine-supply-office  Procurement, storage, and distribution of medicines (default)
  *   - primary-care-clinic     General medical care and preventive health (default)
  *   - dental-clinic           Dental examination, treatment, and hygiene
+ *   - mobile-clinic           Vehicle-based clinic for remote/emergency reach
  */
 export class HealthcareDomain extends FunctionalDomain {
     private static instance: HealthcareDomain;

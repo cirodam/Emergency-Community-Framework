@@ -12,6 +12,8 @@ import calendarRoutes from "./calendarRoutes.js";
 import governanceRoutes from "./governanceRoutes.js";
 import nominationRoutes from "./nominationRoutes.js";
 import shiftRoutes from "./shiftRoutes.js";
+import { CommunityLogService } from "../log/CommunityLogService.js";
+import { Request, Response } from "express";
 
 const router = Router();
 
@@ -24,6 +26,14 @@ router.post("/sms/inbound", sms.smsInbound);
 
 // Public suspension list — satellite apps call this to populate their cache
 router.get("/app-suspensions", suspensions.listSuspensions);
+
+// Community timeline — public transparency log
+// GET /api/log?limit=50&before=<ISO timestamp>
+router.get("/log", (_req: Request, res: Response) => {
+    const limit  = Math.min(200, Math.max(1, Number(_req.query["limit"] ?? 50)));
+    const before = typeof _req.query["before"] === "string" ? _req.query["before"] : undefined;
+    res.json(CommunityLogService.getInstance().recent(limit, before));
+});
 
 router.use("/", personRoutes);
 router.use("/", applicationRoutes);

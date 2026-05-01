@@ -61,7 +61,6 @@ The internal currency is a **closed-loop labor credit system**. It is:
 
 ### Why non-convertibility is the right design
 
-- Keeps the system outside money transmission law (no FinCEN registration, no state banking licenses)
 - Prevents wealth extraction by outside capital
 - Prevents speculation — no exchange rate to manipulate
 - Enforces participation — the currency only has value inside the community

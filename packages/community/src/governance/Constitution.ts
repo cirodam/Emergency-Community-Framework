@@ -138,6 +138,18 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
             description: "Number of members drawn by sortition to form the assembly for a given term.",
             constraints: { min: 9, max: 999 },
         },
+        assemblyFraction: {
+            value: 0.03,
+            authority: "assembly",
+            description: "Fraction of the population that forms the assembly. The seat count is max(9, ceil(population × assemblyFraction)).",
+            constraints: { min: 0.01, max: 0.20 },
+        },
+        assemblyTermMonths: {
+            value: 6,
+            authority: "assembly",
+            description: "Duration of an assembly term in months.",
+            constraints: { min: 1, max: 24 },
+        },
         deliberationPeriodDays: {
             value: 3,
             authority: "assembly",
@@ -516,6 +528,8 @@ export class Constitution {
     }
 
     get deliberationPeriodDays(): number       { return this.get<number>("deliberationPeriodDays"); }
+    get assemblyFraction(): number             { return this.get<number>("assemblyFraction"); }
+    get assemblyTermMonths(): number           { return this.get<number>("assemblyTermMonths"); }
     get bankDemurrageRate(): number            { return this.get<number>("bankDemurrageRate"); }
     get demurrageFloor(): number               { return this.get<number>("demurrageFloor"); }
     get kinPerPersonYear(): number             { return this.get<number>("kinPerPersonYear"); }

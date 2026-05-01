@@ -1,0 +1,40 @@
+import { randomUUID } from "crypto";
+
+export type CommunityLogType =
+    | "motion-passed"
+    | "motion-failed"
+    | "motion-withdrawn"
+    | "member-joined"
+    | "member-discharged"
+    | "demurrage-run"
+    | "dues-collected"
+    | "constitution-amended"
+    | "annual-issuance"
+    | "pool-created"
+    | "assembly-drawn"
+    | "bylaw-created"
+    | "bylaw-amended";
+
+export interface CommunityLogEntry {
+    id:          string;
+    type:        CommunityLogType;
+    summary:     string;
+    actorId:     string | null;  // personId or system actor, null = system
+    refId:       string | null;  // motionId, personId, etc.
+    occurredAt:  string;         // ISO 8601
+}
+
+export function makeLogEntry(
+    type:      CommunityLogType,
+    summary:   string,
+    opts:      { actorId?: string | null; refId?: string | null; occurredAt?: string } = {},
+): CommunityLogEntry {
+    return {
+        id:         randomUUID(),
+        type,
+        summary,
+        actorId:    opts.actorId    ?? null,
+        refId:      opts.refId      ?? null,
+        occurredAt: opts.occurredAt ?? new Date().toISOString(),
+    };
+}

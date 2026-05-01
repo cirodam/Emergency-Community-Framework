@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { getConstitution, listPersons, listPools, listNominations } from "../lib/api.js";
-    import type { ConstitutionDocument, PersonDto, PoolDto, NominationDto } from "../lib/api.js";
+    import { getConstitution, listPersons, listPools, listNominations, listBylaws } from "../lib/api.js";
+    import type { ConstitutionDocument, PersonDto, PoolDto, NominationDto, BylawDto } from "../lib/api.js";
 
     let {
         kind,
@@ -15,6 +15,7 @@
     let persons      = $state<PersonDto[]>([]);
     let pools        = $state<PoolDto[]>([]);
     let nominations  = $state<NominationDto[]>([]);
+    let bylaws       = $state<BylawDto[]>([]);
 
     $effect(() => {
         if (kind === "amend-constitution" && !constitution) {
@@ -25,6 +26,8 @@
             listPools().then(p => { pools = p; }).catch(() => {});
         } else if (kind === "accept-nomination" && !nominations.length) {
             listNominations().then(ns => { nominations = ns.filter(n => n.status === "pending"); }).catch(() => {});
+        } else if ((kind === "amend-bylaw") && !bylaws.length) {
+            listBylaws().then(b => { bylaws = b; }).catch(() => {});
         }
     });
 
@@ -37,6 +40,22 @@
     let roleDesc         = $state("");
     let selectedPoolId   = $state("");
     let nominationId     = $state("");
+
+    // create-bylaw / amend-bylaw fields
+    let bylawTitle    = $state("");
+    let bylawPreamble = $state("");
+    let bylawId       = $state("");
+
+    // schedule-community-event fields
+    let evtTitle            = $state("");
+    let evtDate             = $state("");
+    let evtStartTime        = $state("09:00");
+    let evtEndTime          = $state("");
+    let evtAllDay           = $state(false);
+    let evtLocation         = $state("");
+    let evtDescription      = $state("");
+    let evtRecurrence       = $state("");
+    let evtRecurrenceEndsAt = $state("");
 
     const amendParamInfo = $derived(
         constitution && amendParam ? (constitution.parameters[amendParam] ?? null) : null
@@ -64,6 +83,36 @@
             payload = selectedPoolId ? { poolId: selectedPoolId } : {};
         } else if (kind === "accept-nomination") {
             payload = nominationId ? { nominationId } : {};
+        } else if (kind === "schedule-community-event") {
+            if (!evtTitle.trim() || !evtDate) { payload = {}; return; }
+            const startAt = evtAllDay
+                ? `${evtDate}T00:00:00.000Z`
+                : new Date(`${evtDate}T${evtStartTime}:00`).toISOString();
+            const endAt = (!evtAllDay && evtEndTime)
+                ? new Date(`${evtDate}T${evtEndTime}:00`).toISOString()
+                : null;
+            const recurrenceEndsAt = evtRecurrenceEndsAt
+                ? new Date(evtRecurrenceEndsAt + "T23:59:59").toISOString()
+                : null;
+            payload = {
+                title:       evtTitle.trim(),
+                startAt,
+                ...(endAt            ? { endAt }            : {}),
+                ...(evtAllDay        ? { allDay: true }      : {}),
+                ...(evtLocation.trim()     ? { location:    evtLocation.trim() }     : {}),
+                ...(evtDescription.trim()  ? { description: evtDescription.trim() }  : {}),
+                ...(evtRecurrence          ? { recurrence:  evtRecurrence }           : {}),
+                ...(recurrenceEndsAt       ? { recurrenceEndsAt }                     : {}),
+            };
+        } else if (kind === "create-bylaw") {
+            const title = bylawTitle.trim();
+            payload = title
+                ? { title, ...(bylawPreamble.trim() ? { preamble: bylawPreamble.trim() } : {}) }
+                : {};
+        } else if (kind === "amend-bylaw") {
+            payload = bylawId
+                ? { bylawId, ...(bylawTitle.trim() ? { title: bylawTitle.trim() } : {}), ...(bylawPreamble.trim() ? { preamble: bylawPreamble.trim() } : {}) }
+                : {};
         } else {
             payload = {};
         }
@@ -140,6 +189,73 @@
             {/each}
         </select>
     {/if}
+{:else if kind === "schedule-community-event"}
+    <input class="input" type="text" placeholder="Event title *" bind:value={evtTitle} />
+
+    <div class="row">
+        <label class="field">
+            <span class="field-label">Date *</span>
+            <input class="input" type="date" bind:value={evtDate} />
+        </label>
+        <label class="field field-check">
+            <input type="checkbox" bind:checked={evtAllDay} />
+            <span class="field-label">All day</span>
+        </label>
+    </div>
+
+    {#if !evtAllDay}
+        <div class="row">
+            <label class="field">
+                <span class="field-label">Start time</span>
+                <input class="input" type="time" bind:value={evtStartTime} />
+            </label>
+            <label class="field">
+                <span class="field-label">End time</span>
+                <input class="input" type="time" bind:value={evtEndTime} />
+            </label>
+        </div>
+    {/if}
+
+    <input class="input" type="text" placeholder="Location (optional)" bind:value={evtLocation} />
+    <textarea class="input textarea" placeholder="Description (optional)" bind:value={evtDescription} rows="2"></textarea>
+
+    <div class="row">
+        <label class="field">
+            <span class="field-label">Repeats</span>
+            <select class="input select" bind:value={evtRecurrence}>
+                <option value="">One-time</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Every 2 weeks</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+            </select>
+        </label>
+        {#if evtRecurrence}
+            <label class="field">
+                <span class="field-label">Ends on</span>
+                <input class="input" type="date" bind:value={evtRecurrenceEndsAt} />
+            </label>
+        {/if}
+    </div>
+{:else if kind === "create-bylaw"}
+    <input class="input" type="text" placeholder="Bylaw title *" bind:value={bylawTitle} />
+    <textarea class="input textarea" placeholder="Preamble (optional)" bind:value={bylawPreamble} rows="3"></textarea>
+{:else if kind === "amend-bylaw"}
+    {#if !bylaws.length}
+        <p class="hint">Loading bylaws…</p>
+    {:else}
+        <select class="input select" bind:value={bylawId} onchange={() => { bylawTitle = ""; bylawPreamble = ""; }}>
+            <option value="">— choose bylaw —</option>
+            {#each bylaws as b (b.id)}
+                <option value={b.id}>{b.title}{b.scope ? ` [pool: ${b.scope}]` : ""}</option>
+            {/each}
+        </select>
+    {/if}
+    {#if bylawId}
+        <input class="input" type="text" placeholder="New title (leave blank to keep current)" bind:value={bylawTitle} />
+        <textarea class="input textarea" placeholder="New preamble (leave blank to keep current)" bind:value={bylawPreamble} rows="3"></textarea>
+    {/if}
 {/if}
 
 <style>
@@ -157,4 +273,9 @@
     .select { cursor: pointer; }
     .textarea { resize: vertical; min-height: 3.5rem; font-family: inherit; }
     .hint { font-size: 0.78rem; color: #64748b; margin: 0; }
+    .row { display: flex; gap: 0.5rem; align-items: flex-end; }
+    .field { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
+    .field-check { flex-direction: row; align-items: center; gap: 0.35rem; flex: 0 0 auto; padding-bottom: 0.45rem; }
+    .field-check input { width: auto; }
+    .field-label { font-size: 0.75rem; font-weight: 600; color: #374151; }
 </style>

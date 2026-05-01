@@ -33,6 +33,8 @@ import MotionPage        from "./pages/MotionPage.svelte";
     import ConnectionsPage     from "./pages/ConnectionsPage.svelte";
     import GrowthPage          from "./pages/GrowthPage.svelte";
     import SchedulePage        from "./pages/SchedulePage.svelte";
+    import TimelinePage        from "./pages/TimelinePage.svelte";
+    import CalendarPage        from "./pages/CalendarPage.svelte";
     import BottomNav           from "./components/BottomNav.svelte";
 
     type AppState = "loading" | "setup" | "login" | "apply" | "app";
@@ -129,6 +131,10 @@ import MotionPage        from "./pages/MotionPage.svelte";
             <GrowthPage />
         {:else if $currentPage === "schedule"}
             <SchedulePage />
+        {:else if $currentPage === "calendar"}
+            <CalendarPage />
+        {:else if $currentPage === "timeline"}
+            <TimelinePage />
         {/if}
     </main>
     <BottomNav />

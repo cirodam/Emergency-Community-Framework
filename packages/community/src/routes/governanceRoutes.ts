@@ -3,6 +3,9 @@ import { requireAuth, requireSteward } from "./middleware.js";
 import * as motions   from "./MotionController.js";
 import { Constitution } from "../governance/Constitution.js";
 import { BylawLoader } from "../governance/BylawLoader.js";
+import { CommunityDb } from "../CommunityDb.js";
+import { PersonService } from "../person/PersonService.js";
+import { CommunityLogService } from "../log/CommunityLogService.js";
 
 const router = Router();
 const bylaws = new BylawLoader();
@@ -115,6 +118,115 @@ router.patch("/bylaws/:id/sections/:sectionId", requireSteward, (req: Request, r
 router.delete("/bylaws/:id", requireSteward, (req: Request, res: Response) => {
     if (!bylaws.load(req.params.id as string)) { res.status(404).json({ error: "Bylaw not found" }); return; }
     bylaws.delete(req.params.id as string);
+    res.status(204).end();
+});
+
+// ── Assembly term ─────────────────────────────────────────────────────────────
+
+interface AssemblyTermRecord {
+    termStartDate: string;   // ISO date (YYYY-MM-DD)
+    memberIds:     string[];
+}
+
+const ASSEMBLY_KEY = "assembly_term";
+
+function loadTerm(): AssemblyTermRecord | null {
+    const db  = CommunityDb.getInstance().db;
+    const row = db.prepare("SELECT data FROM singleton_records WHERE key = ?").get(ASSEMBLY_KEY) as { data: string } | undefined;
+    return row ? JSON.parse(row.data) as AssemblyTermRecord : null;
+}
+
+function saveTerm(term: AssemblyTermRecord): void {
+    CommunityDb.getInstance().db.prepare(
+        "INSERT INTO singleton_records (key, data) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET data = excluded.data"
+    ).run(ASSEMBLY_KEY, JSON.stringify(term));
+}
+
+function computeSeats(population: number): number {
+    const fraction = Constitution.getInstance().assemblyFraction;
+    return Math.max(9, Math.ceil(population * fraction));
+}
+
+function personToSlimDto(p: { id: string; firstName: string; lastName: string; handle: string }) {
+    return { id: p.id, firstName: p.firstName, lastName: p.lastName, handle: p.handle };
+}
+
+// GET /api/governance/assembly
+router.get("/assembly", (_req: Request, res: Response) => {
+    const persons = PersonService.getInstance().getAll().filter(p => !p.disabled);
+    const seats   = computeSeats(persons.length);
+    const term    = loadTerm();
+    const constitution = Constitution.getInstance();
+
+    const seatedPersons = term
+        ? term.memberIds
+            .map(id => PersonService.getInstance().get(id))
+            .filter(Boolean)
+            .map(p => personToSlimDto(p!))
+        : [];
+
+    res.json({
+        seats,
+        fraction:      constitution.assemblyFraction,
+        termMonths:    constitution.assemblyTermMonths,
+        termStartDate: term?.termStartDate ?? null,
+        population:    persons.length,
+        seated:        seatedPersons,
+    });
+});
+
+// POST /api/governance/assembly/draw  (steward only)
+// Randomly draws a new assembly term from eligible (non-disabled, adult) members.
+router.post("/assembly/draw", requireSteward, (req: Request, res: Response) => {
+    const { termStartDate } = (req.body ?? {}) as { termStartDate?: string };
+    const startDate = termStartDate ?? new Date().toISOString().slice(0, 10);
+    if (isNaN(new Date(startDate).getTime())) {
+        res.status(400).json({ error: "termStartDate must be a valid date" }); return;
+    }
+
+    const constitution = Constitution.getInstance();
+    const workingMin   = constitution.workingAgeMin;
+    const now          = new Date();
+    const eligible     = PersonService.getInstance().getAll()
+        .filter(p => !p.disabled && p.getAgeYears(now) >= workingMin);
+
+    const seats = computeSeats(eligible.length);
+
+    // Fisher-Yates shuffle, take first `seats` elements
+    const pool = [...eligible];
+    for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+    }
+    const drawn = pool.slice(0, seats);
+
+    const term: AssemblyTermRecord = {
+        termStartDate: startDate,
+        memberIds:     drawn.map(p => p.id),
+    };
+    saveTerm(term);
+
+    try {
+        CommunityLogService.getInstance().write(
+            "assembly-drawn",
+            `A new assembly of ${drawn.length} member${drawn.length === 1 ? "" : "s"} was drawn by sortition for the term beginning ${startDate}.`,
+            { actorId: (req as any).person?.id ?? null },
+        );
+    } catch { /* non-fatal */ }
+
+    res.json({
+        seats,
+        fraction:      constitution.assemblyFraction,
+        termMonths:    constitution.assemblyTermMonths,
+        termStartDate: term.termStartDate,
+        population:    eligible.length,
+        seated:        drawn.map(p => personToSlimDto(p)),
+    });
+});
+
+// DELETE /api/governance/assembly  (steward only) — clear current term
+router.delete("/assembly", requireSteward, (_req: Request, res: Response) => {
+    CommunityDb.getInstance().db.prepare("DELETE FROM singleton_records WHERE key = ?").run(ASSEMBLY_KEY);
     res.status(204).end();
 });
 

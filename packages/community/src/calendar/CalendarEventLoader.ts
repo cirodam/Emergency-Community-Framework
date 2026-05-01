@@ -11,6 +11,7 @@ export class CalendarEventLoader {
             location: event.location, startAt: event.startAt, endAt: event.endAt,
             allDay: event.allDay, cancelledAt: event.cancelledAt,
             organizerId: event.organizerId, organizerType: event.organizerType,
+            recurrence: event.recurrence, recurrenceEndsAt: event.recurrenceEndsAt,
             rsvps: event.rsvps,
         });
         this.db.prepare(

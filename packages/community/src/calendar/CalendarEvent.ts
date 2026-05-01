@@ -1,5 +1,7 @@
 import { randomUUID } from "crypto";
 
+export type RecurrenceRule = "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
+
 export interface Rsvp {
     personId:    string;
     status:      "yes" | "no" | "maybe";
@@ -30,6 +32,9 @@ export class CalendarEvent {
     organizerId:   string;
     organizerType: "person" | "org";
 
+    recurrence:       RecurrenceRule | null;
+    recurrenceEndsAt: string | null;
+
     rsvps: Rsvp[];
 
     constructor(
@@ -38,10 +43,12 @@ export class CalendarEvent {
         createdBy:     string,
         organizerId:   string,
         organizerType: "person" | "org",
-        endAt:         string | null = null,
-        allDay:        boolean       = false,
-        description:   string | null = null,
-        location:      string | null = null,
+        endAt:              string | null    = null,
+        allDay:             boolean          = false,
+        description:        string | null    = null,
+        location:           string | null    = null,
+        recurrence:         RecurrenceRule | null = null,
+        recurrenceEndsAt:   string | null    = null,
     ) {
         this.id            = randomUUID();
         this.createdAt     = new Date().toISOString();
@@ -52,10 +59,12 @@ export class CalendarEvent {
         this.startAt       = startAt;
         this.endAt         = endAt;
         this.allDay        = allDay;
-        this.cancelledAt   = null;
-        this.organizerId   = organizerId;
-        this.organizerType = organizerType;
-        this.rsvps         = [];
+        this.cancelledAt      = null;
+        this.organizerId      = organizerId;
+        this.organizerType    = organizerType;
+        this.recurrence       = recurrence;
+        this.recurrenceEndsAt = recurrenceEndsAt;
+        this.rsvps            = [];
     }
 
     get isCancelled(): boolean { return this.cancelledAt !== null; }
@@ -77,17 +86,19 @@ export class CalendarEvent {
     static restore(r: {
         id:            string;
         createdAt:     string;
-        createdBy:     string;
-        title:         string;
-        description:   string | null;
-        location:      string | null;
-        startAt:       string;
-        endAt:         string | null;
-        allDay:        boolean;
-        cancelledAt:   string | null;
-        organizerId:   string;
-        organizerType: "person" | "org";
-        rsvps:         Rsvp[];
+        createdBy:        string;
+        title:            string;
+        description:      string | null;
+        location:         string | null;
+        startAt:          string;
+        endAt:            string | null;
+        allDay:           boolean;
+        cancelledAt:      string | null;
+        organizerId:      string;
+        organizerType:    "person" | "org";
+        recurrence?:      RecurrenceRule | null;
+        recurrenceEndsAt?: string | null;
+        rsvps:            Rsvp[];
     }): CalendarEvent {
         const e = new CalendarEvent(
             r.title,
@@ -102,8 +113,10 @@ export class CalendarEvent {
         );
         (e as unknown as Record<string, unknown>)["id"]        = r.id;
         (e as unknown as Record<string, unknown>)["createdAt"] = r.createdAt;
-        e.cancelledAt = r.cancelledAt;
-        e.rsvps       = r.rsvps ?? [];
+        e.cancelledAt      = r.cancelledAt;
+        e.recurrence       = r.recurrence      ?? null;
+        e.recurrenceEndsAt = r.recurrenceEndsAt ?? null;
+        e.rsvps            = r.rsvps ?? [];
         return e;
     }
 }

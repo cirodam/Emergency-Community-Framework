@@ -53,6 +53,8 @@ import { ShiftLoader } from "./shift/ShiftLoader.js";
 import { ShiftService } from "./shift/ShiftService.js";
 import { AppSuspensionLoader } from "./person/AppSuspensionLoader.js";
 import { AppSuspensionService } from "./person/AppSuspensionService.js";
+import { CommunityLogLoader } from "./log/CommunityLogLoader.js";
+import { CommunityLogService } from "./log/CommunityLogService.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -171,6 +173,9 @@ async function main(): Promise<void> {
     // ── Locations ─────────────────────────────────────────────────────────────
     const locationLoader = new LocationLoader();
     LocationService.getInstance().init(locationLoader);
+
+    // ── Community log ───────────────────────────────────────────────────────
+    CommunityLogService.getInstance().init(new CommunityLogLoader());
 
     // ── Motions ────────────────────────────────────────────────────────────
     const motionLoader = new MotionLoader();

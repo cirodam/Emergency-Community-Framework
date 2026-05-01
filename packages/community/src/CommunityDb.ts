@@ -191,6 +191,17 @@ export class CommunityDb {
                 key  TEXT PRIMARY KEY,
                 data TEXT NOT NULL
             );
+
+            -- ── Community log (append-only timeline) ─────────────────────────────────
+            CREATE TABLE IF NOT EXISTS community_log (
+                id          TEXT PRIMARY KEY,
+                type        TEXT NOT NULL,
+                summary     TEXT NOT NULL,
+                actor_id    TEXT,
+                ref_id      TEXT,
+                occurred_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_community_log_occurred ON community_log(occurred_at DESC);
         `);
     }
 }

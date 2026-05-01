@@ -108,6 +108,7 @@ export interface EconomicsDto {
         disabled:       number;
         workingAgeMin:  number;
         retirementAge:  number;
+        totalPersonYears: number;
     } | null;
     healthcareStaffing: {
         gp:           { recommended: number; ratioPerPerson: number };
@@ -285,6 +286,50 @@ export async function listPersons(): Promise<PersonDto[]> {
     return res.json() as Promise<PersonDto[]>;
 }
 
+// ── Assembly ──────────────────────────────────────────────────────────────────
+
+export interface AssemblySlimPerson {
+    id: string;
+    firstName: string;
+    lastName: string;
+    handle: string;
+}
+
+export interface AssemblyDto {
+    seats:         number;
+    fraction:      number;
+    termMonths:    number;
+    termStartDate: string | null;
+    population:    number;
+    seated:        AssemblySlimPerson[];
+}
+
+export async function getAssembly(): Promise<AssemblyDto> {
+    const res = await apiFetch("/api/assembly");
+    if (!res.ok) throw new Error("Failed to load assembly");
+    return res.json() as Promise<AssemblyDto>;
+}
+
+export async function drawAssembly(termStartDate?: string): Promise<AssemblyDto> {
+    const res = await apiFetch("/api/assembly/draw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ termStartDate }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error ?? "Failed to draw assembly");
+    }
+    return res.json() as Promise<AssemblyDto>;
+}
+
+export async function clearAssembly(): Promise<void> {
+    const res = await apiFetch("/api/assembly", { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to clear assembly");
+}
+
+
+
 export async function getPerson(id: string): Promise<PersonDto> {
     const res = await apiFetch(`/api/persons/${encodeURIComponent(id)}`);
     if (!res.ok) throw new Error("Member not found");
@@ -425,6 +470,8 @@ export interface BylawDto {
     articles:  DocumentArticle[];
     adoptedAt: string;
     version:   number;
+    /** null = assembly-scope. Pool/domain id = scoped to that body. */
+    scope:     string | null;
 }
 
 export async function listBylaws(): Promise<BylawDto[]> {
@@ -1478,3 +1525,157 @@ export async function deleteShift(id: string): Promise<void> {
         throw new Error(body.error ?? "Failed to delete shift");
     }
 }
+
+// ── Community Log ─────────────────────────────────────────────────────────────
+
+export type CommunityLogType =
+    | "motion-passed"
+    | "motion-failed"
+    | "motion-withdrawn"
+    | "member-joined"
+    | "member-discharged"
+    | "demurrage-run"
+    | "dues-collected"
+    | "constitution-amended"
+    | "annual-issuance"
+    | "pool-created"
+    | "assembly-drawn"
+    | "bylaw-created"
+    | "bylaw-amended";
+
+export interface CommunityLogEntry {
+    id:         string;
+    type:       CommunityLogType;
+    summary:    string;
+    actorId:    string | null;
+    refId:      string | null;
+    occurredAt: string;
+}
+
+export async function getCommunityLog(opts: { limit?: number; before?: string } = {}): Promise<CommunityLogEntry[]> {
+    const params = new URLSearchParams();
+    if (opts.limit)  params.set("limit",  String(opts.limit));
+    if (opts.before) params.set("before", opts.before);
+    const url = `/api/log${params.size ? "?" + params.toString() : ""}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Failed to load community log");
+    return res.json() as Promise<CommunityLogEntry[]>;
+}
+
+// ── Community Calendar ────────────────────────────────────────────────────────
+
+export type RecurrenceRule = "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
+
+export interface CalendarRsvp {
+    personId:    string;
+    status:      "yes" | "no" | "maybe";
+    respondedAt: string;
+}
+
+export interface CalendarEventDto {
+    id:               string;
+    title:            string;
+    description:      string | null;
+    location:         string | null;
+    startAt:          string;
+    endAt:            string | null;
+    allDay:           boolean;
+    cancelledAt:      string | null;
+    organizerId:      string;
+    organizerType:    "person" | "org";
+    createdBy:        string;
+    createdAt:        string;
+    rsvps:            CalendarRsvp[];
+    recurrence:       RecurrenceRule | null;
+    recurrenceEndsAt: string | null;
+    occurrenceDate:   string | null;
+}
+
+export async function listCalendarEvents(opts: { from?: string; to?: string; upcoming?: number } = {}): Promise<CalendarEventDto[]> {
+    const params = new URLSearchParams();
+    if (opts.from)     params.set("from",     opts.from);
+    if (opts.to)       params.set("to",       opts.to);
+    if (opts.upcoming) params.set("upcoming", String(opts.upcoming));
+    const url = `/api/calendar${params.size ? "?" + params.toString() : ""}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Failed to load calendar events");
+    return res.json() as Promise<CalendarEventDto[]>;
+}
+
+export async function createCalendarEvent(data: {
+    title:            string;
+    startAt:          string;
+    organizerId:      string;
+    organizerType:    "person" | "org";
+    endAt?:           string | null;
+    allDay?:          boolean;
+    description?:     string | null;
+    location?:        string | null;
+    recurrence?:      RecurrenceRule | null;
+    recurrenceEndsAt?: string | null;
+}): Promise<CalendarEventDto> {
+    const res = await apiFetch("/api/calendar", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to create event");
+    }
+    return res.json() as Promise<CalendarEventDto>;
+}
+
+export async function updateCalendarEvent(id: string, patch: {
+    title?:            string;
+    description?:      string | null;
+    location?:         string | null;
+    startAt?:          string;
+    endAt?:            string | null;
+    allDay?:           boolean;
+    recurrence?:       RecurrenceRule | null;
+    recurrenceEndsAt?: string | null;
+}): Promise<CalendarEventDto> {
+    const res = await apiFetch(`/api/calendar/${encodeURIComponent(id)}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(patch),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to update event");
+    }
+    return res.json() as Promise<CalendarEventDto>;
+}
+
+export async function cancelCalendarEvent(id: string): Promise<CalendarEventDto> {
+    const res = await apiFetch(`/api/calendar/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to cancel event");
+    }
+    return res.json() as Promise<CalendarEventDto>;
+}
+
+export async function rsvpCalendarEvent(id: string, personId: string, status: "yes" | "no" | "maybe"): Promise<CalendarEventDto> {
+    const res = await apiFetch(`/api/calendar/${encodeURIComponent(id)}/rsvp`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ personId, status }),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to RSVP");
+    }
+    return res.json() as Promise<CalendarEventDto>;
+}
+
+export async function removeCalendarRsvp(id: string, personId: string): Promise<CalendarEventDto> {
+    const res = await apiFetch(`/api/calendar/${encodeURIComponent(id)}/rsvp/${encodeURIComponent(personId)}`, { method: "DELETE" });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to remove RSVP");
+    }
+    return res.json() as Promise<CalendarEventDto>;
+}
+

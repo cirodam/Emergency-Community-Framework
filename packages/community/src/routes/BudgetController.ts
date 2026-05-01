@@ -7,6 +7,7 @@ import { DomainService } from "../DomainService.js";
 import { PersonService } from "../person/PersonService.js";
 import { nodeBankClient as bankClient } from "../nodeBankClient.js";
 import logger from "../logger.js";
+import { CommunityLogService } from "../log/CommunityLogService.js";
 
 /**
  * GET /api/budget — public transparency endpoint.
@@ -104,6 +105,7 @@ export async function simulateStep(_req: Request, res: Response): Promise<void> 
             constitution.demurrageFloor,
         );
         logger.info(`[simulate-step] demurrage applied to ${demurrageCount} accounts`);
+        try { CommunityLogService.getInstance().write("demurrage-run", `Demurrage applied to ${demurrageCount} accounts`); } catch { /* */ }
 
         // 2. Dues
         const { count: duesCount } = await treasury.collectDues(

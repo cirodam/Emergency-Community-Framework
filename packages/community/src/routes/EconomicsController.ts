@@ -32,8 +32,10 @@ export async function getEconomics(_req: Request, res: Response): Promise<void> 
     const retireAge    = constitution.retirementAge;
 
     let children = 0, workingAge = 0, retired = 0, disabled = 0;
+    let totalPersonYears = 0;
     for (const p of persons) {
         const age = p.getAgeYears(now);
+        totalPersonYears += age;
         if (p.disabled) { disabled++; continue; }
         if (p.retired || age >= retireAge) { retired++; continue; }
         if (age < workingMin) { children++; } else { workingAge++; }
@@ -59,6 +61,7 @@ export async function getEconomics(_req: Request, res: Response): Promise<void> 
             disabled,
             workingAgeMin:  workingMin,
             retirementAge:  retireAge,
+            totalPersonYears,
         },
         healthcareStaffing: HealthcareDomain.staffingHeuristic(total),
     });

@@ -72,6 +72,40 @@
             {/if}
         </section>
 
+        <!-- Person years -->
+        {#if econ.demographics}
+            {@const py  = econ.demographics.totalPersonYears}
+            {@const kpy = param("kinPerPersonYear", 1000)}
+            {@const theoreticalSupply = py * kpy}
+            {@const circ = econ.centralBank?.kinInCirculation ?? 0}
+            {@const backingPct = theoreticalSupply > 0 ? circ / theoreticalSupply : null}
+            <section class="stat-card py-card">
+                <div class="py-row">
+                    <div>
+                        <div class="stat-label">Total person-years</div>
+                        <div class="stat-value">{fmt(py)}<span class="stat-unit"> py</span></div>
+                    </div>
+                    <div class="py-divider"></div>
+                    <div>
+                        <div class="stat-label">Theoretical max supply</div>
+                        <div class="stat-value">{fmt(theoreticalSupply)}<span class="stat-unit"> kin</span></div>
+                    </div>
+                    {#if backingPct !== null}
+                        <div class="py-divider"></div>
+                        <div>
+                            <div class="stat-label">Circulation / max</div>
+                            <div class="stat-value" class:backed-low={backingPct < 0.5} class:backed-ok={backingPct >= 0.5}>{pct(backingPct)}</div>
+                        </div>
+                    {/if}
+                </div>
+                <p class="stat-note">
+                    Each person-year earns <strong>{fmt(kpy)} kin</strong> over a lifetime ({fmt(kpy)} kin/year × age).
+                    The theoretical maximum is the sum of all members' ages multiplied by that rate —
+                    the ceiling the community's currency is anchored to.
+                </p>
+            </section>
+        {/if}
+
         <!-- Demographics -->
         {#if econ.demographics && econ.demographics.total > 0}
             {@const d = econ.demographics}
@@ -316,6 +350,27 @@
     }
 
     .cb-color   { color: #15803d; }
+
+    /* Person-years card */
+    .py-card { padding: 1.1rem 1.25rem; }
+
+    .py-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem 1.5rem;
+        align-items: flex-start;
+        margin-bottom: 0.75rem;
+    }
+
+    .py-divider {
+        width: 1px;
+        align-self: stretch;
+        background: #e2e8f0;
+        flex-shrink: 0;
+    }
+
+    .backed-low  { color: #b45309; }
+    .backed-ok   { color: #15803d; }
 
     /* Demographics card */
     .demo-card { padding: 1.1rem 1.25rem; }
