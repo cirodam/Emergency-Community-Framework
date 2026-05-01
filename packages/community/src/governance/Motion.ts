@@ -52,6 +52,8 @@ export class Motion extends AssemblyMotion<MotionVote, MotionComment> {
         proposerId:     string;
         proposerHandle: string;
         parentId?:      string | null;
+        kind?:          string | null;
+        payload?:       string | null;
         id?:            string;
         createdAt?:     string;
     }) {
@@ -76,6 +78,8 @@ export class Motion extends AssemblyMotion<MotionVote, MotionComment> {
             proposerId:     d.proposerId,
             proposerHandle: d.proposerHandle,
             parentId:       d.parentId,
+            kind:           d.kind,
+            payload:        d.payload,
             createdAt:      d.createdAt,
         });
         m.restoreBase(d);

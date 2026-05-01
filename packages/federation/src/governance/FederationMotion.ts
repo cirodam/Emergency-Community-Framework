@@ -58,6 +58,8 @@ export class FederationMotion extends AssemblyMotion<FederationMotionVote, Feder
         proposerMemberId: string;
         proposerHandle:   string;
         parentId?:        string | null;
+        kind?:            string | null;
+        payload?:         string | null;
         id?:              string;
         createdAt?:       string;
     }) {
@@ -82,6 +84,8 @@ export class FederationMotion extends AssemblyMotion<FederationMotionVote, Feder
             proposerMemberId: d.proposerMemberId,
             proposerHandle:   d.proposerHandle,
             parentId:         d.parentId,
+            kind:             d.kind,
+            payload:          d.payload,
             createdAt:        d.createdAt,
         });
         m.restoreBase(d);

@@ -1,7 +1,8 @@
 <script lang="ts">
-    import { getPool, listPersons, listMotions, markMotionDiscussed, recordMotionOutcome, createPoolNomination } from "../lib/api.js";
-    import type { PoolDto, PersonDto, MotionDto, MotionOutcome } from "../lib/api.js";
+    import { getPool, listPersons, listMotions, createMotion, listMotionEffects, markMotionDiscussed, recordMotionOutcome, createPoolNomination, updatePool } from "../lib/api.js";
+    import type { PoolDto, PersonDto, MotionDto, MotionOutcome, MotionEffectKind } from "../lib/api.js";
     import { currentPage, selectedPoolId, session, selectedMotionId } from "../lib/session.js";
+    import EffectPayloadForm from "../components/EffectPayloadForm.svelte";
 
     let pool: PoolDto | null     = $state(null);
     let persons: PersonDto[]     = $state([]);
@@ -19,6 +20,41 @@
     let nomineeStmt    = $state("");
     let nominateError  = $state("");
     let nominateSaving = $state(false);
+
+    // Add-to-docket form
+    let showAddMotion  = $state(false);
+    let addMotionTitle = $state("");
+    let addMotionDesc  = $state("");
+    let addingMotion   = $state(false);
+    let addMotionError = $state("");
+    let effectKinds    = $state<MotionEffectKind[]>([]);
+    let selectedKind   = $state("");
+    let effectPayload  = $state<Record<string, unknown>>({});
+
+    $effect(() => {
+        if (showAddMotion && !effectKinds.length) {
+            listMotionEffects().then(k => { effectKinds = k; }).catch(() => {});
+        }
+    });
+
+    async function doAddMotion() {
+        if (!poolId || !addMotionTitle.trim() || !addMotionDesc.trim()) return;
+        addingMotion = true; addMotionError = "";
+        try {
+            const m = await createMotion({
+                body:        poolId,
+                title:       addMotionTitle.trim(),
+                description: addMotionDesc.trim(),
+                kind:        selectedKind || null,
+                payload:     selectedKind ? effectPayload : undefined,
+            });
+            motions = [...motions, m];
+            showAddMotion = false; addMotionTitle = ""; addMotionDesc = "";
+            selectedKind = ""; effectPayload = {};
+        } catch (e) {
+            addMotionError = e instanceof Error ? e.message : "Failed to add motion";
+        } finally { addingMotion = false; }
+    }
 
     async function doNominate() {
         if (!nomineeId || !pool) return;
@@ -91,6 +127,23 @@
     function personHandle(id: string): string | null {
         return persons.find(p => p.id === id)?.handle ?? null;
     }
+
+    // Mandate editing
+    let editingMandate  = $state(false);
+    let mandateDraft    = $state("");
+    let mandateSaving   = $state(false);
+    let mandateError    = $state("");
+
+    async function saveMandate() {
+        if (!pool) return;
+        mandateSaving = true; mandateError = "";
+        try {
+            pool = await updatePool(pool.id, { mandate: mandateDraft });
+            editingMandate = false;
+        } catch (e) {
+            mandateError = e instanceof Error ? e.message : "Failed to save mandate";
+        } finally { mandateSaving = false; }
+    }
 </script>
 
 <div class="page">
@@ -112,19 +165,54 @@
         {/each}
     {:else if error}
         <p class="error-msg">{error}</p>
-    {:else if pool && pool.personIds.length === 0}
-        <p class="empty-msg">No members in this pool yet.</p>
     {:else if pool}
-        <div class="member-list">
-            {#each pool.personIds as pid (pid)}
-                <div class="member-card">
-                    <span class="member-name">{personName(pid)}</span>
-                    {#if personHandle(pid)}
-                        <span class="member-handle">@{personHandle(pid)}</span>
+        <!-- Mandate -->
+        <div class="mandate-section">
+            {#if editingMandate}
+                <textarea
+                    class="mandate-textarea"
+                    rows={4}
+                    placeholder="Describe this pool's mandate…"
+                    bind:value={mandateDraft}
+                    disabled={mandateSaving}
+                ></textarea>
+                {#if mandateError}<p class="mandate-error">{mandateError}</p>{/if}
+                <div class="mandate-actions">
+                    <button class="btn-sm btn-primary-sm" onclick={saveMandate} disabled={mandateSaving}>
+                        {mandateSaving ? "Saving…" : "Save"}
+                    </button>
+                    <button class="btn-sm" onclick={() => { editingMandate = false; mandateError = ""; }}>Cancel</button>
+                </div>
+            {:else}
+                <div class="mandate-display">
+                    {#if pool.mandate}
+                        <p class="mandate-text">{pool.mandate}</p>
+                    {:else}
+                        <p class="mandate-empty">No mandate set.</p>
+                    {/if}
+                    {#if isSteward}
+                        <button class="mandate-edit-btn" onclick={() => { mandateDraft = pool!.mandate; editingMandate = true; }}>
+                            {pool.mandate ? "Edit mandate" : "Set mandate"}
+                        </button>
                     {/if}
                 </div>
-            {/each}
+            {/if}
         </div>
+
+        {#if pool.personIds.length === 0}
+            <p class="empty-msg">No members in this pool yet.</p>
+        {:else}
+            <div class="member-list">
+                {#each pool.personIds as pid (pid)}
+                    <div class="member-card">
+                        <span class="member-name">{personName(pid)}</span>
+                        {#if personHandle(pid)}
+                            <span class="member-handle">@{personHandle(pid)}</span>
+                        {/if}
+                    </div>
+                {/each}
+            </div>
+        {/if}
     {/if}
 
     {#if !loading && !error && isSteward && pool}
@@ -152,9 +240,42 @@
 
     <!-- Docket -->
     <hr class="divider" />
-    <h2 class="section-heading">Docket</h2>
+    <div class="docket-header">
+        <h2 class="section-heading">Docket</h2>
+        {#if $session}
+            <button class="btn-add" onclick={() => { showAddMotion = !showAddMotion; addMotionError = ""; }}>
+                {showAddMotion ? "Cancel" : "＋ Add"}
+            </button>
+        {/if}
+    </div>
 
-    {#if activeMotions.length === 0 && resolvedMotions.length === 0}
+    {#if showAddMotion}
+        <div class="add-form">
+            <input class="input-sm add-input" type="text" placeholder="Title" bind:value={addMotionTitle} disabled={addingMotion} />
+            <textarea class="input-sm add-input" rows={3} placeholder="Describe the motion…" bind:value={addMotionDesc} disabled={addingMotion}></textarea>
+            {#if effectKinds.length}
+                <select class="input-sm add-input" bind:value={selectedKind} onchange={() => { effectPayload = {}; }}>
+                    <option value="">No automated effect</option>
+                    {#each effectKinds.filter(k => !k.bodyHint || k.bodyHint === "assembly") as k (k.kind)}
+                        <option value={k.kind}>{k.label}</option>
+                    {/each}
+                </select>
+                {#if selectedKind}
+                    <div class="effect-fields">
+                        <EffectPayloadForm kind={selectedKind} bind:payload={effectPayload} />
+                    </div>
+                {/if}
+            {/if}
+            {#if addMotionError}<p class="add-error">{addMotionError}</p>{/if}
+            <div class="docket-actions">
+                <button class="btn-sm btn-primary-sm" onclick={doAddMotion} disabled={addingMotion || !addMotionTitle.trim() || !addMotionDesc.trim()}>
+                    {addingMotion ? "Adding…" : "Add to docket"}
+                </button>
+            </div>
+        </div>
+    {/if}
+
+    {#if activeMotions.length === 0 && resolvedMotions.length === 0 && !showAddMotion}
         <p class="empty-msg">No motions on the docket.</p>
     {:else}
         {#each activeMotions as m (m.id)}
@@ -246,6 +367,33 @@
         gap: 0.5rem;
     }
 
+    /* ── Mandate ───────────────────────────────────────────────────────────── */
+    .mandate-section {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        padding: 0.9rem 1.1rem;
+    }
+    .mandate-display { display: flex; flex-direction: column; gap: 0.4rem; }
+    .mandate-text  { font-size: 0.875rem; color: #1e293b; margin: 0; white-space: pre-wrap; }
+    .mandate-empty { font-size: 0.875rem; color: #94a3b8; margin: 0; font-style: italic; }
+    .mandate-edit-btn {
+        align-self: flex-start;
+        background: none; border: none; padding: 0;
+        font-size: 0.78rem; color: #16a34a; cursor: pointer; font-weight: 500;
+    }
+    .mandate-edit-btn:hover { text-decoration: underline; }
+    .mandate-textarea {
+        width: 100%; box-sizing: border-box;
+        padding: 0.5rem 0.65rem;
+        border: 1px solid #cbd5e1; border-radius: 0.5rem;
+        font-size: 0.875rem; font-family: inherit; resize: vertical;
+        background: #fff; color: #0f172a;
+    }
+    .mandate-textarea:focus { outline: none; border-color: #16a34a; box-shadow: 0 0 0 2px #bbf7d0; }
+    .mandate-actions { display: flex; gap: 0.5rem; }
+    .mandate-error { font-size: 0.78rem; color: #dc2626; margin: 0; }
+
     .member-card {
         display: flex;
         align-items: center;
@@ -304,6 +452,34 @@
 
     .resolved-details { font-size: 0.8rem; color: #64748b; }
     .resolved-details summary { cursor: pointer; padding: 0.3rem 0; font-weight: 600; }
+
+    .docket-header { display: flex; align-items: center; justify-content: space-between; }
+
+    .btn-add {
+        background: transparent;
+        border: 1px dashed #86efac;
+        border-radius: 6px;
+        color: #15803d;
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 0.25rem 0.65rem;
+        cursor: pointer;
+    }
+    .btn-add:hover { background: #f0fdf4; }
+
+    .add-form {
+        display: flex; flex-direction: column; gap: 0.5rem;
+        background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem;
+        padding: 0.9rem 1rem;
+    }
+    .add-input {
+        width: 100%; box-sizing: border-box; border-radius: 0.5rem;
+        border: 1px solid #cbd5e1; font-family: inherit; font-size: 0.875rem;
+        padding: 0.45rem 0.7rem; outline: none; resize: vertical;
+    }
+    .add-input:focus { border-color: #16a34a; }
+    .add-error { font-size: 0.78rem; color: #dc2626; margin: 0; }
+    .effect-fields { display: flex; flex-direction: column; gap: 0.4rem; }
 
     .nominate-btn {
         background: transparent;

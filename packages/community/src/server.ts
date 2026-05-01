@@ -27,10 +27,9 @@ import { FunctionalDomainLoader } from "./common/domain/FunctionalDomainLoader.j
 import { LeaderPoolLoader } from "./governance/LeaderPoolLoader.js";
 import { Constitution } from "./governance/Constitution.js";
 import { ConstitutionLoader } from "./governance/ConstitutionLoader.js";
-import { ProposalLoader } from "./governance/ProposalLoader.js";
-import { ProposalService } from "./governance/ProposalService.js";
 import { MotionLoader } from "./governance/MotionLoader.js";
 import { MotionService } from "./governance/MotionService.js";
+import "./governance/effects/index.js"; // register built-in motion effect handlers
 import { DomainService } from "./DomainService.js";
 import { BankClient } from "@ecf/core";
 import { CentralBank } from "./domains/central_bank/CentralBank.js";
@@ -172,10 +171,6 @@ async function main(): Promise<void> {
     // ── Locations ─────────────────────────────────────────────────────────────
     const locationLoader = new LocationLoader();
     LocationService.getInstance().init(locationLoader);
-
-    // ── Governance proposals ───────────────────────────────────────────────
-    const proposalLoader = new ProposalLoader();
-    ProposalService.getInstance().init(proposalLoader, constitutionLoader);
 
     // ── Motions ────────────────────────────────────────────────────────────
     const motionLoader = new MotionLoader();

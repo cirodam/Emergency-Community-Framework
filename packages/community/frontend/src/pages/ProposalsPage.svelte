@@ -1,10 +1,11 @@
 <script lang="ts">
     import {
         listMotions, createMotion, submitMotionForDeliberation,
-        openMotionVoting, castMotionVote, withdrawMotion,
+        openMotionVoting, castMotionVote, withdrawMotion, listMotionEffects,
     } from "../lib/api.js";
-    import type { MotionDto, VoteThresholdKey } from "../lib/api.js";
+    import type { MotionDto, VoteThresholdKey, MotionEffectKind } from "../lib/api.js";
     import { session, currentPage, selectedMotionId } from "../lib/session.js";
+    import EffectPayloadForm from "../components/EffectPayloadForm.svelte";
 
     type StageFilter = "active" | "resolved" | "all";
 
@@ -14,12 +15,21 @@
     let filter    = $state<StageFilter>("active");
 
     // Create form
-    let showCreate  = $state(false);
-    let creating    = $state(false);
-    let createError = $state("");
-    let newTitle    = $state("");
-    let newDesc     = $state("");
+    let showCreate   = $state(false);
+    let creating     = $state(false);
+    let createError  = $state("");
+    let newTitle     = $state("");
+    let newDesc      = $state("");
     let newThreshold = $state<VoteThresholdKey>("thresholdSimpleMajority");
+    let effectKinds  = $state<MotionEffectKind[]>([]);
+    let selectedKind = $state("");
+    let effectPayload = $state<Record<string, unknown>>({});
+
+    $effect(() => {
+        if (showCreate && !effectKinds.length) {
+            listMotionEffects().then(k => { effectKinds = k; }).catch(() => {});
+        }
+    });
 
     const THRESHOLD_LABELS: Record<VoteThresholdKey, string> = {
         thresholdSimpleMajority: "Simple majority (51%)",
@@ -48,9 +58,16 @@
         if (!newTitle.trim() || !newDesc.trim()) return;
         creating = true; createError = "";
         try {
-            const m = await createMotion({ body: "referendum", title: newTitle.trim(), description: newDesc.trim() });
+            const m = await createMotion({
+                body:        "referendum",
+                title:       newTitle.trim(),
+                description: newDesc.trim(),
+                kind:        selectedKind || null,
+                payload:     selectedKind ? effectPayload : undefined,
+            });
             await submitMotionForDeliberation(m.id, newThreshold);
             showCreate = false; newTitle = ""; newDesc = "";
+            selectedKind = ""; effectPayload = {};
             await load();
         } catch (e) {
             createError = e instanceof Error ? e.message : "Failed to create motion";
@@ -111,6 +128,22 @@
                     {/each}
                 </select>
             </div>
+            {#if effectKinds.length}
+                <div class="threshold-row">
+                    <label class="threshold-label" for="effect-select">Automated effect (optional)</label>
+                    <select id="effect-select" class="input select" bind:value={selectedKind} onchange={() => { effectPayload = {}; }}>
+                        <option value="">None</option>
+                        {#each effectKinds.filter(k => !k.bodyHint || k.bodyHint === "referendum") as k (k.kind)}
+                            <option value={k.kind}>{k.label}</option>
+                        {/each}
+                    </select>
+                </div>
+                {#if selectedKind}
+                    <div class="effect-fields">
+                        <EffectPayloadForm kind={selectedKind} bind:payload={effectPayload} />
+                    </div>
+                {/if}
+            {/if}
             {#if createError}<p class="form-error">{createError}</p>{/if}
             <button class="btn-primary" type="submit" disabled={creating || !newTitle.trim() || !newDesc.trim()}>
                 {creating ? "Submitting…" : "Submit for deliberation"}
@@ -216,6 +249,7 @@
 
     .threshold-row { display: flex; flex-direction: column; gap: 0.3rem; }
     .threshold-label { font-size: 0.78rem; color: #64748b; font-weight: 500; }
+    .effect-fields { display: flex; flex-direction: column; gap: 0.4rem; }
 
     .form-error { font-size: 0.8rem; color: #dc2626; margin: 0; }
 

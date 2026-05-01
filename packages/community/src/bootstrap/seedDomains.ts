@@ -41,6 +41,7 @@ import { CourierUnitTemplates } from "../domains/courier/CourierUnitTemplates.js
 import { MarketDomain } from "../domains/market/MarketDomain.js";
 import { MarketUnitTemplates } from "../domains/market/MarketUnitTemplates.js";
 import { CommunityRole } from "../common/CommunityRole.js";
+import { LeaderPool } from "../governance/LeaderPool.js";
 
 /**
  * Seed role types and register all functional domains + unit templates on first boot.
@@ -203,4 +204,32 @@ export function seedDomains(domainSvc: DomainService): void {
     TransitUnitTemplates.register();
     CourierUnitTemplates.register();
     MarketUnitTemplates.register();
+
+    // Seed default leader pools on first boot.
+    if (domainSvc.getPools().length === 0) {
+        const defaultPools: [string, string, string][] = [
+            ["Farmers",     "Members who work in food production and agriculture.",
+             "Govern decisions related to farming, food sovereignty, crop planning, land stewardship, and the agriculture and food domains."],
+            ["Medics",      "Healthcare workers including doctors, nurses, paramedics, and support staff.",
+             "Govern decisions related to community health, medical services, preventive care, and the healthcare domain."],
+            ["Teachers",    "Educators and enrichment workers at all levels.",
+             "Govern decisions related to schooling, skills training, cultural programming, and the education and enrichment domains."],
+            ["Builders",    "Construction, housing, and maintenance workers.",
+             "Govern decisions related to housing, infrastructure construction and repair, and the housing domain."],
+            ["Firefighters","Fire safety and emergency response workers.",
+             "Govern decisions related to emergency preparedness, fire prevention, disaster response, and the fire domain."],
+            ["Line Workers","Energy, utilities, and infrastructure operators.",
+             "Govern decisions related to power generation, water systems, sanitation, communications, and those respective domains."],
+            ["Caregivers",  "Childcare and dependency care workers.",
+             "Govern decisions related to childcare, eldercare, disability support, and the childcare and dependency care domains."],
+            ["Couriers",    "Transit and delivery workers.",
+             "Govern decisions related to transportation, goods delivery, route planning, and the transit and courier domains."],
+        ];
+        for (const [name, description, mandate] of defaultPools) {
+            const pool = new LeaderPool(name, description);
+            pool.mandate = mandate;
+            domainSvc.createPool(pool);
+        }
+        logger.info(`[community] seeded ${defaultPools.length} default leader pools`);
+    }
 }

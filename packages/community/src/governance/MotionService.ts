@@ -3,6 +3,7 @@ import { Motion, type MotionOutcome, type VoteThresholdKey } from "./Motion.js";
 import { MotionLoader } from "./MotionLoader.js";
 import { Constitution } from "./Constitution.js";
 import { PersonService } from "../person/PersonService.js";
+import { effectRegistry } from "./EffectRegistry.js";
 
 /** How long a referendum motion sits in deliberation before voting may open. */
 const DEFAULT_DELIBERATION_DAYS = 3;
@@ -60,6 +61,8 @@ export class MotionService {
         proposerId:     string;
         proposerHandle: string;
         parentId?:      string;
+        kind?:          string | null;
+        payload?:       string | null;
     }): Motion {
         const motion = new Motion(opts);
         this.motions.set(motion.id, motion);
@@ -190,6 +193,7 @@ export class MotionService {
             m.resolvedAt = new Date().toISOString();
         }
 
+        if (outcome === "passed") effectRegistry.dispatch(m);
         this.loader.save(m);
         return m;
     }
@@ -224,6 +228,7 @@ export class MotionService {
         m.stage      = "resolved";
         m.resolvedAt = new Date().toISOString();
         m.outcomeNote = `Resolved at deadline. ${m.approvalCount}/${totalMembers} approved (needed ${needed}).`;
+        if (m.outcome === "passed") effectRegistry.dispatch(m);
         this.loader.save(m);
     }
 
@@ -237,6 +242,7 @@ export class MotionService {
             m.stage      = "resolved";
             m.resolvedAt = new Date().toISOString();
             m.outcomeNote = `Passed with ${m.approvalCount}/${totalMembers} approvals.`;
+            effectRegistry.dispatch(m);
             this.loader.save(m);
             return;
         }

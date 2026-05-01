@@ -1,6 +1,5 @@
 import { Router, Request, Response } from "express";
 import { requireAuth, requireSteward } from "./middleware.js";
-import * as proposals from "./ProposalController.js";
 import * as motions   from "./MotionController.js";
 import { Constitution } from "../governance/Constitution.js";
 import { BylawLoader } from "../governance/BylawLoader.js";
@@ -8,13 +7,7 @@ import { BylawLoader } from "../governance/BylawLoader.js";
 const router = Router();
 const bylaws = new BylawLoader();
 
-router.get(   "/proposals",          proposals.listProposals);
-router.get(   "/proposals/:id",      proposals.getProposal);
-router.post(  "/proposals",          requireAuth, proposals.createProposal);
-router.post(  "/proposals/:id/vote", requireAuth, proposals.voteOnProposal);
-router.delete("/proposals/:id",      requireAuth, proposals.withdrawProposal);
-
-// ── Motions ───────────────────────────────────────────────────────────────────
+router.get(   "/motions/effects",            motions.listEffects);
 router.get(   "/motions",                    motions.listMotions);
 router.get(   "/motions/:id",                motions.getMotion);
 router.post(  "/motions",                    requireAuth,    motions.createMotion);

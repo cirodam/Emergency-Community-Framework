@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { MotionService } from "../governance/MotionService.js";
 import { Motion, type VoteThresholdKey } from "../governance/Motion.js";
 import { PersonService } from "../person/PersonService.js";
+import { effectRegistry } from "../governance/EffectRegistry.js";
 
 type AuthedRequest = Request & { personId?: string };
 
@@ -29,20 +30,38 @@ export function getMotion(req: Request, res: Response): void {
     res.json(toDto(m));
 }
 
+// GET /api/motions/effects
+export function listEffects(_req: Request, res: Response): void {
+    res.json(effectRegistry.listKinds());
+}
+
 // POST /api/motions
-// Body: { body, title, description, parentId? }
+// Body: { body, title, description, parentId?, kind?, payload? }
 export function createMotion(req: AuthedRequest, res: Response): void {
     const personId = req.personId;
     if (!personId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-    const { body, title, description, parentId } = req.body ?? {};
+    const { body, title, description, parentId, kind, payload } = req.body ?? {};
 
     if (typeof body  !== "string" || !body.trim())  { res.status(400).json({ error: "body is required" }); return; }
     if (typeof title !== "string" || !title.trim()) { res.status(400).json({ error: "title is required" }); return; }
     if (typeof description !== "string" || !description.trim()) { res.status(400).json({ error: "description is required" }); return; }
 
+    // Validate effect kind + payload at creation time
+    if (kind !== undefined && kind !== null) {
+        if (typeof kind !== "string" || !kind.trim()) {
+            res.status(400).json({ error: "kind must be a non-empty string" }); return;
+        }
+        const payloadErr = effectRegistry.validatePayload(kind.trim(), payload ?? {});
+        if (payloadErr) { res.status(400).json({ error: payloadErr }); return; }
+    }
+
     const person = ppl().get(personId);
     const handle = person?.handle ?? personId;
+
+    const payloadJson = (kind && payload !== undefined && payload !== null)
+        ? JSON.stringify(payload)
+        : null;
 
     try {
         const motion = svc().create({
@@ -52,6 +71,8 @@ export function createMotion(req: AuthedRequest, res: Response): void {
             proposerId:     personId,
             proposerHandle: handle,
             parentId:       typeof parentId === "string" ? parentId : undefined,
+            kind:           typeof kind === "string" && kind.trim() ? kind.trim() : null,
+            payload:        payloadJson,
         });
         res.status(201).json(toDto(motion));
     } catch (err) {

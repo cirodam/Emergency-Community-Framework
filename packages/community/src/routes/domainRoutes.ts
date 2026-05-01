@@ -43,6 +43,7 @@ router.delete("/role-types/:id", ...requireSteward, domains.deleteRoleType);
 router.get(   "/pools",                       domains.listPools);
 router.get(   "/pools/:id",                   domains.getPool);
 router.post(  "/pools",                       ...requireSteward, domains.createPool);
+router.patch( "/pools/:id",                   ...requireSteward, domains.updatePool);
 router.post(  "/pools/:id/members",           ...requireSteward, domains.addPoolMember);
 router.delete("/pools/:id/members/:personId", ...requireSteward, domains.removePoolMember);
 router.delete("/pools/:id",                   ...requireSteward, domains.deletePool);

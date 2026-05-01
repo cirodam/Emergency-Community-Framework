@@ -841,6 +841,7 @@ export interface PoolDto {
     id: string;
     name: string;
     description: string;
+    mandate: string;
     personIds: string[];
     createdAt: string;
 }
@@ -865,6 +866,18 @@ export async function createPool(name: string, description = ""): Promise<PoolDt
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Failed to create pool");
+    }
+    return res.json() as Promise<PoolDto>;
+}
+
+export async function updatePool(id: string, data: { mandate?: string; name?: string; description?: string }): Promise<PoolDto> {
+    const res = await apiFetch(`/api/pools/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to update pool");
     }
     return res.json() as Promise<PoolDto>;
 }
@@ -1065,122 +1078,6 @@ export async function deleteLocation(id: string): Promise<void> {
     }
 }
 
-// ── Governance Proposals ───────────────────────────────────────────────────────
-
-export type ProposalType =
-    | "add-member"
-    | "suspend-member"
-    | "reinstate-member"
-    | "change-role"
-    | "budget-change"
-    | "pool-change"
-    | "constitution-amendment"
-    | "other";
-
-export const PROPOSAL_TYPE_LABELS: Record<ProposalType, string> = {
-    "add-member":             "Add Member",
-    "suspend-member":         "Suspend Member",
-    "reinstate-member":       "Reinstate Member",
-    "change-role":            "Change Role",
-    "budget-change":          "Budget Change",
-    "pool-change":            "Pool Change",
-    "constitution-amendment": "Constitution Amendment",
-    "other":                  "Other",
-};
-
-export const PROPOSAL_TYPES = Object.keys(PROPOSAL_TYPE_LABELS) as ProposalType[];
-
-export type ProposalStatus = "open" | "passed" | "rejected" | "expired" | "withdrawn";
-
-export interface ProposalVoteDto {
-    personId:  string;
-    handle:    string;
-    vote:      "approve" | "reject" | "abstain";
-    votedAt:   string;
-    comment:   string;
-}
-
-export interface ProposalDto {
-    id:              string;
-    type:            ProposalType;
-    poolId:          string;
-    proposerId:      string;
-    proposerHandle:  string;
-    title:           string;
-    description:     string;
-    payload:         Record<string, unknown>;
-    approvalsNeeded: number;
-    status:          ProposalStatus;
-    votes:           ProposalVoteDto[];
-    approvalCount:   number;
-    rejectionCount:  number;
-    createdAt:       string;
-    expiresAt:       string;
-    executedAt:      string | null;
-    outcomeNote:     string;
-}
-
-export async function listProposals(opts: { status?: string; poolId?: string } = {}): Promise<ProposalDto[]> {
-    const params = new URLSearchParams();
-    if (opts.status) params.set("status", opts.status);
-    if (opts.poolId) params.set("poolId", opts.poolId);
-    const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await apiFetch(`/api/proposals${qs}`);
-    if (!res.ok) throw new Error("Failed to load proposals");
-    return res.json() as Promise<ProposalDto[]>;
-}
-
-export async function getProposal(id: string): Promise<ProposalDto> {
-    const res = await apiFetch(`/api/proposals/${encodeURIComponent(id)}`);
-    if (!res.ok) throw new Error("Proposal not found");
-    return res.json() as Promise<ProposalDto>;
-}
-
-export async function createProposal(data: {
-    type:            ProposalType;
-    poolId:          string;
-    title:           string;
-    description:     string;
-    payload?:        Record<string, unknown>;
-    approvalsNeeded: number;
-    ttlDays?:        number;
-}): Promise<ProposalDto> {
-    const res = await apiFetch("/api/proposals", {
-        method: "POST",
-        body:   JSON.stringify(data),
-    });
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Failed to create proposal");
-    }
-    return res.json() as Promise<ProposalDto>;
-}
-
-export async function voteOnProposal(
-    id:      string,
-    vote:    "approve" | "reject" | "abstain",
-    comment: string = "",
-): Promise<ProposalDto> {
-    const res = await apiFetch(`/api/proposals/${encodeURIComponent(id)}/vote`, {
-        method: "POST",
-        body:   JSON.stringify({ vote, comment }),
-    });
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Failed to cast vote");
-    }
-    return res.json() as Promise<ProposalDto>;
-}
-
-export async function withdrawProposal(id: string): Promise<ProposalDto> {
-    const res = await apiFetch(`/api/proposals/${encodeURIComponent(id)}`, { method: "DELETE" });
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Failed to withdraw proposal");
-    }
-    return res.json() as Promise<ProposalDto>;
-}
-
 // ── Network / Nodes ───────────────────────────────────────────────────────────
 
 export type NodeType = "community" | "infrastructure" | "federation" | "forum";
@@ -1350,6 +1247,12 @@ export interface MotionVote {
     votedAt:   string;
 }
 
+export interface MotionEffectKind {
+    kind:      string;
+    label:     string;
+    bodyHint?: string;
+}
+
 export interface MotionDto {
     id:                   string;
     body:                 string;
@@ -1373,6 +1276,8 @@ export interface MotionDto {
     pendingAmendmentIds:  string[];
     approvalCount:        number;
     rejectionCount:       number;
+    kind:                 string | null;
+    payload:              string | null;
 }
 
 export async function listMotions(opts: { body?: string; stage?: string } = {}): Promise<MotionDto[]> {
@@ -1391,11 +1296,19 @@ export async function getMotion(id: string): Promise<MotionDto> {
     return res.json() as Promise<MotionDto>;
 }
 
+export async function listMotionEffects(): Promise<MotionEffectKind[]> {
+    const res = await apiFetch("/api/motions/effects");
+    if (!res.ok) throw new Error("Failed to load motion effects");
+    return res.json() as Promise<MotionEffectKind[]>;
+}
+
 export async function createMotion(data: {
     body:        string;
     title:       string;
     description: string;
     parentId?:   string;
+    kind?:       string | null;
+    payload?:    unknown;
 }): Promise<MotionDto> {
     const res = await apiFetch("/api/motions", {
         method:  "POST",

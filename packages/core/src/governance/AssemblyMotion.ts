@@ -40,6 +40,8 @@ export interface AssemblyMotionData<TVote, TComment> {
     referredToId:          string | null;
     parentId:              string | null;
     pendingAmendmentIds:   string[];
+    kind:                  string | null;
+    payload:               string | null;
 }
 
 // ── Base class ────────────────────────────────────────────────────────────────
@@ -77,6 +79,8 @@ export abstract class AssemblyMotion<
     resolvedAt:            string | null          = null;
     referredToId:          string | null          = null;
     pendingAmendmentIds:   string[]               = [];
+    kind:                  string | null          = null;
+    payload:               string | null          = null;
 
     constructor(opts: {
         body:           string;
@@ -84,6 +88,8 @@ export abstract class AssemblyMotion<
         description:    string;
         proposerHandle: string;
         parentId?:      string | null;
+        kind?:          string | null;
+        payload?:       string | null;
         id?:            string;
         createdAt?:     string;
     }) {
@@ -94,6 +100,8 @@ export abstract class AssemblyMotion<
         this.proposerHandle = opts.proposerHandle;
         this.parentId       = opts.parentId       ?? null;
         this.createdAt      = opts.createdAt      ?? new Date().toISOString();
+        this.kind           = opts.kind            ?? null;
+        this.payload        = opts.payload         ?? null;
         // Clerk-driven bodies start at "proposed"; referendum starts at "draft".
         this.stage          = opts.body === "referendum" ? "draft" : "proposed";
     }
@@ -129,6 +137,8 @@ export abstract class AssemblyMotion<
             referredToId:          this.referredToId,
             parentId:              this.parentId,
             pendingAmendmentIds:   this.pendingAmendmentIds,
+            kind:                  this.kind,
+            payload:               this.payload,
         };
     }
 
@@ -145,5 +155,7 @@ export abstract class AssemblyMotion<
         this.resolvedAt            = d.resolvedAt;
         this.referredToId          = d.referredToId;
         this.pendingAmendmentIds   = d.pendingAmendmentIds;
+        this.kind                  = d.kind    ?? null;
+        this.payload               = d.payload ?? null;
     }
 }

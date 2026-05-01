@@ -316,6 +316,28 @@ export function createPool(req: Request, res: Response): void {
     res.status(201).json(toPoolDto(pool));
 }
 
+// PATCH /api/pools/:id
+// Body: { mandate?, name?, description? }
+export function updatePool(req: Request, res: Response): void {
+    const pool = svc().getPool(req.params.id as string);
+    if (!pool) { res.status(404).json({ error: "Pool not found" }); return; }
+    const { mandate, name, description } = req.body ?? {};
+    if (mandate !== undefined) {
+        if (typeof mandate !== "string") { res.status(400).json({ error: "mandate must be a string" }); return; }
+        pool.mandate = mandate;
+    }
+    if (name !== undefined) {
+        if (typeof name !== "string" || !name.trim()) { res.status(400).json({ error: "name must be a non-empty string" }); return; }
+        (pool as unknown as Record<string, unknown>)["name"] = name.trim();
+    }
+    if (description !== undefined) {
+        if (typeof description !== "string") { res.status(400).json({ error: "description must be a string" }); return; }
+        (pool as unknown as Record<string, unknown>)["description"] = description;
+    }
+    svc().savePool(pool);
+    res.json(toPoolDto(pool));
+}
+
 // POST /api/pools/:id/members
 // Body: { personId }
 export function addPoolMember(req: Request, res: Response): void {
@@ -406,6 +428,7 @@ function toPoolDto(p: LeaderPool) {
         id:          p.id,
         name:        p.name,
         description: p.description,
+        mandate:     p.mandate,
         personIds:   p.personIds,
         createdAt:   p.createdAt,
     };

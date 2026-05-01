@@ -13,6 +13,7 @@ export class LeaderPool {
     readonly description: string;
     readonly createdAt: Date;
 
+    mandate:   string = "";
     personIds: string[] = [];
 
     constructor(name: string, description: string = "", id?: string) {

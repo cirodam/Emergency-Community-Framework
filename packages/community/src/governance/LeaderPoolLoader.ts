@@ -3,7 +3,7 @@ import { LeaderPool } from "./LeaderPool.js";
 
 interface PoolRecord {
     id: string; name: string; description: string;
-    personIds: string[]; createdAt: string;
+    mandate: string; personIds: string[]; createdAt: string;
 }
 
 export class LeaderPoolLoader {
@@ -12,7 +12,7 @@ export class LeaderPoolLoader {
     save(pool: LeaderPool): void {
         const data = JSON.stringify({
             id: pool.id, name: pool.name, description: pool.description,
-            personIds: pool.personIds, createdAt: pool.createdAt.toISOString(),
+            mandate: pool.mandate, personIds: pool.personIds, createdAt: pool.createdAt.toISOString(),
         });
         this.db.prepare(
             "INSERT INTO leader_pools (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data"
@@ -25,6 +25,7 @@ export class LeaderPoolLoader {
                 const r = JSON.parse(data) as PoolRecord;
                 const pool = new LeaderPool(r.name, r.description, r.id);
                 (pool as unknown as Record<string, unknown>)["createdAt"] = new Date(r.createdAt);
+                pool.mandate   = r.mandate ?? "";
                 pool.personIds = r.personIds ?? [];
                 return pool;
             });
