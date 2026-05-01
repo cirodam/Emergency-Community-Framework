@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getThread, sendMessage, reportMessage } from "../lib/api.js";
+    import { getThread, sendMessage, reportMessage, archiveThread } from "../lib/api.js";
     import type { MessageDto, ThreadDetail } from "../lib/api.js";
     import { currentPage, session } from "../lib/session.js";
 
@@ -97,6 +97,13 @@
             sending = false;
         }
     }
+    async function archive() {
+        if (!detail) return;
+        try {
+            await archiveThread(detail.thread.id, true);
+            currentPage.go("inbox");
+        } catch { /* ignore */ }
+    }
 </script>
 
 <div class="page">
@@ -105,6 +112,7 @@
         {#if detail}
             <h1 class="subject">{detail.thread.subject || "(no subject)"}</h1>
             <span class="msg-count">{detail.messages.length} message{detail.messages.length !== 1 ? "s" : ""}</span>
+            <button class="archive-btn" onclick={archive} title="Archive thread">Archive</button>
         {/if}
     </div>
 
@@ -213,6 +221,19 @@
         font-weight: 600;
         font-family: inherit;
     }
+
+    .archive-btn {
+        margin-left: auto;
+        background: none;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 4px 10px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        color: #64748b;
+        font-family: inherit;
+    }
+    .archive-btn:hover { background: #f1f5f9; }
 
     .subject {
         font-size: 1.15rem;

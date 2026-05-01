@@ -11,7 +11,7 @@
         try { unread = await getUnreadCount(); } catch { /* ignore */ }
     });
 
-    function nav(p: "inbox" | "outbox" | "compose") {
+    function nav(p: "inbox" | "outbox" | "compose" | "drafts" | "archive" | "search" | "trash") {
         if (p !== "compose") selectedThreadId.set(null);
         currentPage.go(p);
     }
@@ -49,6 +49,34 @@
             onclick={() => nav("outbox")}
         >
             <span class="folder-icon">Sent</span>
+        </button>
+        <button
+            class="folder-btn"
+            class:active={active === "drafts"}
+            onclick={() => nav("drafts")}
+        >
+            <span class="folder-icon">Drafts</span>
+        </button>
+        <button
+            class="folder-btn"
+            class:active={active === "archive"}
+            onclick={() => nav("archive")}
+        >
+            <span class="folder-icon">Archive</span>
+        </button>
+        <button
+            class="folder-btn"
+            class:active={active === "search"}
+            onclick={() => nav("search")}
+        >
+            <span class="folder-icon">Search</span>
+        </button>
+        <button
+            class="folder-btn"
+            class:active={active === "trash"}
+            onclick={() => nav("trash")}
+        >
+            <span class="folder-icon">Trash</span>
         </button>
         {#if $isModerator}
             <button

@@ -4,9 +4,10 @@
     import { getSetupStatus } from "./lib/api.js";
     import SetupPage       from "./pages/SetupPage.svelte";
     import LoginPage       from "./pages/LoginPage.svelte";
-    import ProfilePage     from "./pages/ProfilePage.svelte";
     import DirectoryPage   from "./pages/DirectoryPage.svelte";
     import ConstitutionPage from "./pages/ConstitutionPage.svelte";
+    import DocumentsPage   from "./pages/DocumentsPage.svelte";
+    import BylawPage       from "./pages/BylawPage.svelte";
     import SettingsPage        from "./pages/SettingsPage.svelte";
     import CentralBankPage     from "./pages/CentralBankPage.svelte";
     import SocialInsurancePage from "./pages/SocialInsurancePage.svelte";
@@ -72,12 +73,14 @@ import MotionPage        from "./pages/MotionPage.svelte";
 
 {:else}
     <main>
-        {#if $currentPage === "profile"}
-            <ProfilePage />
-        {:else if $currentPage === "directory"}
+        {#if $currentPage === "directory"}
             <DirectoryPage />
         {:else if $currentPage === "constitution"}
             <ConstitutionPage />
+        {:else if $currentPage === "documents"}
+            <DocumentsPage />
+        {:else if $currentPage === "bylaw"}
+            <BylawPage />
         {:else if $currentPage === "settings"}
             <SettingsPage />
         {:else if $currentPage === "domains"}

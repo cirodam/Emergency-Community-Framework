@@ -3,6 +3,7 @@ import { Message } from "./Message.js";
 import { MessageReceipt } from "./MessageReceipt.js";
 import { MessageReport } from "./MessageReport.js";
 import { Thread } from "./Thread.js";
+import { Draft } from "./Draft.js";
 import { MessageLoader } from "./MessageLoader.js";
 
 export class MessageService {
@@ -346,5 +347,129 @@ export class MessageService {
         for (const [rid, r] of this.reports) {
             if (r.messageId === messageId) this.reports.delete(rid);
         }
+    }
+
+    // ── Trash ──────────────────────────────────────────────────────────────
+
+    /** Messages the person has soft-deleted (receipt.deleted = true). */
+    trash(personId: string): Message[] {
+        const deletedReceiptMessageIds = new Set(
+            [...this.receipts.values()]
+                .filter(r => r.personId === personId && r.deleted)
+                .map(r => r.messageId),
+        );
+        return [...this.messages.values()]
+            .filter(m => deletedReceiptMessageIds.has(m.id))
+            .sort((a, b) => b.sentAt.localeCompare(a.sentAt));
+    }
+
+    /** Move a trashed message back to inbox (set receipt.deleted = false). */
+    restore(messageId: string, personId: string): void {
+        const receipt = [...this.receipts.values()].find(
+            r => r.messageId === messageId && r.personId === personId,
+        );
+        if (!receipt) throw new Error("Message not found in trash");
+        if (!receipt.deleted) return; // already in inbox
+        const updated: MessageReceipt = { ...receipt, deleted: false };
+        this.receipts.set(receipt.id, updated);
+        this.loader.saveReceipt(updated);
+    }
+
+    /** Permanently delete a single message from trash (removes receipt entirely). */
+    permanentDelete(messageId: string, personId: string): void {
+        const receipt = [...this.receipts.values()].find(
+            r => r.messageId === messageId && r.personId === personId && r.deleted,
+        );
+        if (!receipt) throw new Error("Message not found in trash");
+        this.receipts.delete(receipt.id);
+        this.loader.deleteReceipt(receipt.id);
+    }
+
+    /** Permanently delete all trashed messages for personId. */
+    emptyTrash(personId: string): number {
+        const toDelete = [...this.receipts.values()].filter(
+            r => r.personId === personId && r.deleted,
+        );
+        for (const r of toDelete) this.receipts.delete(r.id);
+        this.loader.deleteReceiptsForPerson(personId, true);
+        return toDelete.length;
+    }
+
+    saveDraft(personId: string, id: string | undefined, toPersonIds: string[], subject: string, body: string): Draft {
+        const draft: Draft = {
+            id:          id ?? randomUUID(),
+            personId,
+            toPersonIds,
+            subject,
+            body,
+            updatedAt:   new Date().toISOString(),
+        };
+        this.loader.saveDraft(draft);
+        return draft;
+    }
+
+    getDraft(id: string, personId: string): Draft {
+        const draft = this.loader.loadDraft(id);
+        if (!draft) throw new Error("Draft not found");
+        if (draft.personId !== personId) throw new Error("Forbidden");
+        return draft;
+    }
+
+    listDrafts(personId: string): Draft[] {
+        return this.loader.loadDraftsForPerson(personId);
+    }
+
+    deleteDraft(id: string, personId: string): void {
+        const draft = this.loader.loadDraft(id);
+        if (!draft) throw new Error("Draft not found");
+        if (draft.personId !== personId) throw new Error("Forbidden");
+        this.loader.deleteDraft(id);
+    }
+
+    // ── Archive ────────────────────────────────────────────────────────────
+
+    setThreadArchived(threadId: string, personId: string, archived: boolean): void {
+        const thread = this.threads.get(threadId);
+        if (!thread) throw new Error("Thread not found");
+        if (!thread.participantIds.includes(personId)) throw new Error("Forbidden");
+        this.loader.setThreadArchived(threadId, personId, archived);
+    }
+
+    /** All threads for person, optionally filtered to archived-only or excluding archived. */
+    threadsForPersonFiltered(personId: string, filter: "all" | "active" | "archived"): Thread[] {
+        const archived = this.loader.loadArchivedThreadIds(personId);
+        return [...this.threads.values()]
+            .filter(t => {
+                if (!t.participantIds.includes(personId)) return false;
+                const isArchived = archived.has(t.id);
+                if (filter === "archived") return isArchived;
+                if (filter === "active")   return !isArchived;
+                return true;
+            })
+            .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
+    }
+
+    // ── Search ─────────────────────────────────────────────────────────────
+
+    /** Full-text search over messages the person can see. Returns matching messages newest-first. */
+    search(query: string, personId: string): Message[] {
+        if (!query.trim()) return [];
+        // Escape FTS5 special chars to avoid query parse errors
+        const escaped = query.replace(/["]/g, '""');
+        let ids: string[];
+        try {
+            ids = this.loader.searchMessageIds(`"${escaped}"`);
+        } catch {
+            // Fall back to prefix match without quotes
+            ids = this.loader.searchMessageIds(escaped);
+        }
+        return ids
+            .map(id => this.messages.get(id))
+            .filter((m): m is Message => {
+                if (!m) return false;
+                if (m.fromPersonId === personId) return true;
+                return [...this.receipts.values()].some(r => r.messageId === m.id && r.personId === personId && !r.deleted);
+            })
+            .sort((a, b) => b.sentAt.localeCompare(a.sentAt));
     }
 }

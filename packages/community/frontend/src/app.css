@@ -43,3 +43,35 @@
 .stat-unit    { font-size: 1rem; font-weight: 600; color: #64748b; }
 .stat-note    { font-size: 0.82rem; color: #94a3b8; margin: 0; line-height: 1.6; }
 .stat-offline { font-size: 0.9rem; color: #94a3b8; font-style: italic; }
+
+/* ── Governing document pages (ConstitutionPage, BylawPage) ─────────────── */
+/* Scoped under .doc-viewer to avoid collisions with generic class names.     */
+
+.doc-viewer .doc-meta-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.doc-viewer .doc-meta-sep { color: #cbd5e1; }
+
+.doc-viewer .edit-error  { font-size: 0.8rem; color: #dc2626; margin: 0; }
+.doc-viewer .edit-actions { display: flex; gap: 0.5rem; }
+
+.doc-viewer .save-btn {
+    background: #16a34a;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1.1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.doc-viewer .save-btn:disabled { background: #86efac; cursor: default; }
+.doc-viewer .save-btn:not(:disabled):hover { background: #15803d; }
+
+.doc-viewer .cancel-btn {
+    background: none;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    color: #64748b;
+}

@@ -415,6 +415,86 @@ export async function updateConstitutionSection(sectionId: string, body: string)
     return res.json() as Promise<ConstitutionDocument>;
 }
 
+// ── Bylaws ────────────────────────────────────────────────────────────────────
+
+export interface BylawDto {
+    id:        string;
+    type:      string;
+    title:     string;
+    preamble?: string;
+    articles:  DocumentArticle[];
+    adoptedAt: string;
+    version:   number;
+}
+
+export async function listBylaws(): Promise<BylawDto[]> {
+    const res = await apiFetch("/api/bylaws");
+    if (!res.ok) throw new Error("Failed to load bylaws");
+    return res.json() as Promise<BylawDto[]>;
+}
+
+export async function getBylaw(id: string): Promise<BylawDto> {
+    const res = await apiFetch(`/api/bylaws/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error("Bylaw not found");
+    return res.json() as Promise<BylawDto>;
+}
+
+export async function createBylaw(title: string, preamble?: string): Promise<BylawDto> {
+    const res = await apiFetch("/api/bylaws", {
+        method: "POST",
+        body:   JSON.stringify({ title, preamble }),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to create bylaw");
+    }
+    return res.json() as Promise<BylawDto>;
+}
+
+export async function addBylawArticle(id: string, number: string, title: string, preamble?: string): Promise<BylawDto> {
+    const res = await apiFetch(`/api/bylaws/${encodeURIComponent(id)}/articles`, {
+        method: "POST",
+        body:   JSON.stringify({ number, title, preamble }),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to add article");
+    }
+    return res.json() as Promise<BylawDto>;
+}
+
+export async function addBylawSection(id: string, articleNumber: string, sectionId: string, title: string, body: string): Promise<BylawDto> {
+    const res = await apiFetch(`/api/bylaws/${encodeURIComponent(id)}/articles/${encodeURIComponent(articleNumber)}/sections`, {
+        method: "POST",
+        body:   JSON.stringify({ sectionId, title, body }),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to add section");
+    }
+    return res.json() as Promise<BylawDto>;
+}
+
+export async function updateBylawSection(id: string, sectionId: string, body: string): Promise<BylawDto> {
+    const res = await apiFetch(`/api/bylaws/${encodeURIComponent(id)}/sections/${encodeURIComponent(sectionId)}`, {
+        method: "PATCH",
+        body:   JSON.stringify({ body }),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to update section");
+    }
+    return res.json() as Promise<BylawDto>;
+}
+
+export async function deleteBylaw(id: string): Promise<void> {
+    const res = await apiFetch(`/api/bylaws/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to delete bylaw");
+    }
+}
+
 export interface SimulateStepResult {
     ok:             boolean;
     demurrageCount: number;

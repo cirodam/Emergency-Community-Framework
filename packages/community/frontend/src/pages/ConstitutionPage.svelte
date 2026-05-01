@@ -6,6 +6,7 @@
     } from "../lib/api.js";
     import type { ConstitutionDocument, ConstitutionParam, DocumentSection } from "../lib/api.js";
     import { currentPage, session } from "../lib/session.js";
+    import { formatDate } from "../lib/utils.js";
 
     let doc: ConstitutionDocument | null = $state(null);
     let loading = $state(true);
@@ -140,10 +141,6 @@
         }
     }
 
-    function formatDate(iso: string): string {
-        return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
-    }
-
     function authorityLabel(a: string): string {
         const map: Record<string, string> = {
             immutable: "Immutable", referendum: "Referendum", assembly: "Assembly",
@@ -153,9 +150,9 @@
     }
 </script>
 
-<div class="constitution-page">
+<div class="constitution-page doc-viewer">
     <div class="page-header">
-        <button class="back-btn" onclick={() => currentPage.go("governance")}>‹ Governance</button>
+        <button class="back-btn" onclick={() => currentPage.go("documents")}>‹ Documents</button>
     </div>
 
     {#if loading}
@@ -349,12 +346,7 @@
         padding-bottom: 1.25rem;
     }
 
-    .doc-meta-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.25rem 0.5rem;
-        margin-bottom: 0.5rem;
-    }
+    /* .doc-meta-row / .doc-meta-sep — shared in app.css under .doc-viewer */
 
     .doc-meta-label {
         font-size: 0.75rem;
@@ -362,8 +354,6 @@
         text-transform: uppercase;
         letter-spacing: 0.06em;
     }
-
-    .doc-meta-sep { color: #cbd5e1; font-size: 0.75rem; }
 
     .doc-title {
         font-size: 1.5rem;
@@ -553,39 +543,7 @@
         margin: 0;
     }
 
-    .edit-error {
-        font-size: 0.8rem;
-        color: #dc2626;
-        margin: 0;
-    }
-
-    .edit-actions {
-        display: flex;
-        gap: 0.5rem;
-    }
-
-    .save-btn {
-        background: #15803d;
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        padding: 0.4rem 1rem;
-        font-size: 0.85rem;
-        font-weight: 600;
-        cursor: pointer;
-    }
-
-    .save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-    .cancel-btn {
-        background: none;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 0.4rem 0.8rem;
-        font-size: 0.85rem;
-        color: #64748b;
-        cursor: pointer;
-    }
+    /* .edit-error / .edit-actions / .save-btn / .cancel-btn — shared in app.css under .doc-viewer */
 
     /* ── Authority section ────────────────────────────────────────────── */
 

@@ -211,3 +211,131 @@ export function adminDeleteMessage(req: Request, res: Response): void {
         res.status(msg.includes("not found") ? 404 : 422).json({ error: msg });
     }
 }
+
+// ── Drafts ─────────────────────────────────────────────────────────────────
+
+// GET /api/drafts
+export function listDrafts(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+    res.json(svc().listDrafts(personId));
+}
+
+// PUT /api/drafts/:id  (create or update — client generates ID)
+// Body: { toPersonIds?, subject?, body? }
+export function saveDraft(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+    const id = req.params.id as string;
+    const { toPersonIds, subject, body } = req.body ?? {};
+
+    const draft = svc().saveDraft(
+        personId,
+        id,
+        Array.isArray(toPersonIds) ? toPersonIds : [],
+        typeof subject === "string" ? subject : "",
+        typeof body    === "string" ? body    : "",
+    );
+    res.json(draft);
+}
+
+// DELETE /api/drafts/:id
+export function deleteDraft(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+    try {
+        svc().deleteDraft(req.params.id as string, personId);
+        res.status(204).end();
+    } catch (err) {
+        const e = err instanceof Error ? err.message : "Error";
+        res.status(e === "Forbidden" ? 403 : 404).json({ error: e });
+    }
+}
+
+// ── Archive ────────────────────────────────────────────────────────────────
+
+// GET /api/threads?filter=active|archived|all  (replaces plain listThreads for archive support)
+export function listThreadsFiltered(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+    const filter = (req.query["filter"] as string) === "archived" ? "archived"
+                 : (req.query["filter"] as string) === "all"      ? "all"
+                 : "active";
+    res.json(svc().threadsForPersonFiltered(personId, filter));
+}
+
+// PATCH /api/threads/:id/archive
+// Body: { archived: boolean }
+export function archiveThread(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+    const { archived } = req.body ?? {};
+    if (typeof archived !== "boolean") { res.status(400).json({ error: "archived (boolean) is required" }); return; }
+
+    try {
+        svc().setThreadArchived(req.params.id as string, personId, archived);
+        res.json({ ok: true });
+    } catch (err) {
+        const e = err instanceof Error ? err.message : "Error";
+        res.status(e === "Forbidden" ? 403 : 404).json({ error: e });
+    }
+}
+
+// ── Search ─────────────────────────────────────────────────────────────────
+
+// GET /api/search?q=
+export function searchMessages(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+    const q = typeof req.query["q"] === "string" ? req.query["q"].trim() : "";
+    if (!q) { res.json([]); return; }
+
+    res.json(svc().search(q, personId));
+}
+
+// ── Trash ──────────────────────────────────────────────────────────────────
+
+// GET /api/trash
+export function getTrash(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+    res.json(svc().trash(personId));
+}
+
+// POST /api/trash/:id/restore
+export function restoreMessage(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+    try {
+        svc().restore(req.params.id as string, personId);
+        res.json({ ok: true });
+    } catch (err) {
+        const e = err instanceof Error ? err.message : "Error";
+        res.status(e.includes("not found") ? 404 : 422).json({ error: e });
+    }
+}
+
+// DELETE /api/trash/:id
+export function permanentDeleteMessage(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+    try {
+        svc().permanentDelete(req.params.id as string, personId);
+        res.status(204).end();
+    } catch (err) {
+        const e = err instanceof Error ? err.message : "Error";
+        res.status(e.includes("not found") ? 404 : 422).json({ error: e });
+    }
+}
+
+// DELETE /api/trash
+export function emptyTrash(req: Request & { personId?: string }, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
+    const count = svc().emptyTrash(personId);
+    res.json({ deleted: count });
+}

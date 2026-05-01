@@ -8,6 +8,10 @@
     import ThreadPage     from "./pages/ThreadPage.svelte";
     import ComposePage    from "./pages/ComposePage.svelte";
     import ModerationPage from "./pages/ModerationPage.svelte";
+    import DraftsPage     from "./pages/DraftsPage.svelte";
+    import ArchivePage    from "./pages/ArchivePage.svelte";
+    import SearchPage     from "./pages/SearchPage.svelte";
+    import TrashPage      from "./pages/TrashPage.svelte";
     import Sidebar        from "./components/Sidebar.svelte";
 
     let ready = $state(false);
@@ -82,6 +86,14 @@
                 <ThreadPage threadId={$selectedThreadId} />
             {:else if $currentPage === "compose"}
                 <ComposePage />
+            {:else if $currentPage === "drafts"}
+                <DraftsPage />
+            {:else if $currentPage === "archive"}
+                <ArchivePage />
+            {:else if $currentPage === "search"}
+                <SearchPage />
+            {:else if $currentPage === "trash"}
+                <TrashPage />
             {:else if $currentPage === "moderation"}
                 <ModerationPage />
             {:else}

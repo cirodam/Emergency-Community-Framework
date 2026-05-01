@@ -9,7 +9,7 @@ export interface SessionData {
     appPermissions: Record<string, string[]>;
 }
 
-export type Page = "inbox" | "outbox" | "thread" | "compose" | "moderation";
+export type Page = "inbox" | "outbox" | "thread" | "compose" | "moderation" | "drafts" | "archive" | "search" | "trash";
 
 const SESSION_KEY = "ecf_mail_session";
 const TOKEN_KEY   = "ecf_mail_token";
@@ -71,3 +71,6 @@ function createPageStore() {
 
 export const currentPage = createPageStore();
 export const selectedThreadId = writable<string | null>(null);
+
+import type { DraftDto } from "./api.js";
+export const selectedDraft = writable<DraftDto | null>(null);

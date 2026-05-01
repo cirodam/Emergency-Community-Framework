@@ -41,12 +41,6 @@ export interface ThreadDetail {
 
 // ── API calls ─────────────────────────────────────────────────────────────────
 
-export async function listThreads(): Promise<ThreadDto[]> {
-    const res = await apiFetch("/api/threads");
-    if (!res.ok) throw new Error("Failed to load threads");
-    return res.json() as Promise<ThreadDto[]>;
-}
-
 export async function getThread(id: string): Promise<ThreadDetail> {
     const res = await apiFetch(`/api/threads/${id}`);
     if (!res.ok) throw new Error("Thread not found");
@@ -135,4 +129,84 @@ export async function adminDeleteMessage(id: string): Promise<void> {
         const err = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(err.error ?? "Failed to delete message");
     }
+}
+
+// ── Drafts ────────────────────────────────────────────────────────────────────
+
+export interface DraftDto {
+    id:          string;
+    personId:    string;
+    toPersonIds: string[];
+    subject:     string;
+    body:        string;
+    updatedAt:   string;
+}
+
+export async function listDrafts(): Promise<DraftDto[]> {
+    const res = await apiFetch("/api/drafts");
+    if (!res.ok) throw new Error("Failed to load drafts");
+    return res.json() as Promise<DraftDto[]>;
+}
+
+export async function saveDraft(id: string, toPersonIds: string[], subject: string, body: string): Promise<DraftDto> {
+    const res = await apiFetch(`/api/drafts/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body:   JSON.stringify({ toPersonIds, subject, body }),
+    });
+    if (!res.ok) throw new Error("Failed to save draft");
+    return res.json() as Promise<DraftDto>;
+}
+
+export async function deleteDraft(id: string): Promise<void> {
+    const res = await apiFetch(`/api/drafts/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to delete draft");
+}
+
+// ── Archive ───────────────────────────────────────────────────────────────────
+
+export async function listThreads(filter: "active" | "archived" | "all" = "active"): Promise<ThreadDto[]> {
+    const res = await apiFetch(`/api/threads?filter=${filter}`);
+    if (!res.ok) throw new Error("Failed to load threads");
+    return res.json() as Promise<ThreadDto[]>;
+}
+
+export async function archiveThread(id: string, archived: boolean): Promise<void> {
+    const res = await apiFetch(`/api/threads/${encodeURIComponent(id)}/archive`, {
+        method: "PATCH",
+        body:   JSON.stringify({ archived }),
+    });
+    if (!res.ok) throw new Error("Failed to archive thread");
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+
+export async function searchMessages(q: string): Promise<MessageDto[]> {
+    const res = await apiFetch(`/api/search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) throw new Error("Search failed");
+    return res.json() as Promise<MessageDto[]>;
+}
+
+// ── Trash ─────────────────────────────────────────────────────────────────────
+
+export async function getTrash(): Promise<MessageDto[]> {
+    const res = await apiFetch(`/api/trash`);
+    if (!res.ok) throw new Error("Failed to load trash");
+    return res.json() as Promise<MessageDto[]>;
+}
+
+export async function restoreMessage(id: string): Promise<void> {
+    const res = await apiFetch(`/api/trash/${id}/restore`, { method: "POST" });
+    if (!res.ok) throw new Error("Failed to restore message");
+}
+
+export async function permanentDeleteMessage(id: string): Promise<void> {
+    const res = await apiFetch(`/api/trash/${id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) throw new Error("Failed to delete message");
+}
+
+export async function emptyTrash(): Promise<number> {
+    const res = await apiFetch(`/api/trash`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to empty trash");
+    const json = await res.json() as { deleted: number };
+    return json.deleted;
 }

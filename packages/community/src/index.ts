@@ -21,6 +21,7 @@ export { LeaderPoolLoader } from "./governance/LeaderPoolLoader.js";
 export { Constitution, VoteThreshold } from "./governance/Constitution.js";
 export type { ConstitutionDocument, ConstitutionAmendment, ConstitutionalParameter, ActionAuthority, ParameterAuthority, GovernanceBody } from "./governance/Constitution.js";
 export { ConstitutionLoader } from "./governance/ConstitutionLoader.js";
+export { BylawLoader } from "./governance/BylawLoader.js";
 
 export { CentralBank } from "./domains/central_bank/CentralBank.js";
 export { CentralBankLoader } from "./domains/central_bank/CentralBankLoader.js";

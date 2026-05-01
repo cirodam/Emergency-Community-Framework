@@ -1,18 +1,43 @@
 <script lang="ts">
-    import { sendMessage } from "../lib/api.js";
-    import { currentPage, selectedThreadId } from "../lib/session.js";
+    import { sendMessage, saveDraft, deleteDraft } from "../lib/api.js";
+    import { currentPage, selectedThreadId, selectedDraft } from "../lib/session.js";
+    import { randomUUID } from "../lib/uuid.js";
 
-    let toPersonId = $state("");
-    let subject    = $state("");
-    let body       = $state("");
+    // Pre-fill from draft if one was selected
+    const draft = $selectedDraft;
+    let draftId    = $state(draft?.id ?? randomUUID());
+    let toPersonId = $state(draft?.toPersonIds[0] ?? "");
+    let subject    = $state(draft?.subject ?? "");
+    let body       = $state(draft?.body ?? "");
     let sending    = $state(false);
     let error      = $state("");
+    let savedAt    = $state<string | null>(null);
+
+    // Clear the selected draft so returning to Compose opens a blank form
+    selectedDraft.set(null);
+
+    let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function scheduleSave() {
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => autoSave(), 1500);
+    }
+
+    async function autoSave() {
+        if (!toPersonId.trim() && !subject.trim() && !body.trim()) return;
+        try {
+            await saveDraft(draftId, toPersonId.trim() ? [toPersonId.trim()] : [], subject, body);
+            savedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        } catch { /* non-fatal */ }
+    }
 
     async function send() {
         if (!toPersonId.trim() || !body.trim()) return;
         sending = true; error = "";
         try {
             const msg = await sendMessage(toPersonId.trim(), subject.trim(), body.trim());
+            // Delete draft on successful send
+            try { await deleteDraft(draftId); } catch { /* ignore */ }
             selectedThreadId.set(msg.threadId);
             currentPage.go("thread");
         } catch (e) {
@@ -20,6 +45,11 @@
         } finally {
             sending = false;
         }
+    }
+
+    async function discard() {
+        try { await deleteDraft(draftId); } catch { /* ignore */ }
+        currentPage.go("inbox");
     }
 </script>
 
@@ -29,7 +59,10 @@
     </div>
 
     <div class="compose-card">
-        <div class="compose-title">New Message</div>
+        <div class="compose-title">
+            New Message
+            {#if savedAt}<span class="saved-hint">Draft saved {savedAt}</span>{/if}
+        </div>
 
         {#if error}
             <div class="error-banner">{error}</div>
@@ -42,6 +75,7 @@
                     class="field-input"
                     type="text"
                     bind:value={toPersonId}
+                    oninput={scheduleSave}
                     placeholder="Person ID or @handle"
                     autocapitalize="none"
                     spellcheck={false}
@@ -58,6 +92,7 @@
                     class="field-input"
                     type="text"
                     bind:value={subject}
+                    oninput={scheduleSave}
                     placeholder="(no subject)"
                     disabled={sending}
                 />
@@ -68,6 +103,7 @@
             <textarea
                 class="body-input"
                 bind:value={body}
+                oninput={scheduleSave}
                 placeholder="Write your message…"
                 rows={12}
                 disabled={sending}
@@ -78,7 +114,7 @@
                 <button
                     type="button"
                     class="discard-btn"
-                    onclick={() => currentPage.go("inbox")}
+                    onclick={discard}
                     disabled={sending}
                 >Discard</button>
                 <button
@@ -231,5 +267,12 @@
     }
     .send-btn:hover:not(:disabled) { background: #15803d; }
     .send-btn:disabled { background: #86efac; cursor: default; }
+
+    .saved-hint {
+        font-size: 0.75rem;
+        font-weight: 400;
+        color: #94a3b8;
+        margin-left: 0.75rem;
+    }
 </style>
 

@@ -8,10 +8,16 @@
 
     const items: NavItem[] = [
         {
-            kind: "group", id: "people", label: "People", icon: "◉",
-            activePages: ["profile", "directory", "associations", "association", "add-person", "applications"],
+            kind: "group", id: "calendar", label: "Calendar", icon: "⊞",
+            activePages: ["schedule"],
             children: [
-                { kind: "leaf", id: "profile",      label: "Profile",      icon: "◉" },
+                { kind: "leaf", id: "schedule", label: "Schedule", icon: "⊞" },
+            ],
+        },
+        {
+            kind: "group", id: "people", label: "People", icon: "◉",
+            activePages: ["directory", "associations", "association", "add-person", "applications"],
+            children: [
                 { kind: "leaf", id: "directory",    label: "Directory",    icon: "⊞" },
                 { kind: "leaf", id: "associations", label: "Associations", icon: "⊟" },
                 { kind: "leaf", id: "applications", label: "Applications", icon: "◎" },
@@ -19,21 +25,20 @@
         },
         {
             kind: "group", id: "governance", label: "Governance", icon: "⚖",
-            activePages: ["leadership", "assembly", "pool", "budget", "proposals", "domains", "domain", "unit", "constitution"],
+            activePages: ["leadership", "assembly", "pool", "budget", "proposals", "domains", "domain", "unit", "constitution", "documents", "bylaw"],
             children: [
                 { kind: "leaf", id: "leadership",   label: "Leadership",   icon: "★" },
                 { kind: "leaf", id: "budget",        label: "Budget",       icon: "⊡" },
                 { kind: "leaf", id: "domains",       label: "Domains",      icon: "⊛" },
-                { kind: "leaf", id: "constitution",  label: "Constitution", icon: "§" },
+                { kind: "leaf", id: "documents",     label: "Documents",    icon: "§" },
             ],
         },
         {
             kind: "group", id: "jobs", label: "Jobs", icon: "◈",
-            activePages: ["vacancies", "nominations", "schedule"],
+            activePages: ["vacancies", "nominations"],
             children: [
-                { kind: "leaf", id: "vacancies",    label: "Open Roles",   icon: "◈" },
-                { kind: "leaf", id: "nominations",  label: "Nominations",  icon: "◇" },
-                { kind: "leaf", id: "schedule",     label: "Schedule",     icon: "⊞" },
+                { kind: "leaf", id: "vacancies",   label: "Open Roles",  icon: "◈" },
+                { kind: "leaf", id: "nominations", label: "Nominations", icon: "◇" },
             ],
         },
         {
@@ -76,6 +81,7 @@
         if (item.id === "domains")      return ["domains", "domain", "unit"].includes($currentPage);
         if (item.id === "associations") return ["associations", "association"].includes($currentPage);
         if (item.id === "leadership")   return ["leadership", "assembly", "pool"].includes($currentPage);
+        if (item.id === "documents")    return ["documents", "constitution", "bylaw"].includes($currentPage);
         return $currentPage === item.id;
     }
 
