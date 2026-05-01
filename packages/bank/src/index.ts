@@ -7,6 +7,7 @@ import { AccountLoader } from "./AccountLoader.js";
 import { TransactionLoader } from "./TransactionLoader.js";
 import { BankCharterLoader } from "./BankCharterLoader.js";
 import { AccountOwnerLoader } from "./AccountOwnerLoader.js";
+import { BankDb } from "./BankDb.js";
 import { AccountOwnerService } from "./AccountOwnerService.js";
 import bankRoutes from "./routes/bankRoutes.js";
 import ownerRoutes from "./routes/ownerRoutes.js";
@@ -35,9 +36,10 @@ async function main(): Promise<void> {
         seeds:        process.env.BOOTSTRAP_PEERS,
     });
 
-    const accountLoader      = new AccountLoader(resolve(DATA_DIR, "accounts"));
-    const transactionLoader  = new TransactionLoader(resolve(DATA_DIR, "transactions"));
-    const ownerLoader        = new AccountOwnerLoader(resolve(DATA_DIR, "owners"));
+    BankDb.init(resolve(DATA_DIR));
+    const accountLoader      = new AccountLoader();
+    const transactionLoader  = new TransactionLoader();
+    const ownerLoader        = new AccountOwnerLoader();
     Bank.getInstance().init(accountLoader, transactionLoader);
     AccountOwnerService.getInstance().init(ownerLoader);
 
@@ -99,7 +101,7 @@ async function main(): Promise<void> {
     identityPromise
         .then(community => {
             setCommunityIdentity(community.nodeId, community.publicKey);
-            charter = new BankCharterLoader(DATA_DIR).load(community.nodeId, ownerType);
+            charter = new BankCharterLoader().load(community.nodeId, ownerType);
         })
         .catch(err => {
             console.error("[bank] identity resolution failed:", err);

@@ -17,7 +17,14 @@ const VALID_CATEGORIES: ClassifiedCategory[] = ["for-sale", "wanted", "free", "j
 
 const svc = () => ClassifiedService.getInstance();
 
-// GET /api/classifieds?category=for-sale|wanted|free|job|notice&status=open
+// GET /api/classifieds/mine  — returns all listings by the authenticated caller
+export function listMyClassifieds(req: Request & { personId?: string }, res: Response): void {
+    const posterId = req.personId;
+    if (!posterId) { res.status(401).json({ error: "Not authenticated" }); return; }
+    res.json(svc().getByPoster(posterId));
+}
+
+// GET /api/classifieds?category=for-sale|wanted|free|job|notice&status=open&page=1&limit=20
 export function listClassifieds(req: Request, res: Response): void {
     const { category, status } = req.query;
     const cat = VALID_CATEGORIES.includes(category as ClassifiedCategory)
@@ -32,7 +39,18 @@ export function listClassifieds(req: Request, res: Response): void {
         ? svc().getOpen()
         : all;
 
-    res.json(results);
+    const limit  = Math.min(Math.max(parseInt(req.query.limit as string) || 20, 1), 100);
+    const page   = Math.max(parseInt(req.query.page  as string) || 1, 1);
+    const total  = results.length;
+    const pages  = Math.max(Math.ceil(total / limit), 1);
+    const offset = (Math.min(page, pages) - 1) * limit;
+
+    res.json({
+        items: results.slice(offset, offset + limit),
+        total,
+        page:  Math.min(page, pages),
+        pages,
+    });
 }
 
 // GET /api/classifieds/:id

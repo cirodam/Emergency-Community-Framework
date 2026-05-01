@@ -56,7 +56,6 @@
                 <button class="domain-card" onclick={() => openDomain(d.id)}>
                     <div class="card-top">
                         <span class="domain-name">{d.name}</span>
-                        <span class="unit-pill">{d.unitIds.length} unit{d.unitIds.length !== 1 ? "s" : ""}</span>
                     </div>
                     {#if d.description}
                         <p class="domain-desc">{d.description}</p>
@@ -140,15 +139,7 @@
     }
 
     .unit-pill {
-        flex-shrink: 0;
-        font-size: 0.68rem;
-        font-weight: 600;
-        color: #64748b;
-        background: #f1f5f9;
-        border-radius: 9999px;
-        padding: 0.15rem 0.5rem;
-        white-space: nowrap;
-        margin-top: 0.1rem;
+        display: none;
     }
 
     .domain-desc {

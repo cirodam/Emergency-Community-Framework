@@ -1,89 +1,115 @@
-import { FileStore } from "@ecf/core";
+import { CommunityDb } from "../CommunityDb.js";
 import { Person, PersonCredential, LanguageProficiency } from "./Person.js";
 
-/** Shape of a Person record on disk. All Dates stored as ISO strings. */
-interface PersonRecord {
-    id: string;
-    firstName: string;
-    lastName: string;
-    birthDate: string;
-    joinDate: string;
-    handle: string;
-    disabled: boolean;
-    retired: boolean;
-    steward: boolean;
-    bornInCommunity: boolean;
-    guardianId: string | null;
-    phone: string | null;
-    pinHash: string | null;
-    passwordHash: string | null;
-    privateKeyDer: string;
-    publicKeyHex: string;
-    languages: LanguageProficiency[];
-    credential: PersonCredential | null;
+interface PersonRow {
+    id:                string;
+    first_name:        string;
+    last_name:         string;
+    birth_date:        string;
+    join_date:         string;
+    handle:            string;
+    disabled:          number;
+    retired:           number;
+    steward:           number;
+    born_in_community: number;
+    guardian_id:       string | null;
+    phone:             string | null;
+    pin_hash:          string | null;
+    password_hash:     string | null;
+    private_key_der:   string | null;
+    public_key_hex:    string | null;
+    languages:         string; // JSON
+    credential:        string | null; // JSON
 }
 
 export class PersonLoader {
-    private readonly store: FileStore;
-
-    constructor(dataDir: string) {
-        this.store = new FileStore(dataDir);
-    }
+    private get db() { return CommunityDb.getInstance().db; }
 
     save(person: Person): void {
         const { pinHash, passwordHash } = person.getCredentialsForPersistence();
         const { privateKeyDer, publicKeyHex } = person.getKeypairForPersistence();
-        const record: PersonRecord = {
-            id:           person.id,
-            firstName:    person.firstName,
-            lastName:     person.lastName,
-            birthDate:    person.birthDate.toISOString(),
-            joinDate:     person.joinDate.toISOString(),
-            handle:       person.handle,
-            disabled:     person.disabled,
-            retired:      person.retired,
-            steward:      person.steward,
-            bornInCommunity: person.bornInCommunity,
-            guardianId:   person.guardianId,
-            phone:        person.phone,
-            pinHash,
-            passwordHash,
-            privateKeyDer,
-            publicKeyHex,
-            languages:    person.languages,
-            credential:   person.credential,
-        };
-        this.store.write(person.id, record);
+        this.db.prepare(`
+            INSERT INTO persons
+                (id, first_name, last_name, birth_date, join_date, handle,
+                 disabled, retired, steward, born_in_community,
+                 guardian_id, phone, pin_hash, password_hash,
+                 private_key_der, public_key_hex, languages, credential)
+            VALUES
+                (@id, @first_name, @last_name, @birth_date, @join_date, @handle,
+                 @disabled, @retired, @steward, @born_in_community,
+                 @guardian_id, @phone, @pin_hash, @password_hash,
+                 @private_key_der, @public_key_hex, @languages, @credential)
+            ON CONFLICT(id) DO UPDATE SET
+                first_name        = excluded.first_name,
+                last_name         = excluded.last_name,
+                birth_date        = excluded.birth_date,
+                join_date         = excluded.join_date,
+                handle            = excluded.handle,
+                disabled          = excluded.disabled,
+                retired           = excluded.retired,
+                steward           = excluded.steward,
+                born_in_community = excluded.born_in_community,
+                guardian_id       = excluded.guardian_id,
+                phone             = excluded.phone,
+                pin_hash          = excluded.pin_hash,
+                password_hash     = excluded.password_hash,
+                private_key_der   = excluded.private_key_der,
+                public_key_hex    = excluded.public_key_hex,
+                languages         = excluded.languages,
+                credential        = excluded.credential
+        `).run({
+            id:                person.id,
+            first_name:        person.firstName,
+            last_name:         person.lastName,
+            birth_date:        person.birthDate.toISOString(),
+            join_date:         person.joinDate.toISOString(),
+            handle:            person.handle,
+            disabled:          person.disabled ? 1 : 0,
+            retired:           person.retired ? 1 : 0,
+            steward:           person.steward ? 1 : 0,
+            born_in_community: person.bornInCommunity ? 1 : 0,
+            guardian_id:       person.guardianId ?? null,
+            phone:             person.phone ?? null,
+            pin_hash:          pinHash ?? null,
+            password_hash:     passwordHash ?? null,
+            private_key_der:   privateKeyDer ?? null,
+            public_key_hex:    publicKeyHex ?? null,
+            languages:         JSON.stringify(person.languages),
+            credential:        person.credential ? JSON.stringify(person.credential) : null,
+        });
     }
 
     loadAll(): Person[] {
-        return this.store.readAll<PersonRecord>().map(r => this.fromRecord(r));
+        return (this.db.prepare("SELECT * FROM persons").all() as PersonRow[])
+            .map(r => this.fromRow(r));
     }
 
     delete(id: string): boolean {
-        return this.store.delete(id);
+        const result = this.db.prepare("DELETE FROM persons WHERE id = ?").run(id);
+        return result.changes > 0;
     }
 
-    private fromRecord(r: PersonRecord): Person {
+    private fromRow(r: PersonRow): Person {
         return Person.restore({
-            id:           r.id,
-            firstName:    r.firstName,
-            lastName:     r.lastName,
-            birthDate:    new Date(r.birthDate),
-            joinDate:     new Date(r.joinDate),
-            handle:       r.handle,
-            disabled:     r.disabled ?? false,
-            retired:      r.retired ?? false,
-            steward:      r.steward ?? false,
-            bornInCommunity: r.bornInCommunity ?? false,
-            guardianId:   r.guardianId,
-            phone:        r.phone,
-            pinHash:      r.pinHash ?? null,
-            passwordHash: r.passwordHash ?? null,
-            privateKeyDer: r.privateKeyDer ?? null,
-            publicKeyHex:  r.publicKeyHex ?? null,
-            languages:    r.languages ?? [],
-            credential:   r.credential ?? null,
+            id:              r.id,
+            firstName:       r.first_name,
+            lastName:        r.last_name,
+            birthDate:       new Date(r.birth_date),
+            joinDate:        new Date(r.join_date),
+            handle:          r.handle,
+            disabled:        r.disabled === 1,
+            retired:         r.retired === 1,
+            steward:         r.steward === 1,
+            bornInCommunity: r.born_in_community === 1,
+            guardianId:      r.guardian_id ?? null,
+            phone:           r.phone ?? null,
+            pinHash:         r.pin_hash ?? null,
+            passwordHash:    r.password_hash ?? null,
+            privateKeyDer:   r.private_key_der ?? null,
+            publicKeyHex:    r.public_key_hex ?? null,
+            languages:       JSON.parse(r.languages) as LanguageProficiency[],
+            credential:      r.credential ? JSON.parse(r.credential) as PersonCredential : null,
         });
     }
 }
+

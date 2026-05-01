@@ -14,9 +14,12 @@ export interface ServiceProfile {
     rate:         number | null;   // null if negotiable or free
     rateUnit:     ServiceRateUnit;
     availability: ServiceAvailability;
+    expiresAt:    string;
     createdAt:    string;
     updatedAt:    string;
 }
+
+export const SERVICE_TTL_DAYS = 180;
 
 export function createServiceProfile(
     providerId: string,
@@ -27,8 +30,10 @@ export function createServiceProfile(
     rate: number | null,
     rateUnit: ServiceRateUnit,
     availability: ServiceAvailability,
+    ttlDays: number = SERVICE_TTL_DAYS,
 ): ServiceProfile {
-    const now = new Date().toISOString();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString();
     return {
         id: randomUUID(),
         providerId,
@@ -39,8 +44,9 @@ export function createServiceProfile(
         rate,
         rateUnit,
         availability,
-        createdAt: now,
-        updatedAt: now,
+        expiresAt,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
     };
 }
 

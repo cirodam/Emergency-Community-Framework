@@ -131,10 +131,10 @@
 
                 <div class="policy-row">
                     <div class="policy-label">
-                        <span class="policy-name">Monthly payout rate</span>
+                        <span class="policy-name">Monthly payout (per retiree)</span>
                         <span class="policy-auth">referendum</span>
                     </div>
-                    <strong class="policy-value">{pct(param("retirementPayoutRate", 0.005))} of pool</strong>
+                    <strong class="policy-value">{fmt(param("retirementPayoutRate", 500))} kin/month</strong>
                 </div>
 
                 <div class="policy-row">
@@ -179,9 +179,10 @@
                     <strong>Retirement payouts</strong>
                     <p>
                         Once a member reaches the constitutional retirement age, they
-                        become eligible for monthly distributions. Each month a fixed
-                        percentage of the total pool balance is divided equally among
-                        all current retirees and credited to their primary accounts.
+                        become eligible for monthly distributions. Each month a flat
+                        kin amount is paid to each retiree from the pool. If the pool
+                        balance is insufficient, the per-person amount is reduced
+                        proportionally so the pool is never overdrawn.
                     </p>
                 </div>
             </div>

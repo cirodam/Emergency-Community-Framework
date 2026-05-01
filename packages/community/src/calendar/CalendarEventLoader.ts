@@ -1,40 +1,30 @@
-import { BaseLoader } from "@ecf/core";
-import { CalendarEvent, Rsvp } from "./CalendarEvent.js";
+import { CommunityDb } from "../CommunityDb.js";
+import { CalendarEvent } from "./CalendarEvent.js";
 
-interface EventRecord {
-    id:            string;
-    createdAt:     string;
-    createdBy:     string;
-    title:         string;
-    description:   string | null;
-    location:      string | null;
-    startAt:       string;
-    endAt:         string | null;
-    allDay:        boolean;
-    cancelledAt:   string | null;
-    organizerId:   string;
-    organizerType: "person" | "org";
-    rsvps:         Rsvp[];
-}
+export class CalendarEventLoader {
+    private get db() { return CommunityDb.getInstance().db; }
 
-export class CalendarEventLoader extends BaseLoader<EventRecord, CalendarEvent> {
-    protected serialize(event: CalendarEvent): EventRecord {
-        return {
-            id:            event.id,
-            createdAt:     event.createdAt,
-            createdBy:     event.createdBy,
-            title:         event.title,
-            description:   event.description,
-            location:      event.location,
-            startAt:       event.startAt,
-            endAt:         event.endAt,
-            allDay:        event.allDay,
-            cancelledAt:   event.cancelledAt,
-            organizerId:   event.organizerId,
-            organizerType: event.organizerType,
-            rsvps:         event.rsvps,
-        };
+    save(event: CalendarEvent): void {
+        const data = JSON.stringify({
+            id: event.id, createdAt: event.createdAt, createdBy: event.createdBy,
+            title: event.title, description: event.description,
+            location: event.location, startAt: event.startAt, endAt: event.endAt,
+            allDay: event.allDay, cancelledAt: event.cancelledAt,
+            organizerId: event.organizerId, organizerType: event.organizerType,
+            rsvps: event.rsvps,
+        });
+        this.db.prepare(
+            "INSERT INTO calendar_events (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data"
+        ).run(event.id, data);
     }
 
-    protected deserialize(r: EventRecord): CalendarEvent { return CalendarEvent.restore(r); }
+    loadAll(): CalendarEvent[] {
+        return (this.db.prepare("SELECT data FROM calendar_events").all() as { data: string }[])
+            .map(({ data }) => CalendarEvent.restore(JSON.parse(data)));
+    }
+
+    delete(id: string): boolean {
+        return this.db.prepare("DELETE FROM calendar_events WHERE id = ?").run(id).changes > 0;
+    }
 }
+

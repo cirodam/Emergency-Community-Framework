@@ -2,6 +2,7 @@ import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
 import { initServiceNode, resolveCommunityIdentity, networkRouter, messageRouter } from "@ecf/core";
+import { MailDb } from "./MailDb.js";
 import { MessageLoader } from "./MessageLoader.js";
 import { MessageService } from "./MessageService.js";
 import { setCommunityIdentity } from "./communityIdentity.js";
@@ -30,7 +31,9 @@ async function main(): Promise<void> {
         seeds:        process.env.BOOTSTRAP_PEERS,
     });
 
-    const loader = new MessageLoader(resolve(DATA_DIR, "mail"));
+    MailDb.init(resolve(DATA_DIR));
+
+    const loader = new MessageLoader();
     MessageService.getInstance().init(loader);
 
     resolveCommunityIdentity(COMMUNITY_URL, "[mail]")

@@ -2,6 +2,7 @@ import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
 import { initServiceNode, resolveCommunityIdentity, networkRouter, messageRouter } from "@ecf/core";
+import { MarketDb } from "./MarketDb.js";
 import { ClassifiedLoader } from "./ClassifiedLoader.js";
 import { ClassifiedService } from "./ClassifiedService.js";
 import { StallLoader } from "./StallLoader.js";
@@ -37,20 +38,38 @@ async function main(): Promise<void> {
         seeds:        process.env.BOOTSTRAP_PEERS,
     });
 
+    MarketDb.init(resolve(DATA_DIR));
+
     // Classifieds
-    const classifiedLoader = new ClassifiedLoader(resolve(DATA_DIR, "classifieds"));
+    const classifiedLoader = new ClassifiedLoader();
     ClassifiedService.getInstance().init(classifiedLoader);
 
+    // Expire stale listings once at startup, then every 24 hours.
+    const runExpiryCheck = (): void => {
+        const expired = ClassifiedService.getInstance().expireClassifieds();
+        if (expired > 0) console.info(`[market] expired ${expired} classified listing(s)`);
+    };
+    runExpiryCheck();
+    setInterval(runExpiryCheck, 24 * 60 * 60 * 1000);
+
     // Stalls
-    const stallLoader = new StallLoader(resolve(DATA_DIR, "stalls"));
+    const stallLoader = new StallLoader();
     StallService.getInstance().init(stallLoader);
 
     // Services
-    const serviceProfileLoader = new ServiceProfileLoader(resolve(DATA_DIR, "services"));
+    const serviceProfileLoader = new ServiceProfileLoader();
     ServiceProfileService.getInstance().init(serviceProfileLoader);
 
+    // Expire stale service profiles once at startup, then every 24 hours.
+    const runServiceExpiryCheck = (): void => {
+        const expired = ServiceProfileService.getInstance().expireServices();
+        if (expired > 0) console.info(`[market] expired ${expired} service profile(s)`);
+    };
+    runServiceExpiryCheck();
+    setInterval(runServiceExpiryCheck, 24 * 60 * 60 * 1000);
+
     // Marketplaces
-    const marketplaceLoader = new MarketplaceLoader(resolve(DATA_DIR, "marketplaces"));
+    const marketplaceLoader = new MarketplaceLoader();
     MarketplaceService.getInstance().init(marketplaceLoader);
 
     // Resolve community identity non-blocking — public endpoints work immediately

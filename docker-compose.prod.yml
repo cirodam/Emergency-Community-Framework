@@ -1,0 +1,104 @@
+# Production community stack — images pushed to registry, pulled on server.
+#
+# Build and push (run locally):
+#   docker compose -f docker-compose.prod.yml build
+#   docker compose -f docker-compose.prod.yml push
+#
+# Deploy (run on droplet):
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Reserved IP: 157.230.202.49
+
+services:
+  community:
+    image: registry.digitalocean.com/ecf/community:latest
+    build:
+      context: .
+      dockerfile: packages/community/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      BANK_URL: http://bank:3001
+      PUBLIC_COMMUNITY_URL: http://157.230.202.49:3002
+      PUBLIC_BANK_URL:      http://157.230.202.49:3001
+      PUBLIC_MARKET_URL:    http://157.230.202.49:3003
+      PUBLIC_MAIL_URL:      http://157.230.202.49:3020
+    volumes:
+      - community-data:/app/data
+    depends_on:
+      - bank
+
+  bank:
+    image: registry.digitalocean.com/ecf/bank:latest
+    build:
+      context: .
+      dockerfile: packages/bank/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      COMMUNITY_URL: http://community:3002
+      OWNER_TYPE: community
+      PUBLIC_COMMUNITY_URL: http://157.230.202.49:3002
+      PUBLIC_BANK_URL:      http://157.230.202.49:3001
+      PUBLIC_MARKET_URL:    http://157.230.202.49:3003
+      PUBLIC_MAIL_URL:      http://157.230.202.49:3020
+
+    volumes:
+      - bank-data:/app/data
+
+  market:
+    image: registry.digitalocean.com/ecf/market:latest
+    build:
+      context: .
+      dockerfile: packages/market/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      BANK_URL: http://bank:3001
+      COMMUNITY_URL: http://community:3002
+      PUBLIC_COMMUNITY_URL: http://157.230.202.49:3002
+      PUBLIC_BANK_URL:      http://157.230.202.49:3001
+      PUBLIC_MARKET_URL:    http://157.230.202.49:3003
+      PUBLIC_MAIL_URL:      http://157.230.202.49:3020
+    volumes:
+      - market-data:/app/data
+    depends_on:
+      - bank
+      - community
+
+  mail:
+    image: registry.digitalocean.com/ecf/mail:latest
+    build:
+      context: .
+      dockerfile: packages/mail/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3020:3020"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      COMMUNITY_URL: http://community:3002
+      PUBLIC_COMMUNITY_URL: http://157.230.202.49:3002
+      PUBLIC_BANK_URL:      http://157.230.202.49:3001
+      PUBLIC_MARKET_URL:    http://157.230.202.49:3003
+      PUBLIC_MAIL_URL:      http://157.230.202.49:3020
+    volumes:
+      - mail-data:/app/data
+    depends_on:
+      - community
+
+volumes:
+  bank-data:
+  community-data:
+  market-data:
+  mail-data:

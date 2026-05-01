@@ -8,13 +8,25 @@ const VALID_AVAILABILITY: ServiceAvailability[] = ["available", "busy", "by-appo
 
 const svc = () => ServiceProfileService.getInstance();
 
-// GET /api/services?category=...
+// GET /api/services?category=...&page=1&limit=20
 export function listServices(req: Request, res: Response): void {
     const { category } = req.query;
-    const results = SERVICE_CATEGORIES.includes(category as ServiceCategory)
+    const all = SERVICE_CATEGORIES.includes(category as ServiceCategory)
         ? svc().getByCategory(category as ServiceCategory)
         : svc().getAll();
-    res.json(results);
+
+    const limit  = Math.min(Math.max(parseInt(req.query.limit as string) || 20, 1), 100);
+    const page   = Math.max(parseInt(req.query.page  as string) || 1, 1);
+    const total  = all.length;
+    const pages  = Math.max(Math.ceil(total / limit), 1);
+    const offset = (Math.min(page, pages) - 1) * limit;
+
+    res.json({
+        items: all.slice(offset, offset + limit),
+        total,
+        page:  Math.min(page, pages),
+        pages,
+    });
 }
 
 // GET /api/services/:id

@@ -7,6 +7,10 @@
     let loading = $state(true);
     let error   = $state("");
 
+    const PAGE_SIZE = 20;
+    let search = $state("");
+    let page   = $state(1);
+
     // Create form
     let showCreate = $state(false);
     let creating   = $state(false);
@@ -26,6 +30,22 @@
     }
 
     $effect(() => { load(); });
+
+    const filtered = $derived(
+        search.trim()
+            ? associations.filter(a =>
+                a.name.toLowerCase().includes(search.toLowerCase()) ||
+                a.handle.toLowerCase().includes(search.toLowerCase()) ||
+                (a.description ?? "").toLowerCase().includes(search.toLowerCase())
+              )
+            : associations
+    );
+    const pages   = $derived(Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)));
+    const visible = $derived(filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
+
+    function goPage(p: number) {
+        page = Math.max(1, Math.min(p, pages));
+    }
 
     function autoHandle() {
         if (!form.handle) {
@@ -68,6 +88,16 @@
         </button>
     </div>
 
+    <div class="search-row">
+        <input
+            class="search-input"
+            type="search"
+            placeholder="Search by name, handle, or description…"
+            bind:value={search}
+            oninput={() => { page = 1; }}
+        />
+    </div>
+
     {#if showCreate}
         <form class="create-form" onsubmit={(e) => { e.preventDefault(); submit(); }}>
             <h3 class="form-title">Register an association</h3>
@@ -105,9 +135,11 @@
         <div class="error-msg">{error}</div>
     {:else if associations.length === 0}
         <div class="empty-msg">No associations yet. Register the first one above.</div>
+    {:else if filtered.length === 0}
+        <div class="empty-msg">No associations match your search.</div>
     {:else}
         <div class="list">
-            {#each associations as a (a.id)}
+            {#each visible as a (a.id)}
                 <button class="card" onclick={() => open(a.id)}>
                     <div class="card-left">
                         <div class="avatar">{a.name[0]}</div>
@@ -126,7 +158,14 @@
                 </button>
             {/each}
         </div>
-        <p class="count">{associations.length} association{associations.length !== 1 ? "s" : ""}</p>
+        {#if pages > 1}
+            <div class="pagination">
+                <button class="page-btn" onclick={() => goPage(page - 1)} disabled={page <= 1}>‹ Prev</button>
+                <span class="page-info">{page} / {pages}</span>
+                <button class="page-btn" onclick={() => goPage(page + 1)} disabled={page >= pages}>Next ›</button>
+            </div>
+        {/if}
+        <p class="count">{filtered.length} association{filtered.length !== 1 ? "s" : ""}{search.trim() ? ` matching "${search}"` : ""}</p>
     {/if}
 </div>
 
@@ -278,7 +317,47 @@
     .member-count { font-size: 0.78rem; color: #94a3b8; }
     .chevron { font-size: 1.3rem; color: #cbd5e1; line-height: 1; }
 
-    .count { text-align: center; font-size: 0.8rem; color: #94a3b8; margin-top: 1rem; }
+    .search-row {
+        margin-bottom: 1rem;
+    }
+    .search-input {
+        width: 100%;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 0.6rem 0.9rem;
+        font-size: 0.88rem;
+        color: #0f172a;
+        background: #f8fafc;
+        box-sizing: border-box;
+    }
+    .search-input:focus {
+        outline: none;
+        border-color: #94a3b8;
+        background: #fff;
+    }
+
+    .pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        margin-top: 1rem;
+    }
+    .page-btn {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: #0f172a;
+    }
+    .page-btn:disabled { opacity: 0.35; cursor: default; }
+    .page-btn:not(:disabled):hover { background: #e2e8f0; }
+    .page-info { font-size: 0.82rem; color: #64748b; }
+
+    .count { text-align: center; font-size: 0.8rem; color: #94a3b8; margin-top: 0.5rem; }
 
     @media (min-width: 768px) {
         .page { padding-bottom: 2rem; }

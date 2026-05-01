@@ -1,5 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
+import { CommunityDb } from "../../CommunityDb.js";
 
 export interface SocialInsuranceBankRecord {
     ownerId: string;
@@ -7,25 +6,25 @@ export interface SocialInsuranceBankRecord {
     registeredAt: string; // ISO 8601
 }
 
-export class SocialInsuranceBankLoader {
-    private readonly path: string;
+const KEY = "social_insurance_bank";
 
-    constructor(dataDir: string) {
-        this.path = join(dataDir, "social_insurance_bank.json");
-    }
+export class SocialInsuranceBankLoader {
+    private get db() { return CommunityDb.getInstance().db; }
 
     exists(): boolean {
-        return existsSync(this.path);
+        return !!this.db.prepare("SELECT 1 FROM singleton_records WHERE key = ?").get(KEY);
     }
 
     save(record: SocialInsuranceBankRecord): void {
-        writeFileSync(this.path, JSON.stringify(record, null, 2), "utf-8");
+        this.db.prepare(
+            "INSERT INTO singleton_records (key, data) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET data = excluded.data"
+        ).run(KEY, JSON.stringify(record));
     }
 
     load(): SocialInsuranceBankRecord {
-        if (!existsSync(this.path)) {
-            throw new Error("[SocialInsuranceBank] social_insurance_bank.json not found — call init() first");
-        }
-        return JSON.parse(readFileSync(this.path, "utf-8")) as SocialInsuranceBankRecord;
+        const row = this.db.prepare("SELECT data FROM singleton_records WHERE key = ?").get(KEY) as { data: string } | undefined;
+        if (!row) throw new Error("[SocialInsuranceBank] not found — call init() first");
+        return JSON.parse(row.data) as SocialInsuranceBankRecord;
     }
 }
+

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth, requireCoordinator, requireMarketAccess } from "./middleware.js";
 import {
     listClassifieds,
+    listMyClassifieds,
     getClassified,
     createClassifiedWithHandle as createClassified,
     updateClassified,
@@ -36,12 +37,13 @@ import {
 const router = Router();
 
 // ── Classifieds ───────────────────────────────────────────────────────────────
+router.get(   "/classifieds/mine",      requireAuth, listMyClassifieds);
 router.get(   "/classifieds",           listClassifieds);
 router.get(   "/classifieds/:id",       getClassified);
-router.post(  "/classifieds",           ...requireMarketAccess, createClassified);
-router.patch( "/classifieds/:id",       ...requireMarketAccess, updateClassified);
-router.delete("/classifieds/:id",       ...requireMarketAccess, cancelClassified);
-router.post(  "/classifieds/:id/claim", ...requireMarketAccess, claimClassified);
+router.post(  "/classifieds",           requireAuth, createClassified);
+router.patch( "/classifieds/:id",       requireAuth, updateClassified);
+router.delete("/classifieds/:id",       requireAuth, cancelClassified);
+router.post(  "/classifieds/:id/claim", requireAuth, claimClassified);
 
 // ── Stalls ────────────────────────────────────────────────────────────────
 router.get(   "/stalls",     listStalls);

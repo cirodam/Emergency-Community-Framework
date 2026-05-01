@@ -1,79 +1,71 @@
 import { BankAccount } from "./BankAccount.js";
-import { FileStore } from "@ecf/core";
+import { BankDb } from "./BankDb.js";
 import { Currency } from "./BankTransaction.js";
 
-interface PersistedRecord {
-    accountId: string;
-    ownerId: string;
-    label: string;
-    currency: Currency;
-    amount: number;
-    overdraftLimit: number;
-    createdAt: string;
-    // Backward-compat fields from older schema versions (read-only, never written)
-    id?: string;               // old field name for accountId
-    kin?: number;
-    credits?: number;
-    allowNegativeKin?: boolean;
-    allowNegativeCredits?: boolean;
-    exemptFromDemurrage?: boolean; // removed — governance concern
+interface AccountRow {
+    account_id:      string;
+    owner_id:        string;
+    label:           string;
+    currency:        string;
+    amount:          number; // integer cents
+    overdraft_limit: number; // integer cents; -999999999999 sentinel for -Infinity
+    created_at:      string;
+}
+
+const INF_SENTINEL = -999_999_999_999;
+
+function toCents(n: number): number {
+    if (!Number.isFinite(n)) return INF_SENTINEL;
+    return Math.round(n * 100);
+}
+
+function fromCents(n: number): number {
+    if (n === INF_SENTINEL) return -Infinity;
+    return n / 100;
 }
 
 export class AccountLoader {
-    private readonly store: FileStore;
-
-    constructor(dataDir: string) {
-        this.store = new FileStore(dataDir);
-    }
+    private get db() { return BankDb.getInstance().db; }
 
     save(account: BankAccount): void {
-        this.store.write(account.accountId, {
-            accountId:      account.accountId,
-            ownerId:        account.ownerId,
-            label:          account.label,
-            currency:       account.currency,
-            amount:         account.amount,
-            overdraftLimit: account.overdraftLimit,
-            createdAt:      account.createdAt.toISOString(),
+        this.db.prepare(`
+            INSERT INTO accounts (account_id, owner_id, label, currency, amount, overdraft_limit, created_at)
+            VALUES (@account_id, @owner_id, @label, @currency, @amount, @overdraft_limit, @created_at)
+            ON CONFLICT(account_id) DO UPDATE SET
+                label           = excluded.label,
+                amount          = excluded.amount,
+                overdraft_limit = excluded.overdraft_limit
+        `).run({
+            account_id:      account.accountId,
+            owner_id:        account.ownerId,
+            label:           account.label,
+            currency:        account.currency,
+            amount:          toCents(account.amount),
+            overdraft_limit: toCents(account.overdraftLimit),
+            created_at:      account.createdAt.toISOString(),
         });
     }
 
     loadAll(): BankAccount[] {
-        return this.store.readAll<PersistedRecord>().map(r => this.fromRecord(r));
+        return (this.db.prepare("SELECT * FROM accounts").all() as AccountRow[])
+            .map(r => this.fromRow(r));
     }
 
     delete(id: string): boolean {
-        return this.store.delete(id);
+        const result = this.db.prepare("DELETE FROM accounts WHERE account_id = ?").run(id);
+        return result.changes > 0;
     }
 
-    private fromRecord(r: PersistedRecord): BankAccount {
-        // Backward compat: migrate old boolean overdraft flags → numeric limit
-        let overdraftLimit: number;
-        if (typeof r.overdraftLimit === "number") {
-            overdraftLimit = r.overdraftLimit;
-        } else if (r.overdraftLimit === null || r.allowNegativeKin === true || r.allowNegativeCredits === true) {
-            overdraftLimit = -Infinity;
-        } else {
-            overdraftLimit = 0;
-        }
-
-        // Backward compat: old schema stored balance as "kin" or "credits"
-        const amount = r.amount ?? r.kin ?? r.credits ?? 0;
-
-        // Backward compat: old schema had no currency field — assume "kin"
-        const currency: Currency = r.currency ?? "kin";
-
-        // Backward compat: old records used "id" instead of "accountId"
-        const accountId = r.accountId ?? r.id ?? "";
-
+    private fromRow(r: AccountRow): BankAccount {
         return BankAccount.restore({
-            accountId,
-            ownerId:        r.ownerId,
+            accountId:      r.account_id,
+            ownerId:        r.owner_id,
             label:          r.label,
-            currency,
-            amount,
-            overdraftLimit,
-            createdAt:      new Date(r.createdAt),
+            currency:       r.currency as Currency,
+            amount:         fromCents(r.amount),
+            overdraftLimit: fromCents(r.overdraft_limit),
+            createdAt:      new Date(r.created_at),
         });
     }
 }
+

@@ -111,6 +111,7 @@ export const DEFAULT_ROLE_TYPES: Omit<RoleTypeData, "id">[] = [
     { title: "Driver",                   description: "Operates vehicles for transit and logistics.",                              defaultKinPerMonth: 2_917, preferredUnitTypes: [] },
 
     // Administration & Finance
+    { title: "Treasurer",                description: "Manages the community treasury: tracks income and expenditure, reconciles accounts, prepares financial reports for stewards, and ensures funds are allocated in line with governance decisions.", defaultKinPerMonth: 4_583, preferredUnitTypes: ["treasury-office"] },
     { title: "Treasurer / Accountant",   description: "Manages financial records and community accounts.",                        defaultKinPerMonth: 4_583, preferredUnitTypes: ["office", "branch"] },
     { title: "Administrator",            description: "Handles coordination, record-keeping, and organisational tasks.",           defaultKinPerMonth: 3_750, preferredUnitTypes: ["office"] },
 ];

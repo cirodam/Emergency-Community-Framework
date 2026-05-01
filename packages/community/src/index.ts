@@ -1,6 +1,7 @@
 // @ecf/community — entry point
 // Bank interactions must go through HTTP client — never import @ecf/bank directly
 
+export { CommunityDb } from "./CommunityDb.js";
 export { Person } from "./person/Person.js";
 export type { PersonCredential, LanguageProficiency } from "./person/Person.js";
 export { PersonLoader } from "./person/PersonLoader.js";

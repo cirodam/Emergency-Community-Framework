@@ -3,6 +3,7 @@ import { BankAccount } from "./BankAccount.js";
 import { AccountLoader } from "./AccountLoader.js";
 import { BankTransaction, Currency } from "./BankTransaction.js";
 import { TransactionLoader } from "./TransactionLoader.js";
+import { BankDb } from "./BankDb.js";
 
 /**
  * Pure infrastructure singleton that owns all account balances and transaction history.
@@ -175,9 +176,15 @@ export class Bank {
         to.credit(amount);
 
         const tx = new BankTransaction(fromAccountId, toAccountId, from.currency, amount, memo, reversalOf);
-        this.accountLoader?.save(from);
-        this.accountLoader?.save(to);
-        this.transactionLoader?.save(tx);
+
+        // Persist all three writes atomically so a crash mid-transfer can't
+        // leave accounts and the ledger in an inconsistent state.
+        BankDb.getInstance().db.transaction(() => {
+            this.accountLoader?.save(from);
+            this.accountLoader?.save(to);
+            this.transactionLoader?.save(tx);
+        })();
+
         return tx;
     }
 

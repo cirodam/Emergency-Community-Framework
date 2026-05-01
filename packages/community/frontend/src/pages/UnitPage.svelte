@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getUnit, listRoles, listRoleTypes, listPersons, createRole, updateRole, deleteRole, createNomination } from "../lib/api.js";
+    import { getUnit, listRoles, listRoleTypes, listPersons, createRole, updateRole, deleteRole, createNomination, updateUnit } from "../lib/api.js";
     import type { UnitDto, RoleDto, RoleTypeDto, PersonDto, ScheduleSlot } from "../lib/api.js";
     import { currentPage, selectedUnitId, selectedDomainId } from "../lib/session.js";
 
@@ -26,6 +26,31 @@
 
     // Delete
     let deletingId: string | null = $state(null);
+
+    // Rename unit
+    let renaming = $state(false);
+    let renameValue = $state("");
+    let renameSaving = $state(false);
+
+    function startRename() {
+        if (!unit) return;
+        renameValue = unit.name;
+        renaming = true;
+    }
+
+    async function saveRename() {
+        if (!unit || !renameValue.trim()) return;
+        renameSaving = true;
+        try {
+            const updated = await updateUnit(unit.id, { name: renameValue.trim() });
+            unit = updated;
+            renaming = false;
+        } catch {
+            // leave the rename input open so user can retry
+        } finally {
+            renameSaving = false;
+        }
+    }
 
     // Nominate for a vacant role
     let nominatingRoleId: string | null = $state(null);
@@ -251,7 +276,24 @@
     {:else if unit}
         <div class="unit-header">
             <div class="unit-type-badge">{unit.type}</div>
-            <h2 class="unit-name">{unit.name}</h2>
+            {#if renaming}
+                <div class="rename-row">
+                    <input
+                        class="rename-input"
+                        type="text"
+                        bind:value={renameValue}
+                        onkeydown={(e) => { if (e.key === "Enter") saveRename(); if (e.key === "Escape") renaming = false; }}
+                        autofocus
+                    />
+                    <button class="rename-save" onclick={saveRename} disabled={renameSaving || !renameValue.trim()}>Save</button>
+                    <button class="rename-cancel" onclick={() => renaming = false}>Cancel</button>
+                </div>
+            {:else}
+                <div class="rename-row">
+                    <h2 class="unit-name">{unit.name}</h2>
+                    <button class="rename-btn" onclick={startRename} title="Rename">✎</button>
+                </div>
+            {/if}
             {#if unit.description}
                 <p class="unit-desc">{unit.description}</p>
             {/if}
@@ -555,6 +597,55 @@
         color: #0f172a;
         margin: 0 0 0.4rem;
     }
+
+    .rename-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.4rem;
+    }
+    .rename-row .unit-name { margin: 0; }
+
+    .rename-input {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #0f172a;
+        border: 1px solid #3b82f6;
+        border-radius: 0.4rem;
+        padding: 0.2rem 0.5rem;
+        outline: none;
+        flex: 1;
+        min-width: 0;
+        font-family: inherit;
+    }
+
+    .rename-btn {
+        font-size: 0.9rem;
+        color: #94a3b8;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.1rem 0.3rem;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+    .rename-btn:hover { color: #475569; }
+
+    .rename-save, .rename-cancel {
+        font-size: 0.78rem;
+        font-weight: 500;
+        border-radius: 0.375rem;
+        padding: 0.25rem 0.65rem;
+        cursor: pointer;
+        border: 1px solid;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .rename-save   { background: #16a34a; color: #fff; border-color: #16a34a; }
+    .rename-save:hover:not(:disabled) { background: #15803d; }
+    .rename-save:disabled { opacity: 0.5; cursor: not-allowed; }
+    .rename-cancel { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+    .rename-cancel:hover { background: #e2e8f0; }
 
     .unit-desc {
         font-size: 0.9rem;

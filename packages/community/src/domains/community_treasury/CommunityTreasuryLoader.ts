@@ -1,5 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
+import { CommunityDb } from "../../CommunityDb.js";
 
 export interface CommunityTreasuryRecord {
     ownerId: string;
@@ -7,25 +6,25 @@ export interface CommunityTreasuryRecord {
     registeredAt: string; // ISO 8601
 }
 
-export class CommunityTreasuryLoader {
-    private readonly path: string;
+const KEY = "community_treasury";
 
-    constructor(dataDir: string) {
-        this.path = join(dataDir, "community_treasury.json");
-    }
+export class CommunityTreasuryLoader {
+    private get db() { return CommunityDb.getInstance().db; }
 
     exists(): boolean {
-        return existsSync(this.path);
+        return !!this.db.prepare("SELECT 1 FROM singleton_records WHERE key = ?").get(KEY);
     }
 
     save(record: CommunityTreasuryRecord): void {
-        writeFileSync(this.path, JSON.stringify(record, null, 2), "utf-8");
+        this.db.prepare(
+            "INSERT INTO singleton_records (key, data) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET data = excluded.data"
+        ).run(KEY, JSON.stringify(record));
     }
 
     load(): CommunityTreasuryRecord {
-        if (!existsSync(this.path)) {
-            throw new Error("[CommunityTreasury] community_treasury.json not found — call init() first");
-        }
-        return JSON.parse(readFileSync(this.path, "utf-8")) as CommunityTreasuryRecord;
+        const row = this.db.prepare("SELECT data FROM singleton_records WHERE key = ?").get(KEY) as { data: string } | undefined;
+        if (!row) throw new Error("[CommunityTreasury] not found — call init() first");
+        return JSON.parse(row.data) as CommunityTreasuryRecord;
     }
 }
+

@@ -108,4 +108,21 @@ export class ClassifiedService {
         this.loader.save(c);
         return c;
     }
+
+    /**
+     * Expire all open listings whose expiresAt has passed.
+     * Call once per day. Returns the number of listings expired.
+     */
+    expireClassifieds(now: Date = new Date()): number {
+        let count = 0;
+        for (const c of this.classifieds.values()) {
+            if (c.status === "open" && c.expiresAt && new Date(c.expiresAt) <= now) {
+                c.status    = "expired";
+                c.updatedAt = now.toISOString();
+                this.loader.save(c);
+                count++;
+            }
+        }
+        return count;
+    }
 }

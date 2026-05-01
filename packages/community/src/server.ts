@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
 import { NodeService, NodeSigner, ClusterService, DataManifest, networkRouter, messageRouter, parseRoutableAddress, MessageDispatcher } from "@ecf/core";
 import { PaymentTokenService } from "./PaymentTokenService.js";
+import { CommunityDb } from "./CommunityDb.js";
 import { clusterRoutes } from "./routes/clusterRoutes.js";
 import { PersonLoader } from "./person/PersonLoader.js";
 import { PersonService } from "./person/PersonService.js";
@@ -132,49 +133,52 @@ async function main(): Promise<void> {
     // ── Federation membership (community node owns the application process) ─
     FederationMembershipService.getInstance(DATA_DIR);
 
+    // ── SQLite database (must be first — all loaders depend on it) ────────
+    CommunityDb.init(resolve(DATA_DIR));
+
     DataManifest.getInstance().init(
         body => communitySigner.signBody(body),
         communitySigner.publicKeyHex,
     );
 
     // ── Constitution ───────────────────────────────────────────────────────
-    const constitutionLoader = new ConstitutionLoader(resolve(DATA_DIR, "governance"));
+    const constitutionLoader = new ConstitutionLoader();
     constitutionLoader.load();
     Constitution.getInstance().init(constitutionLoader);
 
     // ── Persons ────────────────────────────────────────────────────────────
-    const personLoader = new PersonLoader(resolve(DATA_DIR, "persons"));
+    const personLoader = new PersonLoader();
     PersonService.getInstance().init(personLoader);
     PersonService.getInstance().setCommunitySigner(communitySigner);
     // ── App suspensions ────────────────────────────────────────────────
-    const suspensionLoader = new AppSuspensionLoader(resolve(DATA_DIR, "persons"));
+    const suspensionLoader = new AppSuspensionLoader();
     AppSuspensionService.getInstance().init(suspensionLoader);
     // ── Member applications ────────────────────────────────────────────────
-    const appLoader = new MemberApplicationLoader(resolve(DATA_DIR, "applications"));
+    const appLoader = new MemberApplicationLoader();
     MemberApplicationService.getInstance().init(appLoader);
 
     // ── Associations ───────────────────────────────────────────────────────
-    const associationLoader = new AssociationLoader(resolve(DATA_DIR, "associations"));
+    const associationLoader = new AssociationLoader();
     AssociationService.getInstance().init(associationLoader);
 
     // ── Organizations ──────────────────────────────────────────────────────
-    const orgLoader = new OrgLoader(resolve(DATA_DIR, "orgs"));
+    const orgLoader = new OrgLoader();
     OrgService.getInstance().init(orgLoader);
 
     // ── Calendar ─────────────────────────────────────────────────────────────
-    const calendarLoader = new CalendarEventLoader(resolve(DATA_DIR, "calendar"));
+    const calendarLoader = new CalendarEventLoader();
     CalendarService.getInstance().init(calendarLoader);
 
     // ── Locations ─────────────────────────────────────────────────────────────
-    const locationLoader = new LocationLoader(resolve(DATA_DIR, "locations"));
+    const locationLoader = new LocationLoader();
     LocationService.getInstance().init(locationLoader);
 
     // ── Governance proposals ───────────────────────────────────────────────
-    const proposalLoader = new ProposalLoader(resolve(DATA_DIR, "proposals"));
+    const proposalLoader = new ProposalLoader();
     ProposalService.getInstance().init(proposalLoader, constitutionLoader);
 
     // ── Motions ────────────────────────────────────────────────────────────
-    const motionLoader = new MotionLoader(resolve(DATA_DIR, "motions"));
+    const motionLoader = new MotionLoader();
     MotionService.getInstance().init(motionLoader);
 
     // ── Payment tokens ─────────────────────────────────────────────────────
@@ -222,24 +226,24 @@ async function main(): Promise<void> {
     // ── Domain registries ──────────────────────────────────────────────────
     const domainSvc = DomainService.getInstance();
     domainSvc.init(
-        new FunctionalDomainLoader(resolve(DATA_DIR, "domains")),
-        new FunctionalUnitLoader(resolve(DATA_DIR, "units")),
-        new CommunityRoleLoader(resolve(DATA_DIR, "roles")),
-        new LeaderPoolLoader(resolve(DATA_DIR, "pools")),
+        new FunctionalDomainLoader(),
+        new FunctionalUnitLoader(),
+        new CommunityRoleLoader(),
+        new LeaderPoolLoader(),
     );
 
     // ── Role type bank ─────────────────────────────────────────────────────
-    const roleTypeLoader = new RoleTypeLoader(resolve(DATA_DIR, "role-types"));
+    const roleTypeLoader = new RoleTypeLoader();
     domainSvc.initRoleTypes(roleTypeLoader);
 
     seedDomains(domainSvc);
 
     // ── Nominations ────────────────────────────────────────────────────────
-    const nominationLoader = new NominationLoader(resolve(DATA_DIR, "nominations"));
+    const nominationLoader = new NominationLoader();
     NominationService.getInstance().init(nominationLoader);
 
     // ── Shifts ─────────────────────────────────────────────────────────────
-    const shiftLoader = new ShiftLoader(resolve(DATA_DIR, "shifts"));
+    const shiftLoader = new ShiftLoader();
     ShiftService.getInstance().init(shiftLoader);
 
     // ── Monetary institutions (non-fatal — bank may be unreachable) ────────
@@ -247,10 +251,10 @@ async function main(): Promise<void> {
 
     registerMonetaryHandlers(bank);
 
-    const centralBankLoader   = new CentralBankLoader(DATA_DIR);
-    const siBankLoader        = new SocialInsuranceBankLoader(DATA_DIR);
-    const siMemberLoader      = new SocialInsuranceMemberLoader(resolve(DATA_DIR, "si_members"));
-    const treasuryLoader      = new CommunityTreasuryLoader(DATA_DIR);
+    const centralBankLoader   = new CentralBankLoader();
+    const siBankLoader        = new SocialInsuranceBankLoader();
+    const siMemberLoader      = new SocialInsuranceMemberLoader();
+    const treasuryLoader      = new CommunityTreasuryLoader();
 
     async function initMonetaryInstitutions(): Promise<void> {
         await CentralBank.getInstance().init(bank, centralBankLoader);

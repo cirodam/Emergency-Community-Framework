@@ -1,5 +1,6 @@
 import logger from "../logger.js";
 import { BankClient } from "@ecf/core";
+import { Person } from "../person/Person.js";
 import { PersonService } from "../person/PersonService.js";
 import { CentralBank } from "../domains/central_bank/CentralBank.js";
 import { SocialInsuranceBank } from "../domains/social_insurance/SocialInsuranceBank.js";
@@ -229,4 +230,58 @@ export function registerMonetaryHandlers(bank: BankClient): void {
     };
     runAnniversaryCheck();
     setInterval(runAnniversaryCheck, 24 * 60 * 60 * 1000);
+
+    // Issue monthly retirement payments to all persons who have reached
+    // retirementAge. Runs daily; fires only when 30 days have elapsed since
+    // the last payout. Automatically marks persons as retired when they first
+    // cross the threshold — no steward action required.
+    const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
+    const runRetirementPayouts = (): void => {
+        const siBank       = SocialInsuranceBank.getInstance();
+        const constitution = Constitution.getInstance();
+        const personSvc    = PersonService.getInstance();
+
+        if (!siBank.isReady()) {
+            logger.warn("[community] SI bank not ready — skipping retirement payouts");
+            return;
+        }
+
+        const retirementAge = constitution.retirementAge;
+        const payoutRate    = constitution.retirementPayoutRate;
+        const now           = Date.now();
+
+        // Collect eligible persons; auto-flag anyone newly past retirement age.
+        const eligible: Person[] = [];
+        for (const person of personSvc.getAll()) {
+            if (person.disabled || !person.birthDate) continue;
+            const ageYears = (now - person.birthDate.getTime()) / MS_PER_YEAR;
+            if (ageYears >= retirementAge) {
+                if (!person.retired) {
+                    personSvc.update(person.id, { retired: true });
+                    logger.info(`[community] @${person.handle} reached retirement age — marked retired`);
+                }
+                eligible.push(person);
+            }
+        }
+
+        if (eligible.length === 0) return;
+
+        siBank.issueMonthlyPayments(eligible, payoutRate).then(() => {
+            logger.info(`[community] retirement payouts issued to ${eligible.length} retirees`);
+        }).catch((err: unknown) => {
+            logger.error({ err }, "[community] retirement payout failed");
+        });
+    };
+
+    let lastRetirementDate: Date | null = null;
+    setInterval(() => {
+        const now = new Date();
+        if (
+            lastRetirementDate === null ||
+            now.getTime() - lastRetirementDate.getTime() >= 30 * MS_PER_DAY
+        ) {
+            lastRetirementDate = now;
+            runRetirementPayouts();
+        }
+    }, MS_PER_DAY);
 }

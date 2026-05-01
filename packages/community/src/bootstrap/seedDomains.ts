@@ -75,6 +75,14 @@ export function seedDomains(domainSvc: DomainService): void {
     }
 
     domainSvc.registerDomain(CommunityTreasury.getInstance());
+    if (CommunityTreasury.getInstance().unitIds.length === 0) {
+        const treasuryOffice = new FunctionalUnit("Treasury Office", "Administrative office responsible for tracking community income and expenditure, reconciling accounts, and preparing financial reports for stewards.", "treasury-office");
+        domainSvc.createUnit(treasuryOffice, CommunityTreasury.getInstance().id);
+        domainSvc.createRole(
+            new CommunityRole("Treasurer", "Manages the community treasury: tracks income and expenditure, reconciles accounts, prepares financial reports for stewards, and ensures funds are allocated in line with governance decisions.", 4_583),
+            treasuryOffice.id,
+        );
+    }
 
     domainSvc.registerDomain(CommunityBankDomain.getInstance());
     if (CommunityBankDomain.getInstance().unitIds.length === 0) {

@@ -85,4 +85,15 @@ export class ServiceProfileService {
         this.loader.delete(id);
         return true;
     }
+
+    /** Mark and remove profiles whose expiresAt is in the past. Returns count removed. */
+    expireServices(now: Date = new Date()): number {
+        const expired = Array.from(this.profiles.values())
+            .filter(p => new Date(p.expiresAt) <= now);
+        for (const p of expired) {
+            this.profiles.delete(p.id);
+            this.loader.delete(p.id);
+        }
+        return expired.length;
+    }
 }

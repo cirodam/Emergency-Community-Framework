@@ -186,11 +186,11 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
             constraints: { min: 55, max: 75 },
         },
         retirementPayoutRate: {
-            value: 0.005,
+            value: 500,
             authority: "referendum",
             description:
-                "Fraction of the retirement pool distributed each month across all current retirees.",
-            constraints: { min: 0.001, max: 0.02 },
+                "Flat kin amount paid to each eligible retiree per month from the social insurance pool. Capped by available pool balance.",
+            constraints: { min: 0, max: 100_000 },
         },
         birthdayCirculationFraction: {
             value: 0.20,

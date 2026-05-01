@@ -1,29 +1,37 @@
-import { BaseLoader } from "@ecf/core";
+import { CommunityDb } from "../CommunityDb.js";
 import { LeaderPool } from "./LeaderPool.js";
 
 interface PoolRecord {
-    id:          string;
-    name:        string;
-    description: string;
-    personIds:   string[];
-    createdAt:   string;
+    id: string; name: string; description: string;
+    personIds: string[]; createdAt: string;
 }
 
-export class LeaderPoolLoader extends BaseLoader<PoolRecord, LeaderPool> {
-    protected serialize(pool: LeaderPool): PoolRecord {
-        return {
-            id:          pool.id,
-            name:        pool.name,
-            description: pool.description,
-            personIds:   pool.personIds,
-            createdAt:   pool.createdAt.toISOString(),
-        };
+export class LeaderPoolLoader {
+    private get db() { return CommunityDb.getInstance().db; }
+
+    save(pool: LeaderPool): void {
+        const data = JSON.stringify({
+            id: pool.id, name: pool.name, description: pool.description,
+            personIds: pool.personIds, createdAt: pool.createdAt.toISOString(),
+        });
+        this.db.prepare(
+            "INSERT INTO leader_pools (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data"
+        ).run(pool.id, data);
     }
 
-    protected deserialize(r: PoolRecord): LeaderPool {
-        const pool = new LeaderPool(r.name, r.description, r.id);
-        (pool as unknown as Record<string, unknown>)["createdAt"] = new Date(r.createdAt);
-        pool.personIds = r.personIds ?? [];
-        return pool;
+    loadAll(): LeaderPool[] {
+        return (this.db.prepare("SELECT data FROM leader_pools").all() as { data: string }[])
+            .map(({ data }) => {
+                const r = JSON.parse(data) as PoolRecord;
+                const pool = new LeaderPool(r.name, r.description, r.id);
+                (pool as unknown as Record<string, unknown>)["createdAt"] = new Date(r.createdAt);
+                pool.personIds = r.personIds ?? [];
+                return pool;
+            });
+    }
+
+    delete(id: string): boolean {
+        return this.db.prepare("DELETE FROM leader_pools WHERE id = ?").run(id).changes > 0;
     }
 }
+

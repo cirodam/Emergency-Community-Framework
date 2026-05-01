@@ -4,6 +4,7 @@
         createService,
         updateService,
         deleteService,
+        sendMailMessage,
         type ServiceProfileDto,
         type ServiceCategory,
         type ServiceRateUnit,
@@ -32,6 +33,12 @@
     let error       = $state("");
     let filter      = $state<ServiceCategory | "all">("all");
 
+    // Pagination
+    const PAGE_SIZE = 20;
+    let page  = $state(1);
+    let total = $state(0);
+    let pages = $state(1);
+
     // Create form
     let showForm    = $state(false);
     let newName     = $state("");
@@ -52,22 +59,35 @@
     let editRateUnit = $state<ServiceRateUnit>("per-hour");
     let editAvail   = $state<ServiceAvailability>("available");
 
-    const myId = $derived($session?.personId);
-    const filtered = $derived(
-        filter === "all" ? profiles : profiles.filter(p => p.category === filter)
-    );
+    // Message compose
+    let msgId      = $state<string | null>(null);
+    let msgBody    = $state("");
+    let msgSending = $state(false);
+    let msgError   = $state("");
+    let msgSent    = $state(false);
 
-    async function load() {
+    const myId = $derived($session?.personId);
+    // server filters by category; profiles is always the current page
+    const filtered = $derived(profiles);
+
+    async function load(p = page) {
         loading = true;
         error   = "";
         try {
-            profiles = await listServices();
+            const cat = filter === "all" ? undefined : filter;
+            const result = await listServices(cat, p, PAGE_SIZE);
+            profiles = result.items;
+            total    = result.total;
+            pages    = result.pages;
+            page     = result.page;
         } catch {
             error = "Failed to load services";
         } finally {
             loading = false;
         }
     }
+
+    function goPage(p: number) { load(p); }
 
     async function handleCreate() {
         if (!newName.trim()) { formError = "Name is required"; return; }
@@ -135,7 +155,36 @@
         return a === "available" ? "avail-open" : a === "busy" ? "avail-busy" : "avail-appt";
     }
 
-    load();
+    function daysLeft(expiresAt: string): number {
+        return Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+    }
+
+    function openMessage(p: ServiceProfileDto) {
+        msgId    = p.id;
+        msgBody  = "";
+        msgError = "";
+        msgSent  = false;
+    }
+
+    async function handleSendMessage(p: ServiceProfileDto) {
+        if (!msgBody.trim()) return;
+        msgSending = true; msgError = "";
+        try {
+            await sendMailMessage(
+                p.providerId,
+                `Re: ${p.name}`,
+                `Hi ${p.providerHandle},\n\nI'm interested in your service "${p.name}".\n\n${msgBody.trim()}`,
+            );
+            msgSent = true;
+            setTimeout(() => { msgId = null; msgSent = false; }, 1500);
+        } catch (e) {
+            msgError = e instanceof Error ? e.message : "Failed to send";
+        } finally {
+            msgSending = false;
+        }
+    }
+
+    load(1);
 </script>
 
 <div class="page">
@@ -207,9 +256,9 @@
     {/if}
 
     <div class="filter-bar">
-        <button class="pill" class:active={filter === "all"} onclick={() => filter = "all"}>All</button>
+        <button class="pill" class:active={filter === "all"} onclick={() => { filter = "all"; load(1); }}>All</button>
         {#each CATEGORIES as cat}
-            <button class="pill" class:active={filter === cat} onclick={() => filter = cat}>
+            <button class="pill" class:active={filter === cat} onclick={() => { filter = cat; load(1); }}>
                 {cat.charAt(0).toUpperCase() + cat.slice(1)}
             </button>
         {/each}
@@ -282,18 +331,49 @@
                             {/if}
                         </div>
                         <div class="svc-name">{p.name}</div>
-                        <p class="svc-meta">{p.providerHandle || p.providerId}</p>
+                        <p class="svc-meta">{p.providerHandle || p.providerId} · expires in {daysLeft(p.expiresAt)}d</p>
                         {#if p.description}<p class="svc-desc">{p.description}</p>{/if}
-                        {#if myId === p.providerId}
+                        {#if msgId === p.id}
+                            {#if msgSent}
+                                <p class="msg-sent">Message sent ✓</p>
+                            {:else}
+                                <div class="msg-compose">
+                                    <textarea
+                                        class="input"
+                                        rows="3"
+                                        placeholder="Write your message…"
+                                        bind:value={msgBody}
+                                    ></textarea>
+                                    {#if msgError}<p class="form-error">{msgError}</p>{/if}
+                                    <div class="form-actions">
+                                        <button class="btn-secondary" onclick={() => msgId = null}>Cancel</button>
+                                        <button class="btn-primary" onclick={() => handleSendMessage(p)} disabled={msgSending || !msgBody.trim()}>
+                                            {msgSending ? "Sending…" : "Send"}
+                                        </button>
+                                    </div>
+                                </div>
+                            {/if}
+                        {:else}
                             <div class="card-actions">
-                                <button class="action-btn" onclick={() => startEdit(p)}>Edit</button>
-                                <button class="action-btn danger" onclick={() => handleDelete(p.id)}>Delete</button>
+                                {#if myId === p.providerId}
+                                    <button class="action-btn" onclick={() => startEdit(p)}>Edit</button>
+                                    <button class="action-btn danger" onclick={() => handleDelete(p.id)}>Delete</button>
+                                {:else if myId}
+                                    <button class="btn-primary" onclick={() => openMessage(p)}>Message provider</button>
+                                {/if}
                             </div>
                         {/if}
                     {/if}
                 </div>
             {/each}
         </div>
+        {#if pages > 1}
+            <div class="pagination">
+                <button class="page-btn" onclick={() => goPage(page - 1)} disabled={page <= 1}>‹ Prev</button>
+                <span class="page-info">{page} / {pages}</span>
+                <button class="page-btn" onclick={() => goPage(page + 1)} disabled={page >= pages}>Next ›</button>
+            </div>
+        {/if}
     {/if}
 </div>
 
@@ -433,6 +513,25 @@
     .action-btn:hover        { background: #f8fafc; }
     .action-btn.danger       { color: #ef4444; border-color: #fecaca; }
     .action-btn.danger:hover { background: #fef2f2; }
+
+    /* ── Message compose ── */
+    .msg-compose { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+    .msg-sent    { font-size: 0.85rem; color: #16a34a; font-weight: 500; margin: 0.5rem 0 0; }
+
+    /* ── Pagination ── */
+    .pagination {
+        display: flex; align-items: center; justify-content: center;
+        gap: 1rem; margin-top: 1.25rem;
+    }
+    .page-btn {
+        font-size: 0.82rem; font-weight: 500;
+        color: #475569; background: #f8fafc;
+        border: 1px solid #e2e8f0; border-radius: 0.5rem;
+        padding: 0.35rem 0.85rem; cursor: pointer;
+    }
+    .page-btn:hover:not(:disabled) { background: #f1f5f9; }
+    .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .page-info { font-size: 0.82rem; color: #64748b; }
 
     /* ── Misc ── */
     .empty-msg { font-size: 0.875rem; color: #94a3b8; }

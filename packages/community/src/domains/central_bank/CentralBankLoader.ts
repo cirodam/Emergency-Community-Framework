@@ -1,5 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
+import { CommunityDb } from "../../CommunityDb.js";
 
 export interface CentralBankRecord {
     ownerId: string;
@@ -10,29 +9,29 @@ export interface CentralBankRecord {
     dischargeShortfall?: number;
 }
 
+const KEY = "central_bank";
+
 /**
  * Persists the central bank's owner ID and issuance account ID.
  * Written once on first boot, read on every subsequent boot.
  */
 export class CentralBankLoader {
-    private readonly path: string;
-
-    constructor(dataDir: string) {
-        this.path = join(dataDir, "central_bank.json");
-    }
+    private get db() { return CommunityDb.getInstance().db; }
 
     exists(): boolean {
-        return existsSync(this.path);
+        return !!this.db.prepare("SELECT 1 FROM singleton_records WHERE key = ?").get(KEY);
     }
 
     save(record: CentralBankRecord): void {
-        writeFileSync(this.path, JSON.stringify(record, null, 2), "utf-8");
+        this.db.prepare(
+            "INSERT INTO singleton_records (key, data) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET data = excluded.data"
+        ).run(KEY, JSON.stringify(record));
     }
 
     load(): CentralBankRecord {
-        if (!existsSync(this.path)) {
-            throw new Error("[CentralBank] central_bank.json not found — call init() first");
-        }
-        return JSON.parse(readFileSync(this.path, "utf-8")) as CentralBankRecord;
+        const row = this.db.prepare("SELECT data FROM singleton_records WHERE key = ?").get(KEY) as { data: string } | undefined;
+        if (!row) throw new Error("[CentralBank] not found — call init() first");
+        return JSON.parse(row.data) as CentralBankRecord;
     }
 }
+

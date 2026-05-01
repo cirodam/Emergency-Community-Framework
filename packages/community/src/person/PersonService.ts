@@ -166,6 +166,8 @@ export class PersonService {
             const title = role.title.toLowerCase();
             if (title === "teller") {
                 perms.bank.add("teller");
+            } else if (title === "treasurer") {
+                perms.bank.add("teller");
             } else if (title === "marketplace coordinator") {
                 perms.market.add("coordinator");
             } else if (title === "food supply officer") {

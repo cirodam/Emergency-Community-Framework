@@ -12,10 +12,45 @@ async function apiFetch(input: string, init: RequestInit = {}): Promise<Response
     return res;
 }
 
+// ── Config / service discovery ────────────────────────────────────────────────
+
+let _mailUrl: string | null = null;
+
+async function getMailUrl(): Promise<string> {
+    if (_mailUrl) return _mailUrl;
+    const cfg = await fetch("/api/config").then(r => r.json()).catch(() => ({})) as { mailUrl?: string };
+    _mailUrl = cfg.mailUrl ?? "http://localhost:3020";
+    return _mailUrl;
+}
+
+export async function sendMailMessage(toPersonId: string, subject: string, body: string): Promise<void> {
+    const mailUrl = await getMailUrl();
+    const token   = getToken();
+    const res     = await fetch(`${mailUrl}/api/messages`, {
+        method:  "POST",
+        headers: {
+            "Content-Type":  "application/json",
+            ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ toPersonId, subject, body }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error ?? "Failed to send message");
+    }
+}
+
 // ── Classifieds ───────────────────────────────────────────────────────────────
 
+export interface Page<T> {
+    items:  T[];
+    total:  number;
+    page:   number;
+    pages:  number;
+}
+
 export type ClassifiedCategory = "for-sale" | "wanted" | "free" | "job" | "notice";
-export type ClassifiedStatus   = "open" | "closed" | "cancelled";
+export type ClassifiedStatus   = "open" | "closed" | "cancelled" | "expired";
 
 export interface Classified {
     id:             string;
@@ -29,12 +64,22 @@ export interface Classified {
     counterpartyId: string | null;
     createdAt:      string;
     updatedAt:      string;
+    expiresAt:      string;
 }
 
-export async function listClassifieds(category?: ClassifiedCategory): Promise<Classified[]> {
-    const qs = category ? `?category=${encodeURIComponent(category)}` : "";
-    const res = await fetch(`/api/classifieds${qs}`);
+export async function listClassifieds(category?: ClassifiedCategory, page = 1, limit = 20): Promise<Page<Classified>> {
+    const params = new URLSearchParams();
+    if (category) params.set("category", category);
+    params.set("page",  String(page));
+    params.set("limit", String(limit));
+    const res = await fetch(`/api/classifieds?${params}`);
     if (!res.ok) throw new Error("Failed to load classifieds");
+    return res.json() as Promise<Page<Classified>>;
+}
+
+export async function listMyClassifieds(): Promise<Classified[]> {
+    const res = await apiFetch("/api/classifieds/mine");
+    if (!res.ok) throw new Error("Failed to load your classifieds");
     return res.json() as Promise<Classified[]>;
 }
 
@@ -190,15 +235,19 @@ export interface ServiceProfileDto {
     rate:           number | null;
     rateUnit:       ServiceRateUnit;
     availability:   ServiceAvailability;
+    expiresAt:      string;
     createdAt:      string;
     updatedAt:      string;
 }
 
-export async function listServices(category?: ServiceCategory): Promise<ServiceProfileDto[]> {
-    const qs = category ? `?category=${encodeURIComponent(category)}` : "";
-    const res = await fetch(`/api/services${qs}`);
+export async function listServices(category?: ServiceCategory, page = 1, limit = 20): Promise<Page<ServiceProfileDto>> {
+    const params = new URLSearchParams();
+    if (category) params.set("category", category);
+    params.set("page",  String(page));
+    params.set("limit", String(limit));
+    const res = await fetch(`/api/services?${params}`);
     if (!res.ok) throw new Error("Failed to load services");
-    return res.json() as Promise<ServiceProfileDto[]>;
+    return res.json() as Promise<Page<ServiceProfileDto>>;
 }
 
 export async function getService(id: string): Promise<ServiceProfileDto> {

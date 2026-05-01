@@ -1,11 +1,13 @@
 <script lang="ts">
     import {
         listClassifieds,
+        listMyClassifieds,
         createClassified,
         updateClassified,
         cancelClassified,
         claimClassified,
         adminCancelClassified,
+        sendMailMessage,
         type Classified,
         type ClassifiedCategory,
     } from "../lib/api.js";
@@ -21,9 +23,17 @@
     };
 
     let items       = $state<Classified[]>([]);
+    let myItems     = $state<Classified[]>([]);
     let loading     = $state(true);
     let error       = $state("");
     let filter      = $state<ClassifiedCategory | "all">("all");
+    let tab         = $state<"board" | "mine">("board");
+
+    // Pagination
+    const PAGE_SIZE = 20;
+    let page  = $state(1);
+    let total = $state(0);
+    let pages = $state(1);
 
     // Create form
     let showForm    = $state(false);
@@ -40,22 +50,47 @@
     let editDesc    = $state("");
     let editPrice   = $state("");
 
-    const myId = $derived($session?.personId);
-    const filtered = $derived(
-        filter === "all" ? items.filter(c => c.status === "open") : items.filter(c => c.status === "open" && c.category === filter)
-    );
+    // Message compose
+    let msgId      = $state<string | null>(null);   // classified id the compose pane is open for
+    let msgBody    = $state("");
+    let msgSending = $state(false);
+    let msgError   = $state("");
+    let msgSent    = $state(false);
 
-    async function load() {
+    const myId = $derived($session?.personId);
+    // server filters by category now; items is always the current page
+    const filtered = $derived(items);
+
+    function daysLeft(expiresAt: string): number {
+        return Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000));
+    }
+
+    function statusLabel(s: string): string {
+        return s === "open" ? "Open" : s === "closed" ? "Fulfilled" : s === "cancelled" ? "Cancelled" : "Expired";
+    }
+
+    async function load(p = page) {
         loading = true;
         error   = "";
         try {
-            items = await listClassifieds();
+            const cat = filter === "all" ? undefined : filter;
+            const result = await listClassifieds(cat, p, PAGE_SIZE);
+            items = result.items;
+            total = result.total;
+            pages = result.pages;
+            page  = result.page;
+            if (myId) myItems = await listMyClassifieds();
         } catch {
             error = "Failed to load classifieds";
         } finally {
             loading = false;
         }
     }
+
+    function goPage(p: number) { load(p); }
+
+    $effect(() => { if (tab === "mine" && myId && myItems.length === 0) load(page); });
+    load(1);
 
     async function handleCreate() {
         if (!newTitle.trim()) { formError = "Title is required"; return; }
@@ -68,7 +103,8 @@
                 description: newDesc.trim(),
                 price:       newPrice ? parseFloat(newPrice) : 0,
             });
-            items = [created, ...items];
+            items   = [created, ...items];
+            myItems = [created, ...myItems];
             showForm = false; newTitle = ""; newDesc = ""; newPrice = "";
         } catch (e) {
             formError = e instanceof Error ? e.message : "Failed to create";
@@ -92,7 +128,8 @@
                 description: editDesc.trim(),
                 price:       editPrice ? parseFloat(editPrice) : 0,
             });
-            items = items.map(c => c.id === id ? updated : c);
+            items   = items.map(c => c.id === id ? updated : c);
+            myItems = myItems.map(c => c.id === id ? updated : c);
             editId = null;
         } catch (e) {
             formError = e instanceof Error ? e.message : "Update failed";
@@ -105,7 +142,8 @@
         if (!confirm("Cancel this classified?")) return;
         try {
             const updated = await cancelClassified(id);
-            items = items.map(c => c.id === id ? updated : c);
+            items   = items.map(c => c.id === id ? updated : c);
+            myItems = myItems.map(c => c.id === id ? updated : c);
         } catch {
             error = "Failed to cancel";
         }
@@ -115,9 +153,37 @@
         if (!confirm("Remove this listing as coordinator? This cannot be undone.")) return;
         try {
             const updated = await adminCancelClassified(id);
-            items = items.map(c => c.id === id ? updated : c);
+            items   = items.map(c => c.id === id ? updated : c);
+            myItems = myItems.map(c => c.id === id ? updated : c);
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to remove listing";
+        }
+    }
+
+    function openMessage(c: Classified) {
+        msgId    = c.id;
+        msgBody  = "";
+        msgError = "";
+        msgSent  = false;
+    }
+
+    async function handleSendMessage(c: Classified) {
+        if (!msgBody.trim()) return;
+        msgSending = true; msgError = "";
+        try {
+            const action = c.category === "for-sale" ? "buy"
+                         : c.category === "wanted"   ? "supply"
+                         : c.category === "job"      ? "apply for"
+                         : "respond to";
+            const subject = `Re: ${c.title}`;
+            const body    = `Hi ${c.posterHandle},\n\nI'd like to ${action} your classified "${c.title}".\n\n${msgBody.trim()}`;
+            await sendMailMessage(c.posterId, subject, body);
+            msgSent = true;
+            setTimeout(() => { msgId = null; msgSent = false; }, 1500);
+        } catch (e) {
+            msgError = e instanceof Error ? e.message : "Failed to send";
+        } finally {
+            msgSending = false;
         }
     }
 
@@ -130,8 +196,6 @@
             error = e instanceof Error ? e.message : "Claim failed";
         }
     }
-
-    load();
 </script>
 
 <div class="page">
@@ -185,71 +249,141 @@
         </form>
     {/if}
 
-    <div class="filter-bar">
-        <button class="pill" class:active={filter === "all"} onclick={() => filter = "all"}>All</button>
-        {#each CATEGORIES as cat}
-            <button class="pill" class:active={filter === cat} onclick={() => filter = cat}>{CATEGORY_LABELS[cat]}</button>
-        {/each}
+    <!-- Tabs -->
+    <div class="tab-bar">
+        <button class="tab" class:active={tab === "board"} onclick={() => tab = "board"}>Board</button>
+        {#if myId}
+            <button class="tab" class:active={tab === "mine"} onclick={() => tab = "mine"}>My Posts</button>
+        {/if}
     </div>
 
-    {#if loading}
-        <div class="skeleton"></div>
-        <div class="skeleton short"></div>
-        <div class="skeleton"></div>
-    {:else if error}
-        <p class="error-msg">{error}</p>
-    {:else if filtered.length === 0}
-        <p class="empty-msg">No classifieds in this category.</p>
-    {:else}
-        <div class="cl-list">
-            {#each filtered as c (c.id)}
-                <div class="cl-card">
-                    {#if editId === c.id}
-                        <label class="field">
-                            <span class="field-label">Title *</span>
-                            <input class="input" bind:value={editTitle} />
-                        </label>
-                        <label class="field">
-                            <span class="field-label">Description</span>
-                            <textarea class="input" bind:value={editDesc} rows="3"></textarea>
-                        </label>
-                        {#if c.category === "for-sale" || c.category === "wanted"}
-                            <label class="field">
-                                <span class="field-label">Price</span>
-                                <input class="input" type="number" min="0" step="0.01" bind:value={editPrice} />
-                            </label>
-                        {/if}
-                        {#if formError}<p class="form-error">{formError}</p>{/if}
-                        <div class="form-actions">
-                            <button class="btn-secondary" onclick={() => editId = null}>Cancel</button>
-                            <button class="btn-primary" onclick={() => handleUpdate(c.id)} disabled={saving}>Save</button>
-                        </div>
-                    {:else}
+    {#if tab === "board"}
+        <div class="filter-bar">
+            <button class="pill" class:active={filter === "all"} onclick={() => { filter = "all"; load(1); }}>All</button>
+            {#each CATEGORIES as cat}
+                <button class="pill" class:active={filter === cat} onclick={() => { filter = cat; load(1); }}>{CATEGORY_LABELS[cat]}</button>
+            {/each}
+        </div>
+
+        {#if loading}
+            <div class="skeleton"></div>
+            <div class="skeleton short"></div>
+            <div class="skeleton"></div>
+        {:else if error}
+            <p class="error-msg">{error}</p>
+        {:else if filtered.length === 0}
+            <p class="empty-msg">No classifieds in this category.</p>
+        {:else}
+            <div class="cl-list">
+                {#each filtered as c (c.id)}
+                    <div class="cl-card">
                         <div class="cl-badges">
                             <span class="badge cat-{c.category}">{CATEGORY_LABELS[c.category]}</span>
-                            {#if c.price > 0}<span class="badge price">${c.price.toFixed(2)}</span>{/if}
+                            {#if c.price > 0}<span class="badge price">{c.price.toFixed(2)} kin</span>{/if}
                         </div>
                         <div class="cl-title">{c.title}</div>
                         {#if c.description}<p class="cl-desc">{c.description}</p>{/if}
-                        <p class="cl-meta">Posted by {c.posterHandle || c.posterId}</p>
-                        <div class="card-actions">
-                            {#if myId && myId !== c.posterId}
-                                <button class="btn-primary" onclick={() => handleClaim(c.id)}>
-                                    {c.category === "for-sale" ? "Buy" : c.category === "wanted" ? "Supply" : c.category === "job" ? "Apply" : "Respond"}
-                                </button>
+                        <p class="cl-meta">
+                            Posted by {c.posterHandle || c.posterId}
+                            · expires in {daysLeft(c.expiresAt)}d
+                        </p>
+
+                        {#if msgId === c.id}
+                            {#if msgSent}
+                                <p class="msg-sent">Message sent ✓</p>
+                            {:else}
+                                <div class="msg-compose">
+                                    <textarea
+                                        class="input"
+                                        rows="3"
+                                        placeholder="Write your message…"
+                                        bind:value={msgBody}
+                                    ></textarea>
+                                    {#if msgError}<p class="form-error">{msgError}</p>{/if}
+                                    <div class="form-actions">
+                                        <button class="btn-secondary" onclick={() => msgId = null}>Cancel</button>
+                                        <button class="btn-primary" onclick={() => handleSendMessage(c)} disabled={msgSending || !msgBody.trim()}>
+                                            {msgSending ? "Sending…" : "Send"}
+                                        </button>
+                                    </div>
+                                </div>
                             {/if}
-                            {#if myId === c.posterId}
-                                <button class="action-btn" onclick={() => startEdit(c)}>Edit</button>
-                                <button class="action-btn danger" onclick={() => handleCancel(c.id)}>Cancel listing</button>
-                            {/if}
-                            {#if $isCoordinator && myId !== c.posterId}
-                                <button class="action-btn danger" onclick={() => handleAdminRemove(c.id)} title="Remove as coordinator">⚑ Remove</button>
-                            {/if}
-                        </div>
-                    {/if}
+                        {:else}
+                            <div class="card-actions">
+                                {#if myId && myId !== c.posterId}
+                                    <button class="btn-primary" onclick={() => openMessage(c)}>Message poster</button>
+                                {/if}
+                                {#if $isCoordinator && myId !== c.posterId}
+                                    <button class="action-btn danger" onclick={() => handleAdminRemove(c.id)} title="Remove as coordinator">⚑ Remove</button>
+                                {/if}
+                            </div>
+                        {/if}
+                    </div>
+                {/each}
+            </div>
+            {#if pages > 1}
+                <div class="pagination">
+                    <button class="page-btn" onclick={() => goPage(page - 1)} disabled={page <= 1}>‹ Prev</button>
+                    <span class="page-info">{page} / {pages}</span>
+                    <button class="page-btn" onclick={() => goPage(page + 1)} disabled={page >= pages}>Next ›</button>
                 </div>
-            {/each}
-        </div>
+            {/if}
+        {/if}
+
+    {:else}
+        <!-- My Posts tab -->
+        {#if loading}
+            <div class="skeleton"></div>
+            <div class="skeleton short"></div>
+        {:else if myItems.length === 0}
+            <p class="empty-msg">You haven't posted anything yet.</p>
+        {:else}
+            <div class="cl-list">
+                {#each myItems as c (c.id)}
+                    <div class="cl-card" class:inactive={c.status !== "open"}>
+                        {#if editId === c.id}
+                            <label class="field">
+                                <span class="field-label">Title *</span>
+                                <input class="input" bind:value={editTitle} />
+                            </label>
+                            <label class="field">
+                                <span class="field-label">Description</span>
+                                <textarea class="input" bind:value={editDesc} rows="3"></textarea>
+                            </label>
+                            {#if c.category === "for-sale" || c.category === "wanted"}
+                                <label class="field">
+                                    <span class="field-label">Price</span>
+                                    <input class="input" type="number" min="0" step="0.01" bind:value={editPrice} />
+                                </label>
+                            {/if}
+                            {#if formError}<p class="form-error">{formError}</p>{/if}
+                            <div class="form-actions">
+                                <button class="btn-secondary" onclick={() => editId = null}>Cancel</button>
+                                <button class="btn-primary" onclick={() => handleUpdate(c.id)} disabled={saving}>Save</button>
+                            </div>
+                        {:else}
+                            <div class="cl-badges">
+                                <span class="badge cat-{c.category}">{CATEGORY_LABELS[c.category]}</span>
+                                {#if c.price > 0}<span class="badge price">{c.price.toFixed(2)} kin</span>{/if}
+                                <span class="badge status-{c.status}">{statusLabel(c.status)}</span>
+                            </div>
+                            <div class="cl-title">{c.title}</div>
+                            {#if c.description}<p class="cl-desc">{c.description}</p>{/if}
+                            <p class="cl-meta">
+                                Posted {new Date(c.createdAt).toLocaleDateString()}
+                                {#if c.status === "open"}· expires in {daysLeft(c.expiresAt)}d{/if}
+                            </p>
+                            {#if c.status === "open"}
+                                <div class="card-actions">
+                                    <button class="action-btn" onclick={() => startEdit(c)}>Edit</button>
+                                    <button class="action-btn danger" onclick={() => handleCancel(c.id)}>Cancel listing</button>
+                                </div>
+                            {/if}
+                        {/if}
+                    </div>
+                {/each}
+            </div>
+        {/if}
     {/if}
 </div>
 
@@ -333,6 +467,21 @@
     }
     .btn-secondary:hover { background: #e2e8f0; }
 
+    /* ── Tabs ── */
+    .tab-bar { display: flex; gap: 0; border-bottom: 1px solid #e2e8f0; margin-bottom: 1rem; }
+
+    .tab {
+        font-size: 0.85rem; font-weight: 500;
+        padding: 0.5rem 1rem;
+        border: none; background: none;
+        color: #64748b; cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        transition: color 0.15s, border-color 0.15s;
+    }
+    .tab:hover  { color: #334155; }
+    .tab.active { color: #0f172a; border-bottom-color: #0f172a; font-weight: 600; }
+
     /* ── Filter pills ── */
     .filter-bar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
 
@@ -372,6 +521,32 @@
     .cat-job      { background: #fef9c3; color: #a16207; }
     .cat-notice   { background: #fee2e2; color: #b91c1c; }
     .price        { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+
+    .status-open      { background: #dcfce7; color: #15803d; }
+    .status-closed    { background: #dbeafe; color: #1d4ed8; }
+    .status-cancelled { background: #f1f5f9; color: #94a3b8; }
+    .status-expired   { background: #fef9c3; color: #92400e; }
+
+    .cl-card.inactive { opacity: 0.65; }
+
+    /* ── Message compose ── */
+    .msg-compose { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+    .msg-sent    { font-size: 0.85rem; color: #16a34a; font-weight: 500; margin: 0.5rem 0 0; }
+
+    /* ── Pagination ── */
+    .pagination {
+        display: flex; align-items: center; justify-content: center;
+        gap: 1rem; margin-top: 1.25rem;
+    }
+    .page-btn {
+        font-size: 0.82rem; font-weight: 500;
+        color: #475569; background: #f8fafc;
+        border: 1px solid #e2e8f0; border-radius: 0.5rem;
+        padding: 0.35rem 0.85rem; cursor: pointer;
+    }
+    .page-btn:hover:not(:disabled) { background: #f1f5f9; }
+    .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .page-info { font-size: 0.82rem; color: #64748b; }
 
     .cl-title { font-size: 0.95rem; font-weight: 600; color: #0f172a; margin-bottom: 0.2rem; }
     .cl-desc  { font-size: 0.875rem; color: #475569; margin: 0.2rem 0 0.3rem; line-height: 1.5; }

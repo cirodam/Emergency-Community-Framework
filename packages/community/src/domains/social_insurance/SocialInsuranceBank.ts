@@ -153,28 +153,29 @@ export class SocialInsuranceBank extends FunctionalDomain {
     /**
      * Distribute monthly retirement payments to all retired persons.
      *
-     * Total payout = poolBalance × payoutRate, split equally among retirees.
+     * Each retiree receives a flat `monthlyPayoutPerPerson` kin amount,
+     * capped so the total never exceeds the available pool balance.
      * Each payment transfers from the pool account to the retiree's primary
      * bank account.
      *
      * The caller is responsible for filtering `retiredPersons` (e.g. by age
      * against `Constitution.getInstance().retirementAge`).
      *
-     * @param retiredPersons  Pre-filtered list of persons eligible for payment
-     * @param payoutRate      Fraction of pool to distribute this month
+     * @param retiredPersons         Pre-filtered list of persons eligible for payment
+     * @param monthlyPayoutPerPerson Flat kin amount paid to each retiree this month
      */
-    async issueMonthlyPayments(retiredPersons: Person[], payoutRate: number): Promise<void> {
+    async issueMonthlyPayments(retiredPersons: Person[], monthlyPayoutPerPerson: number): Promise<void> {
         if (retiredPersons.length === 0) return;
 
-        // Fetch pool balance
+        // Fetch pool balance and cap the per-person amount so we never overdraw.
         const poolAccountInfo = await this._bank.getAccountById(this._poolAccountId);
         if (!poolAccountInfo) return;
         const poolBalance = poolAccountInfo.amount;
 
-        const totalPayout = Math.floor(poolBalance * payoutRate);
-        if (totalPayout <= 0) return;
-
-        const perPerson = Math.floor(totalPayout / retiredPersons.length);
+        const maxPerPerson = retiredPersons.length > 0
+            ? Math.floor(poolBalance / retiredPersons.length)
+            : 0;
+        const perPerson = Math.min(Math.floor(monthlyPayoutPerPerson), maxPerPerson);
         if (perPerson <= 0) return;
 
         for (const person of retiredPersons) {

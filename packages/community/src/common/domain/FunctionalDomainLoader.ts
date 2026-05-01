@@ -1,4 +1,4 @@
-import { FileStore } from "@ecf/core";
+import { CommunityDb } from "../../CommunityDb.js";
 import { FunctionalDomain, type BudgetItem } from "./FunctionalDomain.js";
 
 interface DomainStateRecord {
@@ -14,20 +14,16 @@ interface DomainStateRecord {
  * IDs of associated units, roles, and the governing pool are persisted here.
  */
 export class FunctionalDomainLoader {
-    private readonly store: FileStore;
-
-    constructor(dataDir: string) {
-        this.store = new FileStore(dataDir);
-    }
+    private get db() { return CommunityDb.getInstance().db; }
 
     save(domain: FunctionalDomain): void {
-        const record: DomainStateRecord = {
-            id:          domain.id,
-            unitIds:     domain.unitIds,
-            budgetItems: domain.budgetItems,
-            poolId:      domain.poolId,
-        };
-        this.store.write(domain.id, record);
+        const data = JSON.stringify({
+            id: domain.id, unitIds: domain.unitIds,
+            budgetItems: domain.budgetItems, poolId: domain.poolId,
+        });
+        this.db.prepare(
+            "INSERT INTO functional_domain_states (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data"
+        ).run(domain.id, data);
     }
 
     /**
@@ -35,14 +31,16 @@ export class FunctionalDomainLoader {
      * Called during startup after all domain singletons have been created.
      */
     restore(domain: FunctionalDomain): void {
-        const record = this.store.read<DomainStateRecord>(domain.id);
-        if (!record) return;
+        const row = this.db.prepare("SELECT data FROM functional_domain_states WHERE id = ?").get(domain.id) as { data: string } | undefined;
+        if (!row) return;
+        const record = JSON.parse(row.data) as DomainStateRecord;
         domain.unitIds     = record.unitIds     ?? [];
         domain.budgetItems = record.budgetItems ?? [];
         domain.poolId      = record.poolId      ?? null;
     }
 
     delete(domainId: string): boolean {
-        return this.store.delete(domainId);
+        return this.db.prepare("DELETE FROM functional_domain_states WHERE id = ?").run(domainId).changes > 0;
     }
 }
+

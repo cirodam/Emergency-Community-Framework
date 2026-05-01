@@ -1,0 +1,21 @@
+[Unit]
+Description=Emergency Community Framework
+Documentation=https://github.com/you/ecf
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/app
+ExecStartPre=docker compose -f docker-compose.prod.yml pull
+ExecStart=docker compose -f docker-compose.prod.yml up
+ExecStop=docker compose -f docker-compose.prod.yml down
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
