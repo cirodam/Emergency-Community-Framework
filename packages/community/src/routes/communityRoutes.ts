@@ -1,7 +1,6 @@
 import { Router } from "express";
 import * as setup from "./SetupController.js";
 import * as sms from "./SmsController.js";
-import * as suspensions from "./AppSuspensionController.js";
 import personRoutes from "./personRoutes.js";
 import applicationRoutes from "./applicationRoutes.js";
 import domainRoutes from "./domainRoutes.js";
@@ -23,9 +22,6 @@ router.post("/setup",        setup.setup);
 
 // SMS banking (inbound webhook — for testing or gammu-smsd RunOnReceive)
 router.post("/sms/inbound", sms.smsInbound);
-
-// Public suspension list — satellite apps call this to populate their cache
-router.get("/app-suspensions", suspensions.listSuspensions);
 
 // Community timeline — public transparency log
 // GET /api/log?limit=50&before=<ISO timestamp>

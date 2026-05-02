@@ -5,7 +5,7 @@ import { Person, PersonCredential, LanguageProficiency } from "./Person.js";
 import { PersonLoader } from "./PersonLoader.js";
 import { Constitution } from "../governance/Constitution.js";
 import type { DomainService } from "../DomainService.js";
-import { AppSuspensionService } from "./AppSuspensionService.js";
+
 import { HandleRegistry } from "../HandleRegistry.js";
 
 export interface PersonPatch {
@@ -50,6 +50,7 @@ export class PersonService {
     private joinHandlers: ((person: Person) => Promise<void>)[] = [];
     private dischargeHandlers: ((person: Person) => Promise<void>)[] = [];
     private anniversaryHandlers: ((person: Person) => Promise<void>)[] = [];
+    private bankAccessGrantedHandlers: ((person: Person) => Promise<void>)[] = [];
 
     private constructor() {}
 
@@ -95,19 +96,55 @@ export class PersonService {
         this.anniversaryHandlers.push(handler);
     }
 
+    onPersonBankAccessGranted(handler: (person: Person) => Promise<void>): void {
+        this.bankAccessGrantedHandlers.push(handler);
+    }
+
     // ── Person lifecycle ──────────────────────────────────────────────────────
 
     /**
      * Add a new person, issue their credential, fire join handlers, and persist.
-     * Join handlers are responsible for opening the person's bank account,
-     * issuing their endowment, etc.
      */
     async add(person: Person): Promise<void> {
         this.persons.set(person.id, person);
         HandleRegistry.getInstance().register(person.handle, "person", person.id);
+        // Set a temporary password and require the person to change it on first login.
+        person.setPasswordHash(await hashSecret("testpass"));
+        person.mustChangePassword = true;
         this.issueCredential(person);
         for (const h of this.joinHandlers) await h(person);
         this.save(person);
+    }
+
+    /**
+     * Grant access to a satellite app. Fires bank-specific handler when "bank" is granted.
+     * No-op if already enrolled. Reissues credential.
+     */
+    async grantApp(personId: string, app: string): Promise<Person> {
+        const person = this.persons.get(personId);
+        if (!person) throw new Error(`Person ${personId} not found`);
+        if (!person.apps.includes(app)) {
+            person.apps = [...person.apps, app];
+            this.issueCredential(person);
+            this.save(person);
+            if (app === "bank") {
+                for (const h of this.bankAccessGrantedHandlers) await h(person);
+            }
+        }
+        return person;
+    }
+
+    /**
+     * Revoke access to a satellite app. Reissues credential.
+     * No-op if not enrolled.
+     */
+    revokeApp(personId: string, app: string): Person {
+        const person = this.persons.get(personId);
+        if (!person) throw new Error(`Person ${personId} not found`);
+        person.apps = person.apps.filter(a => a !== app);
+        this.issueCredential(person);
+        this.save(person);
+        return person;
     }
 
     /**
@@ -154,34 +191,24 @@ export class PersonService {
         person: Person,
         domainSvc: DomainService,
     ): Record<string, string[]> {
-        const perms: Record<string, Set<string>> = {
-            bank:   new Set(["member"]),
-            market: new Set(["member"]),
-            mail:   new Set(["member"]),
-        };
+        // Only grant access to apps the person has been enrolled in.
+        const perms: Record<string, Set<string>> = {};
+        for (const app of person.apps) {
+            perms[app] = new Set(["member"]);
+        }
 
-        if (this.isSteward(person)) {
+        if (perms.mail && this.isSteward(person)) {
             perms.mail.add("moderator");
         }
 
-        // Role-based permissions
+        // Role-based permissions (only applies if enrolled in the relevant app)
         for (const role of domainSvc.getRoles()) {
             if (role.memberId !== person.id) continue;
             const title = role.title.toLowerCase();
-            if (title === "teller") {
-                perms.bank.add("teller");
-            } else if (title === "treasurer") {
-                perms.bank.add("teller");
-            } else if (title === "marketplace coordinator") {
-                perms.market.add("coordinator");
-            } else if (title === "food supply officer") {
-                perms.market.add("coordinator");
-            } else if (title === "community kitchen director") {
-                perms.market.add("coordinator");
-            } else if (title === "liquid fuel officer") {
-                perms.market.add("coordinator");
-            } else if (title === "farm coordinator") {
-                perms.market.add("coordinator");
+            if (title === "teller" || title === "treasurer") {
+                perms.bank?.add("teller");
+            } else if (["marketplace coordinator", "food supply officer", "community kitchen director", "liquid fuel officer", "farm coordinator"].includes(title)) {
+                perms.market?.add("coordinator");
             }
         }
 
@@ -190,11 +217,11 @@ export class PersonService {
             if (!pool.hasPerson(person.id)) continue;
             const name = pool.name.toLowerCase();
             if (name.includes("bank")) {
-                perms.bank.add("admin");
+                perms.bank?.add("admin");
             } else if (name.includes("market")) {
-                perms.market.add("admin");
+                perms.market?.add("admin");
             } else if (name.includes("mail")) {
-                perms.mail.add("moderator");
+                perms.mail?.add("moderator");
             }
         }
 
@@ -203,24 +230,7 @@ export class PersonService {
         );
     }
 
-    /**
-     * Overlay suspension state on top of derived permissions.
-     * A suspended person gets an empty permission array for that app,
-     * meaning their next credential will deny all access.
-     */
-    resolveAppPermissionsWithSuspensions(
-        person: Person,
-        domainSvc: DomainService,
-    ): Record<string, string[]> {
-        const base = this.resolveAppPermissions(person, domainSvc);
-        const suspSvc = AppSuspensionService.getInstance();
-        for (const app of Object.keys(base)) {
-            if (suspSvc.isSuspended(person.id, app)) {
-                base[app] = [];
-            }
-        }
-        return base;
-    }
+
 
     /**
      * Issue or renew a PersonCredential for the given person.
@@ -240,8 +250,8 @@ export class PersonService {
         const issuedAt  = new Date().toISOString();
         const expiresAt = new Date(Date.now() + ttlMs).toISOString();
         const appPermissions = domainSvc
-            ? this.resolveAppPermissionsWithSuspensions(person, domainSvc)
-            : { bank: ["member"], market: ["member"], mail: ["member"] };
+            ? this.resolveAppPermissions(person, domainSvc)
+            : {};
 
         const payload = JSON.stringify({
             personId:           person.id,
@@ -375,6 +385,7 @@ export class PersonService {
         if (!person) throw new Error(`Person ${personId} not found`);
         if (password.length < 8) throw new Error("Password must be at least 8 characters");
         person.setPasswordHash(await hashSecret(password));
+        person.mustChangePassword = false;
         this.save(person);
     }
 

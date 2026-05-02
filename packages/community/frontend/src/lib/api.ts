@@ -32,17 +32,11 @@ export interface PersonDto {
     isSteward: boolean;
     joinDate: string;
     hasPassword: boolean;
+    mustChangePassword?: boolean;
+    /** Satellite apps this person has been enrolled in. */
+    apps: string[];
     /** Present on individual GET /api/persons/:handle; absent from list responses. */
     appPermissions?: Record<string, string[]>;
-}
-
-export interface AppSuspension {
-    id: string;
-    personId: string;
-    app: string;
-    reason: string;
-    suspendedAt: string;
-    suspendedBy: string;
 }
 
 export interface ConstitutionParam {
@@ -372,6 +366,17 @@ export async function setPassword(handle: string, password: string): Promise<voi
     }
 }
 
+export async function changeOwnPassword(password: string): Promise<void> {
+    const res = await apiFetch("/api/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({ password }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Failed to change password");
+    }
+}
+
 export async function setPin(handle: string, pin: string): Promise<void> {
     const res = await apiFetch(`/api/persons/${encodeURIComponent(handle)}/pin`, {
         method: "POST",
@@ -413,28 +418,24 @@ export async function revokeSteward(handle: string): Promise<PersonDto> {
     return res.json() as Promise<PersonDto>;
 }
 
-export async function suspendFromApp(handle: string, app: string, reason: string): Promise<AppSuspension> {
-    const res = await apiFetch(`/api/persons/${encodeURIComponent(handle)}/app-suspensions`, {
-        method: "POST",
-        body: JSON.stringify({ app, reason }),
-    });
+export async function grantPersonApp(handle: string, app: string): Promise<PersonDto> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(handle)}/apps/${encodeURIComponent(app)}`, { method: "POST" });
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Failed to suspend");
+        throw new Error(body.error ?? `Failed to grant ${app} access`);
     }
-    return res.json() as Promise<AppSuspension>;
+    return res.json() as Promise<PersonDto>;
 }
 
-export async function unsuspendFromApp(handle: string, app: string): Promise<void> {
-    const res = await apiFetch(
-        `/api/persons/${encodeURIComponent(handle)}/app-suspensions/${encodeURIComponent(app)}`,
-        { method: "DELETE" },
-    );
+export async function revokePersonApp(handle: string, app: string): Promise<PersonDto> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(handle)}/apps/${encodeURIComponent(app)}`, { method: "DELETE" });
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Failed to lift suspension");
+        throw new Error(body.error ?? `Failed to revoke ${app} access`);
     }
+    return res.json() as Promise<PersonDto>;
 }
+
 
 // ── Constitution ──────────────────────────────────────────────────────────────
 

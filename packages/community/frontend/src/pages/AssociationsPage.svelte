@@ -145,7 +145,7 @@
                         <div class="avatar">{a.name[0]}</div>
                         <div class="card-text">
                             <span class="card-name">{a.name}</span>
-                            <span class="card-handle">@{a.handle}</span>
+                            <span class="card-handle">{a.handle}</span>
                             {#if a.description}
                                 <span class="card-desc">{a.description}</span>
                             {/if}

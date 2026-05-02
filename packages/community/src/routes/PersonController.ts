@@ -118,6 +118,28 @@ export function revokeSteward(req: Request, res: Response): void {
     }
 }
 
+// POST /api/persons/:handle/apps/:app
+export async function grantApp(req: Request, res: Response): Promise<void> {
+    const person = svc().getByHandle(req.params.handle as string);
+    if (!person) { res.status(404).json({ error: "Person not found" }); return; }
+    const { app } = req.params;
+    const KNOWN = ["bank", "market", "mail"];
+    if (!KNOWN.includes(app as string)) {
+        res.status(400).json({ error: `Unknown app "${app}"` }); return;
+    }
+    const updated = await svc().grantApp(person.id, app as string);
+    res.json(toDto(updated));
+}
+
+// DELETE /api/persons/:handle/apps/:app
+export function revokeApp(req: Request, res: Response): void {
+    const person = svc().getByHandle(req.params.handle as string);
+    if (!person) { res.status(404).json({ error: "Person not found" }); return; }
+    const { app } = req.params;
+    const updated = svc().revokeApp(person.id, app as string);
+    res.json(toDto(updated));
+}
+
 /** Full DTO — includes phone and appPermissions; only used for the individual GET. */
 function toDto(p: Person) {
     return {
@@ -131,8 +153,9 @@ function toDto(p: Person) {
         isSteward:       svc().isSteward(p),
         languages:       p.languages,
         joinDate:        p.joinDate,
+        apps:            p.apps,
         credential:      p.credential,
-        appPermissions:  svc().resolveAppPermissionsWithSuspensions(p, DomainService.getInstance()),
+        appPermissions:  svc().resolveAppPermissions(p, DomainService.getInstance()),
     };
 }
 
@@ -148,5 +171,6 @@ function toListDto(p: Person) {
         isSteward:       svc().isSteward(p),
         languages:       p.languages,
         joinDate:        p.joinDate,
+        apps:            p.apps,
     };
 }

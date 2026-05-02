@@ -52,7 +52,15 @@ export function getMyAccounts(req: Request & { personId?: string }, res: Respons
     const personId = req.personId;
     if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
     const accounts = bank().getAccounts(personId);
-    res.json(accounts.map(toMemberAccountDto));
+    // Deduplicate by handle — keep the primary one if there are dupes (can happen if bank
+    // access was revoked and re-granted before the idempotency check was in place)
+    const seen = new Map<string, ReturnType<typeof toMemberAccountDto>>();
+    for (const a of accounts) {
+        const dto = toMemberAccountDto(a);
+        const existing = seen.get(dto.handle);
+        if (!existing || dto.primary) seen.set(dto.handle, dto);
+    }
+    res.json([...seen.values()]);
 }
 
 // GET /api/me/accounts/:handle — single account by handle

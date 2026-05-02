@@ -18,7 +18,9 @@ interface PersonRow {
     private_key_der:   string | null;
     public_key_hex:    string | null;
     languages:         string; // JSON
-    credential:        string | null; // JSON
+    apps:                 string; // JSON
+    must_change_password: number;
+    credential:           string | null; // JSON
 }
 
 export class PersonLoader {
@@ -32,29 +34,31 @@ export class PersonLoader {
                 (id, first_name, last_name, birth_date, join_date, handle,
                  disabled, retired, steward,
                  guardian_id, phone, pin_hash, password_hash,
-                 private_key_der, public_key_hex, languages, credential)
+                 private_key_der, public_key_hex, languages, apps, must_change_password, credential)
             VALUES
                 (@id, @first_name, @last_name, @birth_date, @join_date, @handle,
                  @disabled, @retired, @steward,
                  @guardian_id, @phone, @pin_hash, @password_hash,
-                 @private_key_der, @public_key_hex, @languages, @credential)
+                 @private_key_der, @public_key_hex, @languages, @apps, @must_change_password, @credential)
             ON CONFLICT(id) DO UPDATE SET
-                first_name        = excluded.first_name,
-                last_name         = excluded.last_name,
-                birth_date        = excluded.birth_date,
-                join_date         = excluded.join_date,
-                handle            = excluded.handle,
-                disabled          = excluded.disabled,
-                retired           = excluded.retired,
-                steward           = excluded.steward,
-                guardian_id       = excluded.guardian_id,
-                phone             = excluded.phone,
-                pin_hash          = excluded.pin_hash,
-                password_hash     = excluded.password_hash,
-                private_key_der   = excluded.private_key_der,
-                public_key_hex    = excluded.public_key_hex,
-                languages         = excluded.languages,
-                credential        = excluded.credential
+                first_name           = excluded.first_name,
+                last_name            = excluded.last_name,
+                birth_date           = excluded.birth_date,
+                join_date            = excluded.join_date,
+                handle               = excluded.handle,
+                disabled             = excluded.disabled,
+                retired              = excluded.retired,
+                steward              = excluded.steward,
+                guardian_id          = excluded.guardian_id,
+                phone                = excluded.phone,
+                pin_hash             = excluded.pin_hash,
+                password_hash        = excluded.password_hash,
+                private_key_der      = excluded.private_key_der,
+                public_key_hex       = excluded.public_key_hex,
+                languages            = excluded.languages,
+                apps                 = excluded.apps,
+                must_change_password = excluded.must_change_password,
+                credential           = excluded.credential
         `).run({
             id:                person.id,
             first_name:        person.firstName,
@@ -71,8 +75,10 @@ export class PersonLoader {
             password_hash:     passwordHash ?? null,
             private_key_der:   privateKeyDer ?? null,
             public_key_hex:    publicKeyHex ?? null,
-            languages:         JSON.stringify(person.languages),
-            credential:        person.credential ? JSON.stringify(person.credential) : null,
+            languages:            JSON.stringify(person.languages),
+            apps:                 JSON.stringify(person.apps),
+            must_change_password: person.mustChangePassword ? 1 : 0,
+            credential:           person.credential ? JSON.stringify(person.credential) : null,
         });
     }
 
@@ -99,12 +105,14 @@ export class PersonLoader {
             steward:         r.steward === 1,
             guardianId:      r.guardian_id ?? null,
             phone:           r.phone ?? null,
-            pinHash:         r.pin_hash ?? null,
-            passwordHash:    r.password_hash ?? null,
-            privateKeyDer:   r.private_key_der ?? null,
-            publicKeyHex:    r.public_key_hex ?? null,
-            languages:       JSON.parse(r.languages) as LanguageProficiency[],
-            credential:      r.credential ? JSON.parse(r.credential) as PersonCredential : null,
+            pinHash:            r.pin_hash ?? null,
+            passwordHash:       r.password_hash ?? null,
+            mustChangePassword: r.must_change_password === 1,
+            privateKeyDer:      r.private_key_der ?? null,
+            publicKeyHex:       r.public_key_hex ?? null,
+            languages:          JSON.parse(r.languages) as LanguageProficiency[],
+            apps:               JSON.parse(r.apps ?? "[]") as string[],
+            credential:         r.credential ? JSON.parse(r.credential) as PersonCredential : null,
         });
     }
 }

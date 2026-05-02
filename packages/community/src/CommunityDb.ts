@@ -57,22 +57,14 @@ export class CommunityDb {
                 password_hash     TEXT,
                 private_key_der   TEXT,
                 public_key_hex    TEXT,
-                languages         TEXT NOT NULL DEFAULT '[]',
-                credential        TEXT
+                languages            TEXT NOT NULL DEFAULT '[]',
+                apps                 TEXT NOT NULL DEFAULT '[]',
+                must_change_password INTEGER NOT NULL DEFAULT 0,
+                credential           TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_persons_handle ON persons(handle);
             CREATE INDEX IF NOT EXISTS idx_persons_phone  ON persons(phone) WHERE phone IS NOT NULL;
 
-            -- ── App suspensions ───────────────────────────────────────────────────────
-            CREATE TABLE IF NOT EXISTS app_suspensions (
-                id           TEXT PRIMARY KEY,
-                person_id    TEXT NOT NULL,
-                app          TEXT NOT NULL,
-                reason       TEXT NOT NULL,
-                suspended_at TEXT NOT NULL,
-                suspended_by TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_suspensions_person ON app_suspensions(person_id);
 
             -- ── Locations ─────────────────────────────────────────────────────────────
             CREATE TABLE IF NOT EXISTS locations (

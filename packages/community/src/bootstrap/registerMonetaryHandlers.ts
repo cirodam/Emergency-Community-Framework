@@ -15,10 +15,16 @@ import { CommunityLogService } from "../log/CommunityLogService.js";
  */
 export function registerMonetaryHandlers(bank: BankClient): void {
 
-    // On join: open a primary kin account and issue the age-derived endowment.
-    // Non-fatal: if the bank is temporarily unreachable the person record still
-    // commits — the monetary operations are best-effort at join time.
+    // On join: just log. Bank account and endowment are deferred until
+    // bank access is explicitly granted (see onPersonBankAccessGranted below).
     PersonService.getInstance().onPersonJoined(async (person) => {
+        try {
+            CommunityLogService.getInstance().write("member-joined", `${person.firstName} ${person.lastName} joined the community`, { actorId: person.id, refId: person.id });
+        } catch { /* */ }
+    });
+
+    // On bank access granted: open a primary kin account and issue the age-derived endowment.
+    PersonService.getInstance().onPersonBankAccessGranted(async (person) => {
         const displayName  = `${person.firstName} ${person.lastName}`;
         const centralBank  = CentralBank.getInstance();
         const siBank       = SocialInsuranceBank.getInstance();
@@ -26,20 +32,20 @@ export function registerMonetaryHandlers(bank: BankClient): void {
         const constitution = Constitution.getInstance();
 
         try {
+            // Don't open a second account if they already have one (e.g. access was revoked and re-granted)
+            const existing = await bank.getPrimaryAccountAsync(person.id);
+            if (existing) {
+                logger.info(`[community] @${person.handle} already has a bank account — skipping account creation`);
+                return;
+            }
             const memberAccount = await bank.openAccount(person.id, displayName, "kin", 0, person.handle, true);
             logger.info(`[community] opened bank account for @${person.handle}`);
-            try { CommunityLogService.getInstance().write("member-joined", `${person.firstName} ${person.lastName} joined the community`, { actorId: person.id, refId: person.id }); } catch { /* */ }
 
             if (!centralBank.isReady() || !siBank.isReady() || !treasury.isReady()) {
                 logger.warn(`[community] monetary institutions not ready — skipping issuance for @${person.handle}`);
                 return;
             }
 
-            // Age-derived back-endowment: floor(age in years) × kinPerPersonYear.
-            // All kin is issued into the community fund first; the fund then
-            // distributes per policy: pool fraction → insurance fund,
-            // remainder stays in the community treasury.
-            // For newborns (age 0) the endowment is 0 and no issuance occurs.
             const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
             const ageInYears  = Math.floor((Date.now() - person.birthDate.getTime()) / MS_PER_YEAR);
             const endowment   = ageInYears * constitution.kinPerPersonYear;
@@ -54,7 +60,6 @@ export function registerMonetaryHandlers(bank: BankClient): void {
 
             await centralBank.issue(endowment, treasury.accountId,          "join endowment — community fund");
             await treasury.transfer(siBank.poolAccountId, poolAmount,       "join endowment — insurance fund");
-            // treasuryAmount remains in the community fund
 
             siBank.recordContribution(person.id, poolAmount);
 
@@ -63,7 +68,7 @@ export function registerMonetaryHandlers(bank: BankClient): void {
                 `${endowment} kin (community treasury: ${treasuryAmount}, insurance: ${poolAmount})`,
             );
         } catch (err) {
-            logger.warn(`[community] join handler failed for @${person.handle}: ${(err as Error).message}`);
+            logger.warn(`[community] bank access grant handler failed for @${person.handle}: ${(err as Error).message}`);
         }
     });
 

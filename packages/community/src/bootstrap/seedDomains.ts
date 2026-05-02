@@ -70,7 +70,7 @@ export function seedDomains(domainSvc: DomainService): void {
     domainSvc.registerDomain(SocialInsuranceBank.getInstance());
     if (SocialInsuranceBank.getInstance().unitIds.length === 0) {
         domainSvc.createUnit(
-            new FunctionalUnit("Social Insurance Office", "The central administrative office of the social insurance bank.", "office"),
+            new FunctionalUnit("Retirement Office", "The central administrative office of the community retirement fund.", "office"),
             SocialInsuranceBank.getInstance().id,
         );
     }

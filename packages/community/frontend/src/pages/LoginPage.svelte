@@ -1,7 +1,8 @@
 <script lang="ts">
     import ErrorBanner from "../components/ErrorBanner.svelte";
     import { session, currentPage } from "../lib/session.js";
-    import { login } from "../lib/api.js";
+    import { login, changeOwnPassword } from "../lib/api.js";
+    import type { PersonDto } from "../lib/api.js";
 
     const { onApply }: { onApply?: () => void } = $props();
 
@@ -9,6 +10,14 @@
     let password = $state("");
     let error    = $state("");
     let loading  = $state(false);
+
+    // Must-change-password step
+    let mustChange      = $state(false);
+    let pendingPerson:  (PersonDto & { token: string }) | null = $state(null);
+    let newPassword     = $state("");
+    let confirmPassword = $state("");
+    let changeError     = $state("");
+    let changeLoading   = $state(false);
 
     // Other ECF services redirect here with ?return=<origin> after which we
     // hand the credential back via a hash fragment so it never hits a server.
@@ -22,6 +31,14 @@
         loading = true;
         try {
             const person = await login(handle.trim().toLowerCase(), password);
+
+            if (person.mustChangePassword) {
+                // Log in so subsequent API calls have a token, then intercept.
+                session.login(person);
+                pendingPerson = person;
+                mustChange = true;
+                return;
+            }
 
             if (returnUrl && (returnUrl.startsWith("http://") || returnUrl.startsWith("https://"))) {
                 // Hand the session payload back to the requesting service via
@@ -46,54 +63,110 @@
             loading = false;
         }
     }
+
+    async function submitPasswordChange() {
+        changeError = "";
+        if (newPassword.length < 8)              { changeError = "Password must be at least 8 characters"; return; }
+        if (newPassword !== confirmPassword)      { changeError = "Passwords do not match"; return; }
+        changeLoading = true;
+        try {
+            await changeOwnPassword(newPassword);
+            // Proceed normally after changing password
+            if (returnUrl && (returnUrl.startsWith("http://") || returnUrl.startsWith("https://"))) {
+                const p = pendingPerson!;
+                const payload = btoa(encodeURIComponent(JSON.stringify({
+                    token:     p.token,
+                    id:        p.id,
+                    firstName: p.firstName,
+                    lastName:  p.lastName,
+                    handle:    p.handle,
+                })));
+                window.location.href = `${returnUrl}#session=${payload}`;
+            } else {
+                currentPage.go("profile");
+            }
+        } catch (e) {
+            changeError = e instanceof Error ? e.message : "Failed to change password";
+        } finally {
+            changeLoading = false;
+        }
+    }
 </script>
 
 <div class="login-page">
     <header class="login-header">
         <div class="logo">⊚</div>
         <h1>Community Portal</h1>
-        <p>Sign in with your handle</p>
+        <p>{mustChange ? "Set your password" : "Sign in with your handle"}</p>
     </header>
 
     <div class="login-body">
-        <ErrorBanner message={error} />
-
-        <form onsubmit={(e) => { e.preventDefault(); submit(); }}>
-            <label class="field">
-                <span>Handle</span>
-                <div class="handle-input">
+        {#if mustChange}
+            <p class="must-change-notice">Your account uses a temporary password. Choose a new password to continue.</p>
+            <ErrorBanner message={changeError} />
+            <form onsubmit={(e) => { e.preventDefault(); submitPasswordChange(); }}>
+                <label class="field">
+                    <span>New password</span>
                     <input
-                        type="text"
-                        bind:value={handle}
-                        placeholder="your_handle"
-                        autocomplete="username"
-                        autocapitalize="none"
-                        spellcheck={false}
+                        type="password"
+                        bind:value={newPassword}
+                        autocomplete="new-password"
+                        disabled={changeLoading}
+                    />
+                </label>
+                <label class="field">
+                    <span>Confirm password</span>
+                    <input
+                        type="password"
+                        bind:value={confirmPassword}
+                        autocomplete="new-password"
+                        disabled={changeLoading}
+                    />
+                </label>
+                <button type="submit" class="btn-primary" disabled={changeLoading}>
+                    {changeLoading ? "Saving…" : "Set password"}
+                </button>
+            </form>
+        {:else}
+            <ErrorBanner message={error} />
+
+            <form onsubmit={(e) => { e.preventDefault(); submit(); }}>
+                <label class="field">
+                    <span>Handle</span>
+                    <div class="handle-input">
+                        <input
+                            type="text"
+                            bind:value={handle}
+                            placeholder="your_handle"
+                            autocomplete="username"
+                            autocapitalize="none"
+                            spellcheck={false}
+                            disabled={loading}
+                        />
+                    </div>
+                </label>
+
+                <label class="field">
+                    <span>Password</span>
+                    <input
+                        type="password"
+                        bind:value={password}
+                        autocomplete="current-password"
                         disabled={loading}
                     />
-                </div>
-            </label>
+                </label>
 
-            <label class="field">
-                <span>Password</span>
-                <input
-                    type="password"
-                    bind:value={password}
-                    autocomplete="current-password"
-                    disabled={loading}
-                />
-            </label>
+                <button type="submit" class="btn-primary" disabled={loading}>
+                    {loading ? "Signing in…" : "Sign in"}
+                </button>
+            </form>
 
-            <button type="submit" class="btn-primary" disabled={loading}>
-                {loading ? "Signing in…" : "Sign in"}
-            </button>
-        </form>
-
-        {#if onApply}
-            <p class="apply-link">
-                Not a member yet?
-                <button class="link-btn" onclick={onApply}>Apply to join</button>
-            </p>
+            {#if onApply}
+                <p class="apply-link">
+                    Not a member yet?
+                    <button class="link-btn" onclick={onApply}>Apply to join</button>
+                </p>
+            {/if}
         {/if}
     </div>
 </div>
@@ -195,6 +268,16 @@
         text-align: center;
         font-size: 0.9rem;
         color: #64748b;
+        margin: 0;
+    }
+
+    .must-change-notice {
+        background: #fef9c3;
+        border: 1px solid #fde68a;
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+        color: #713f12;
         margin: 0;
     }
 

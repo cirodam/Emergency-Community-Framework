@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { listPersons, getPerson, setPassword, grantSteward, revokeSteward, suspendFromApp, unsuspendFromApp } from "../lib/api.js";
+    import { listPersons, getPerson, setPassword, grantSteward, revokeSteward, grantPersonApp, revokePersonApp } from "../lib/api.js";
     import type { PersonDto } from "../lib/api.js";
     import { session } from "../lib/session.js";
 
@@ -22,11 +22,10 @@
     let stewardError = $state("");
     let stewardWorking = $state(false);
 
-    // ── Suspension state ───────────────────────────────────────────────────────
-    let suspendingApp: string | null = $state(null);
-    let suspendReason = $state("");
-    let suspendWorking = $state(false);
-    let suspendError = $state("");
+    // ── App access state ──────────────────────────────────────────────────────
+    let appAccessWorking = $state(false);
+    let appAccessError = $state("");
+    const ALL_APPS = ["bank", "market", "mail"];
 
     async function load() {
         loading = true;
@@ -64,9 +63,6 @@
         resetError = "";
         resetOk    = false;
         stewardError = "";
-        suspendingApp = null;
-        suspendReason = "";
-        suspendError  = "";
         if (newHandle) {
             detailLoading = true;
             try { expandedDetail = await getPerson(newHandle); } catch { /* keep null */ }
@@ -112,28 +108,29 @@
         }
     }
 
-    async function doSuspend(handle: string, app: string) {
-        suspendWorking = true; suspendError = "";
+    async function doGrantApp(handle: string, app: string) {
+        appAccessWorking = true; appAccessError = "";
         try {
-            await suspendFromApp(handle, app, suspendReason);
-            expandedDetail = await getPerson(handle);
-            suspendingApp = null; suspendReason = "";
+            const updated = await grantPersonApp(handle, app);
+            members = members.map(m => m.handle === handle ? updated : m);
+            expandedDetail = updated;
         } catch (e) {
-            suspendError = e instanceof Error ? e.message : "Failed to suspend";
+            appAccessError = e instanceof Error ? e.message : "Failed to grant access";
         } finally {
-            suspendWorking = false;
+            appAccessWorking = false;
         }
     }
 
-    async function doUnsuspend(handle: string, app: string) {
-        suspendWorking = true; suspendError = "";
+    async function doRevokeApp(handle: string, app: string) {
+        appAccessWorking = true; appAccessError = "";
         try {
-            await unsuspendFromApp(handle, app);
-            expandedDetail = await getPerson(handle);
+            const updated = await revokePersonApp(handle, app);
+            members = members.map(m => m.handle === handle ? updated : m);
+            expandedDetail = updated;
         } catch (e) {
-            suspendError = e instanceof Error ? e.message : "Failed to lift suspension";
+            appAccessError = e instanceof Error ? e.message : "Failed to revoke access";
         } finally {
-            suspendWorking = false;
+            appAccessWorking = false;
         }
     }
 </script>
@@ -189,58 +186,27 @@
                                 <p class="detail-phone">📞 {m.phone}</p>
                             {/if}
 
-                            {#if expandedDetail?.appPermissions}
-                                <div class="app-perms-section">
-                                    <p class="reset-label">App Access</p>
-                                    {#each Object.entries(expandedDetail.appPermissions) as [app, perms]}
-                                        <div class="app-perm-row">
-                                            <span class="app-name">{app}</span>
-                                            <div class="perm-badges">
-                                                {#if perms.length === 0}
-                                                    <span class="badge perm-suspended">Suspended</span>
-                                                {:else}
-                                                    {#each perms as p}
-                                                        <span class="badge perm-{p}">{p}</span>
-                                                    {/each}
-                                                {/if}
-                                            </div>
-                                            {#if $session?.isSteward && m.handle !== $session.handle}
-                                                {#if perms.length === 0}
-                                                    <button
-                                                        class="btn-lift"
-                                                        onclick={() => doUnsuspend(m.handle, app)}
-                                                        disabled={suspendWorking}
-                                                    >{suspendWorking ? "…" : "Lift"}</button>
-                                                {:else if suspendingApp === app}
-                                                    <div class="suspend-confirm">
-                                                        <input
-                                                            class="suspend-reason"
-                                                            bind:value={suspendReason}
-                                                            placeholder="Reason (optional)"
-                                                        />
-                                                        <button
-                                                            class="btn-suspend-confirm"
-                                                            onclick={() => doSuspend(m.handle, app)}
-                                                            disabled={suspendWorking}
-                                                        >{suspendWorking ? "…" : "Confirm"}</button>
-                                                        <button
-                                                            class="btn-cancel"
-                                                            onclick={() => { suspendingApp = null; suspendReason = ""; }}
-                                                        >Cancel</button>
-                                                    </div>
-                                                {:else}
-                                                    <button
-                                                        class="btn-suspend"
-                                                        onclick={() => { suspendingApp = app; suspendReason = ""; }}
-                                                    >Suspend</button>
-                                                {/if}
-                                            {/if}
-                                        </div>
-                                    {/each}
-                                    {#if suspendError}<p class="reset-error">{suspendError}</p>{/if}
-                                </div>
-                            {:else if detailLoading}
+                            {#if detailLoading}
                                 <p class="detail-loading">Loading…</p>
+                            {/if}
+
+                            {#if $session?.isSteward}
+                                <div class="app-access-section">
+                                    <p class="reset-label">App access</p>
+                                    <div class="app-access-row">
+                                        {#each ALL_APPS as app}
+                                            {@const enrolled = (expandedDetail ?? m).apps?.includes(app) ?? false}
+                                            <button
+                                                class="app-toggle"
+                                                class:enrolled
+                                                onclick={() => enrolled ? doRevokeApp(m.handle, app) : doGrantApp(m.handle, app)}
+                                                disabled={appAccessWorking}
+                                                title={enrolled ? `Remove ${app} access` : `Grant ${app} access`}
+                                            >{app}</button>
+                                        {/each}
+                                    </div>
+                                    {#if appAccessError}<p class="reset-error">{appAccessError}</p>{/if}
+                                </div>
                             {/if}
 
                             {#if $session?.isSteward}
@@ -454,6 +420,42 @@
 
     .reset-section { margin-bottom: 0; }
 
+    .app-access-section { margin-bottom: 1rem; }
+
+    .app-access-row {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .app-toggle {
+        padding: 0.3rem 0.75rem;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        color: #64748b;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+
+    .app-toggle.enrolled {
+        background: #dcfce7;
+        border-color: #86efac;
+        color: #166534;
+    }
+
+    .app-toggle:hover:not(:disabled) {
+        border-color: #94a3b8;
+        color: #1e293b;
+    }
+
+    .app-toggle.enrolled:hover:not(:disabled) {
+        background: #fef2f2;
+        border-color: #fca5a5;
+        color: #991b1b;
+    }
+
     .reset-label {
         font-size: 0.75rem;
         font-weight: 600;
@@ -567,98 +569,7 @@
         white-space: nowrap;
     }
 
-    /* ── App permissions ── */
-    .app-perms-section { margin-bottom: 0.75rem; }
-
-    .app-perm-row {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.3rem 0;
-        flex-wrap: wrap;
-    }
-
-    .app-name {
-        font-size: 0.8rem;
-        font-weight: 600;
-        color: #475569;
-        width: 3.5rem;
-        flex-shrink: 0;
-        text-transform: capitalize;
-    }
-
-    .perm-badges { display: flex; gap: 0.3rem; flex-wrap: wrap; flex: 1; }
-
-    .badge.perm-member     { background: #f1f5f9; color: #64748b; }
-    .badge.perm-teller     { background: #dbeafe; color: #1d4ed8; }
-    .badge.perm-coordinator{ background: #ede9fe; color: #7c3aed; }
-    .badge.perm-admin      { background: #fef3c7; color: #d97706; }
-    .badge.perm-moderator  { background: #d1fae5; color: #065f46; }
-    .badge.perm-suspended  { background: #fee2e2; color: #b91c1c; }
-
-    .btn-suspend {
-        font-size: 0.75rem;
-        font-weight: 600;
-        padding: 0.2rem 0.6rem;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        background: #fee2e2;
-        color: #b91c1c;
-        transition: background 0.15s;
-        white-space: nowrap;
-        flex-shrink: 0;
-    }
-    .btn-suspend:hover { background: #fecaca; }
-
-    .btn-lift {
-        font-size: 0.75rem;
-        font-weight: 600;
-        padding: 0.2rem 0.6rem;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        background: #d1fae5;
-        color: #065f46;
-        transition: background 0.15s;
-        white-space: nowrap;
-        flex-shrink: 0;
-    }
-    .btn-lift:hover:not(:disabled) { background: #a7f3d0; }
-    .btn-lift:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    .suspend-confirm {
-        display: flex;
-        gap: 0.4rem;
-        align-items: center;
-        flex-wrap: wrap;
-        flex: 1;
-    }
-
-    .suspend-reason {
-        flex: 1;
-        min-width: 8rem;
-        padding: 0.25rem 0.5rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        font-size: 0.8rem;
-        font-family: inherit;
-        outline: none;
-    }
-    .suspend-reason:focus { border-color: #b91c1c; }
-
-    .btn-suspend-confirm {
-        font-size: 0.75rem;
-        font-weight: 600;
-        padding: 0.25rem 0.6rem;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        background: #b91c1c;
-        color: #fff;
-        white-space: nowrap;
-    }
-    .btn-suspend-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
+    /* ── App permissions ───────────────────────────────────────────────────────────────── */
 
     .btn-cancel {
         font-size: 0.75rem;

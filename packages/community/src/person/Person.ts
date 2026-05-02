@@ -40,12 +40,16 @@ export class Person implements IEconomicActor {
     guardianId: string | null;
     phone: string | null;       // E.164, e.g. "+15551234567". null if no phone.
     languages: LanguageProficiency[];
+    /** Satellite apps this person has been enrolled in (e.g. ["bank", "market", "mail"]). */
+    apps: string[];
 
     /**
      * The community-signed credential binding this person's public key to their identity.
      * Null until explicitly issued (see PersonService.issueCredential).
      */
     credential: PersonCredential | null = null;
+
+    mustChangePassword: boolean = false;
 
     private _pinHash: string | null = null;
     private _passwordHash: string | null = null;
@@ -77,6 +81,7 @@ export class Person implements IEconomicActor {
         this.guardianId = guardianId;
         this.phone = phone;
         this.languages = languages;
+        this.apps = [];
 
         const { privateKey, publicKey } = generateKeyPairSync("ed25519");
         this._privateKey = privateKey;
@@ -108,6 +113,7 @@ export class Person implements IEconomicActor {
         disabled: boolean;
         retired: boolean;
         steward: boolean;
+        mustChangePassword: boolean;
         guardianId: string | null;
         phone: string | null;
         pinHash: string | null;
@@ -115,6 +121,7 @@ export class Person implements IEconomicActor {
         privateKeyDer: string | null;
         publicKeyHex: string | null;
         languages: LanguageProficiency[];
+        apps: string[];
         credential: PersonCredential | null;
     }): Person {
         const p = new Person(
@@ -131,6 +138,8 @@ export class Person implements IEconomicActor {
         (p as unknown as Record<string, unknown>)["joinDate"] = record.joinDate;
         p.retired = record.retired;
         p.steward = record.steward;
+        p.mustChangePassword = record.mustChangePassword ?? false;
+        p.apps = record.apps ?? [];
         p.credential = record.credential;
         p._pinHash = record.pinHash;
         p._passwordHash = record.passwordHash;

@@ -1,7 +1,7 @@
 <script lang="ts">
     import ErrorBanner from "../components/ErrorBanner.svelte";
     import { session } from "../lib/session.js";
-    import { getPerson, setPin, updatePerson, setPassword } from "../lib/api.js";
+    import { getPerson, setPin, updatePerson, changeOwnPassword } from "../lib/api.js";
     import type { PersonDto } from "../lib/api.js";
 
     const s = $derived($session!);
@@ -81,7 +81,7 @@
         if (newPassword.length < 8) { passError = "Password must be at least 8 characters"; return; }
         passLoading = true;
         try {
-            await setPassword(s.handle, newPassword);
+            await changeOwnPassword(newPassword);
             session.refresh({ hasPassword: true });
             passOk = true;
             newPassword = "";

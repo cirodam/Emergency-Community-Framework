@@ -5,7 +5,7 @@ import { SocialInsuranceMemberLoader } from "./SocialInsuranceMemberLoader.js";
 import { SocialInsuranceBankLoader } from "./SocialInsuranceBankLoader.js";
 import { FunctionalDomain } from "../../common/domain/FunctionalDomain.js";
 
-export const SOCIAL_INSURANCE_DOMAIN_ID = "ecf-domain-social-insurance-000003";
+export const SOCIAL_INSURANCE_DOMAIN_ID = "ecf-domain-retirement-000003";
 
 /**
  * The Social Insurance Bank maintains the community retirement pool.
@@ -38,7 +38,7 @@ export class SocialInsuranceBank extends FunctionalDomain {
     private memberLoader!: SocialInsuranceMemberLoader;
 
     private constructor() {
-        super("Social Insurance", "Community retirement pool. Members contribute throughout their working life and draw equal monthly payments in retirement.", SOCIAL_INSURANCE_DOMAIN_ID);
+        super("Retirement", "Community retirement pool. Members contribute throughout their working life and draw equal monthly payments in retirement.", SOCIAL_INSURANCE_DOMAIN_ID);
     }
 
     static getInstance(): SocialInsuranceBank {
@@ -82,7 +82,7 @@ export class SocialInsuranceBank extends FunctionalDomain {
             "Social Insurance Bank",
             "kin",
             0,
-            "insurance",
+            "retirement",
             true,
         );
         this._poolAccountId = account.accountId;

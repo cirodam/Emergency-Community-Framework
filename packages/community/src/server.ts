@@ -52,8 +52,6 @@ import { NominationLoader } from "./nomination/NominationLoader.js";
 import { NominationService } from "./nomination/NominationService.js";
 import { ShiftLoader } from "./shift/ShiftLoader.js";
 import { ShiftService } from "./shift/ShiftService.js";
-import { AppSuspensionLoader } from "./person/AppSuspensionLoader.js";
-import { AppSuspensionService } from "./person/AppSuspensionService.js";
 import { CommunityLogLoader } from "./log/CommunityLogLoader.js";
 import { CommunityLogService } from "./log/CommunityLogService.js";
 
@@ -152,9 +150,7 @@ async function main(): Promise<void> {
     const personLoader = new PersonLoader();
     PersonService.getInstance().init(personLoader);
     PersonService.getInstance().setCommunitySigner(communitySigner);
-    // ── App suspensions ────────────────────────────────────────────────
-    const suspensionLoader = new AppSuspensionLoader();
-    AppSuspensionService.getInstance().init(suspensionLoader);
+
     // ── Member applications ────────────────────────────────────────────────
     const appLoader = new MemberApplicationLoader();
     MemberApplicationService.getInstance().init(appLoader);

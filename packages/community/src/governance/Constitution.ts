@@ -453,7 +453,7 @@ export class Constitution {
     /** Set the community's federation handle. Validated: lowercase alphanumeric + hyphens,
      *  no leading/trailing hyphens, 2–32 characters. */
     setCommunityHandle(handle: string): void {
-        const h = handle.toLowerCase().trim();
+        const h = handle.toLowerCase().trim().replace(/_/g, "-");
         if (!/^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$|^[a-z0-9]{1,2}$/.test(h)) {
             throw new Error(
                 `Invalid community handle "${handle}". Use 2–32 characters: lowercase letters, digits, hyphens (no leading/trailing hyphens).`,

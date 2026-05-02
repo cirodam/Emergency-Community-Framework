@@ -2,7 +2,6 @@ import { Router } from "express";
 import { requireAuth, requireSteward } from "./middleware.js";
 import * as persons from "./PersonController.js";
 import * as auth from "./AuthController.js";
-import * as suspensions from "./AppSuspensionController.js";
 
 const router = Router();
 
@@ -16,14 +15,12 @@ router.post(  "/persons/:handle/password",             ...requireSteward, auth.s
 router.post(  "/persons/:handle/pin",                  ...requireSteward, auth.setPin);
 router.post(  "/persons/:handle/steward",              ...requireSteward, persons.grantSteward);
 router.delete("/persons/:handle/steward",              ...requireSteward, persons.revokeSteward);
+router.post(  "/persons/:handle/apps/:app",            ...requireSteward, persons.grantApp);
+router.delete("/persons/:handle/apps/:app",            ...requireSteward, persons.revokeApp);
 
-// ── App suspensions (steward-only write, steward-only full read) ──────────────
-router.get(   "/persons/:handle/app-suspensions",          ...requireSteward, suspensions.listPersonSuspensions);
-router.post(  "/persons/:handle/app-suspensions",          ...requireSteward, suspensions.suspendFromApp);
-router.delete("/persons/:handle/app-suspensions/:app",     ...requireSteward, suspensions.unsuspendFromApp);
-router.get(   "/app-suspensions/full",                 ...requireSteward, suspensions.listSuspensionsFull);
 
-router.post("/auth/login",  auth.login);
-router.post("/auth/verify", auth.verifyCredential);
+router.post("/auth/login",           auth.login);
+router.post("/auth/verify",          auth.verifyCredential);
+router.post("/auth/change-password", requireAuth, auth.changeOwnPassword);
 
 export default router;

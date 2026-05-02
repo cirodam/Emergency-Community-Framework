@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PersonService } from "../person/PersonService.js";
 import { DomainService } from "../DomainService.js";
 import { Person } from "../person/Person.js";
+import type { AuthedRequest } from "@ecf/core";
 
 const svc = () => PersonService.getInstance();
 
@@ -26,17 +27,18 @@ function checkLoginRateLimit(ip: string): boolean {
 
 function toPersonDto(p: Person) {
     return {
-        id:        p.id,
-        firstName: p.firstName,
-        lastName:  p.lastName,
-        handle:    p.handle,
-        phone:     p.phone,
-        disabled:  p.disabled,
-        retired:   p.retired,
-        steward:   p.steward,
-        isSteward: svc().isSteward(p),
-        joinDate:  p.joinDate,
-        hasPassword: p.hasPassword(),
+        id:                p.id,
+        firstName:         p.firstName,
+        lastName:          p.lastName,
+        handle:            p.handle,
+        phone:             p.phone,
+        disabled:          p.disabled,
+        retired:           p.retired,
+        steward:           p.steward,
+        isSteward:         svc().isSteward(p),
+        joinDate:          p.joinDate,
+        hasPassword:       p.hasPassword(),
+        mustChangePassword: p.mustChangePassword,
     };
 }
 
@@ -104,4 +106,21 @@ export function verifyCredential(req: Request, res: Response): void {
     }
     const valid = svc().verifyCredential(credential);
     res.json({ valid });
+}
+
+// POST /api/auth/change-password
+// Body: { password }
+// Requires: requireAuth — changes the caller's own password and clears mustChangePassword.
+export async function changeOwnPassword(req: Request, res: Response): Promise<void> {
+    const { password } = (req as AuthedRequest).body ?? {};
+    if (typeof password !== "string" || password.length < 8) {
+        res.status(400).json({ error: "password must be at least 8 characters" }); return;
+    }
+    const personId = (req as AuthedRequest).personId;
+    try {
+        await svc().setPassword(personId, password);
+        res.status(204).send();
+    } catch (err) {
+        res.status(404).json({ error: (err as Error).message });
+    }
 }

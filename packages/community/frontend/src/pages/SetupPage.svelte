@@ -10,6 +10,7 @@
 
     let communityName   = $state("");
     let communityHandle = $state("");
+    let communityHandleEdited = $state(false);
     let firstName     = $state("");
     let lastName      = $state("");
     let birthDate     = $state("");
@@ -29,7 +30,7 @@
     );
 
     $effect(() => {
-        if (!communityHandle && suggestedCommunityHandle) {
+        if (!communityHandleEdited) {
             communityHandle = suggestedCommunityHandle;
         }
     });
@@ -102,6 +103,7 @@
                     <input
                         type="text"
                         bind:value={communityHandle}
+                        oninput={() => communityHandleEdited = true}
                         placeholder="e.g. sunridge-community"
                         autocomplete="off"
                         autocapitalize="none"

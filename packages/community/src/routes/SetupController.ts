@@ -67,6 +67,12 @@ async function seedPopulation(svc: PersonService): Promise<number> {
         const isChild = birthDate > new Date(Date.now() - 18 * 365.25 * 86400_000);
         const person = new Person(firstName, lastName, birthDate, handle, false, null, null, []);
         await svc.add(person);
+        // Seed adults with all apps; children get community-only by default
+        if (!isChild) {
+            await svc.grantApp(person.id, "bank");
+            await svc.grantApp(person.id, "market");
+            await svc.grantApp(person.id, "mail");
+        }
     }
 
     return count;
@@ -131,6 +137,11 @@ export async function setup(req: Request, res: Response): Promise<void> {
 
     // Grant the founder explicit stewardship
     svc().grantSteward(person.id);
+
+    // Grant the founder access to all satellite apps
+    await svc().grantApp(person.id, "bank");
+    await svc().grantApp(person.id, "market");
+    await svc().grantApp(person.id, "mail");
 
     // Set the community name and handle in the constitution and persist
     Constitution.getInstance().setCommunityName(communityName.trim());

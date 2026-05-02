@@ -150,7 +150,7 @@
                 <div class="hero-avatar">{assoc.name[0]}</div>
                 <div>
                     <h2 class="hero-name">{assoc.name}</h2>
-                    <p class="hero-handle">@{assoc.handle}</p>
+                    <p class="hero-handle">{assoc.handle}</p>
                     {#if assoc.description}
                         <p class="hero-desc">{assoc.description}</p>
                     {/if}
@@ -190,7 +190,7 @@
                                 <div class="mini-avatar">{m.firstName[0]}{m.lastName[0]}</div>
                                 <div class="member-info">
                                     <span class="member-name">{m.firstName} {m.lastName}</span>
-                                    <span class="member-handle">@{m.handle}</span>
+                                    <span class="member-handle">{m.handle}</span>
                                 </div>
                                 {#if memberIsAdmin}
                                     <span class="admin-badge">admin</span>
