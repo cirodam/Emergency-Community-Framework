@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { getDomain, listUnits, listTemplates, createUnit, getPool, listPools, updateDomain, getDomainBudget, addBudgetItem, removeBudgetItem } from "../lib/api.js";
-    import type { DomainDto, UnitDto, TemplateDto, PoolDto, DomainBudgetDto, BudgetItem } from "../lib/api.js";
+    import { getDomain, listUnits, getPool, listPools, updateDomain, getDomainBudget, addBudgetItem, removeBudgetItem } from "../lib/api.js";
+    import type { DomainDto, UnitDto, PoolDto, DomainBudgetDto, BudgetItem } from "../lib/api.js";
     import { currentPage, selectedDomainId, selectedUnitId } from "../lib/session.js";
 
     let domain: DomainDto | null = $state(null);
@@ -8,13 +8,6 @@
     let budget: DomainBudgetDto | null = $state(null);
     let loading = $state(true);
     let error = $state("");
-
-    // Unit picker state
-    let showPicker = $state(false);
-    let templates = $state<TemplateDto[]>([]);
-    let templatesLoading = $state(false);
-    let addingType = $state<string | null>(null);
-    let addError = $state("");
 
     // Leadership pool state
     let pool = $state<PoolDto | null>(null);
@@ -53,39 +46,6 @@
         const id = $selectedDomainId;
         if (id) load(id);
     });
-
-    async function openPicker() {
-        showPicker = true;
-        addError = "";
-        if (templates.length === 0) {
-            templatesLoading = true;
-            try {
-                templates = await listTemplates();
-            } finally {
-                templatesLoading = false;
-            }
-        }
-    }
-
-    function closePicker() {
-        showPicker = false;
-        addError = "";
-    }
-
-    async function addUnit(type: string) {
-        if (!domain) return;
-        addingType = type;
-        addError = "";
-        try {
-            await createUnit(type, domain.id);
-            await load(domain.id);
-            showPicker = false;
-        } catch (e) {
-            addError = e instanceof Error ? e.message : "Failed to add unit";
-        } finally {
-            addingType = null;
-        }
-    }
 
     async function openPoolPicker() {
         showPoolPicker = true;
@@ -169,8 +129,6 @@
         return new Date(date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
     }
 
-    // Types already present in this domain
-    const presentTypes = $derived(new Set(units.map(u => u.type)));
 </script>
 
 <div class="domain-page">
@@ -196,7 +154,6 @@
         <section class="units-section">
             <div class="section-row">
                 <h3 class="section-title">Functional Units</h3>
-                <button class="add-btn" onclick={openPicker}>+ Add unit</button>
             </div>
 
             {#if units.length === 0}
@@ -222,40 +179,6 @@
                 </div>
             {/if}
 
-            {#if showPicker}
-                <div class="picker">
-                    <div class="picker-header">
-                        <span class="picker-title">Choose a unit type</span>
-                        <button class="picker-close" onclick={closePicker} aria-label="Close">✕</button>
-                    </div>
-
-                    {#if addError}
-                        <div class="add-error">{addError}</div>
-                    {/if}
-
-                    {#if templatesLoading}
-                        <p class="picker-loading">Loading…</p>
-                    {:else}
-                        <div class="template-list">
-                            {#each templates as tmpl (tmpl.type)}
-                                <div class="template-row" class:already={presentTypes.has(tmpl.type)}>
-                                    <div class="template-info">
-                                        <span class="template-label">{tmpl.label}</span>
-                                        <span class="template-desc">{tmpl.description}</span>
-                                    </div>
-                                    <button
-                                        class="template-add-btn"
-                                        disabled={addingType !== null}
-                                        onclick={() => addUnit(tmpl.type)}
-                                    >
-                                        {addingType === tmpl.type ? "Adding…" : presentTypes.has(tmpl.type) ? "Add again" : "Add"}
-                                    </button>
-                                </div>
-                            {/each}
-                        </div>
-                    {/if}
-                </div>
-            {/if}
         </section>
 
         <section class="pool-section">

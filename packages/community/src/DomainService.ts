@@ -267,7 +267,7 @@ export class DomainService {
      * - items: the domain's manually-added line items (supplies, equipment, etc.)
      */
     getDomainBudget(domainId: string): {
-        payroll: { roleId: string; title: string; memberId: string | null; kinPerMonth: number }[];
+        payroll: { roleId: string; title: string; memberId: string; kinPerMonth: number }[];
         items: BudgetItem[];
         totals: { payroll: number; items: number; total: number };
     } | null {
@@ -279,7 +279,7 @@ export class DomainService {
             if (!unit) return [];
             return unit.roleIds.flatMap(roleId => {
                 const role = this.roles.get(roleId);
-                if (!role) return [];
+                if (!role || !role.memberId) return [];
                 return [{ roleId: role.id, title: role.title, memberId: role.memberId, kinPerMonth: role.kinPerMonth }];
             });
         });
@@ -344,7 +344,7 @@ export class DomainService {
         domains: Array<{
             domainId:   string;
             domainName: string;
-            payroll:    { roleId: string; title: string; memberId: string | null; kinPerMonth: number }[];
+            payroll:    { roleId: string; title: string; memberId: string; kinPerMonth: number }[];
             items:      BudgetItem[];
             totals:     { payroll: number; items: number; total: number };
         }>;

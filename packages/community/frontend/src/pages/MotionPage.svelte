@@ -22,6 +22,18 @@
     let commentText = $state("");
     let commenting  = $state(false);
 
+    // comment pagination
+    const COMMENT_PAGE_SIZE = 10;
+    let commentPage = $state(1);
+    const totalCommentPages = $derived(
+        motion ? Math.max(1, Math.ceil(motion.comments.length / COMMENT_PAGE_SIZE)) : 1
+    );
+    const paginatedComments = $derived(
+        motion
+            ? motion.comments.slice((commentPage - 1) * COMMENT_PAGE_SIZE, commentPage * COMMENT_PAGE_SIZE)
+            : []
+    );
+
     // outcome form (steward)
     let showOutcomeForm = $state(false);
     let outcomeChoice   = $state<MotionOutcome>("passed");
@@ -69,6 +81,8 @@
         try {
             motion = await addMotionComment(motion.id, commentText.trim());
             commentText = "";
+            // jump to last page so the new comment is visible
+            commentPage = Math.max(1, Math.ceil(motion.comments.length / COMMENT_PAGE_SIZE));
         } catch (e) { actionError = e instanceof Error ? e.message : "Failed"; }
         finally { commenting = false; }
     }
@@ -240,7 +254,14 @@
         {#if motion.comments.length === 0}
             <p class="empty-msg">No comments yet. Start the discussion.</p>
         {:else}
-            {#each motion.comments as c (c.id)}
+            {#if totalCommentPages > 1}
+                <div class="comment-pagination">
+                    <button class="page-btn" onclick={() => commentPage--} disabled={commentPage <= 1}>← Prev</button>
+                    <span class="page-info">Page {commentPage} of {totalCommentPages}</span>
+                    <button class="page-btn" onclick={() => commentPage++} disabled={commentPage >= totalCommentPages}>Next →</button>
+                </div>
+            {/if}
+            {#each paginatedComments as c (c.id)}
                 <div class="comment">
                     <div class="comment-header">
                         <span class="comment-author">{c.authorHandle}</span>
@@ -249,6 +270,13 @@
                     <p class="comment-body">{c.body}</p>
                 </div>
             {/each}
+            {#if totalCommentPages > 1}
+                <div class="comment-pagination">
+                    <button class="page-btn" onclick={() => commentPage--} disabled={commentPage <= 1}>← Prev</button>
+                    <span class="page-info">{(commentPage - 1) * COMMENT_PAGE_SIZE + 1}–{Math.min(commentPage * COMMENT_PAGE_SIZE, motion.comments.length)} of {motion.comments.length}</span>
+                    <button class="page-btn" onclick={() => commentPage++} disabled={commentPage >= totalCommentPages}>Next →</button>
+                </div>
+            {/if}
         {/if}
 
         {#if me && motion.stage !== "resolved" && motion.stage !== "draft"}
@@ -385,6 +413,23 @@
     .comment-body   { font-size: 0.875rem; color: #334155; margin: 0; line-height: 1.5; }
 
     .comment-form { display: flex; flex-direction: column; gap: 0.5rem; }
+    .comment-pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        margin: 0.5rem 0;
+    }
+    .page-btn {
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 0.25rem 0.65rem;
+        font-size: 0.8rem;
+        cursor: pointer;
+    }
+    .page-btn:disabled { opacity: 0.4; cursor: default; }
+    .page-info { font-size: 0.8rem; color: #64748b; }
 
     /* ── Vote list ───────────────────────────────────────────────────────────── */
     .votes-detail { font-size: 0.8rem; color: #64748b; }

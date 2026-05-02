@@ -52,13 +52,14 @@
         },
         {
             kind: "group", id: "other", label: "Other", icon: "⊙",
-            activePages: ["locations", "nodes", "connections", "how-it-works", "settings", "growth", "timeline"],
+            activePages: ["locations", "nodes", "connections", "how-it-works", "settings", "growth", "timeline", "registry"],
             children: [
                 { kind: "leaf", id: "timeline",     label: "Timeline",      icon: "◷" },
                 { kind: "leaf", id: "locations",    label: "Locations",     icon: "⊕" },
                 { kind: "leaf", id: "nodes",        label: "Nodes",         icon: "⬡" },
                 { kind: "leaf", id: "connections",  label: "Connections",   icon: "⬡" },
                 { kind: "leaf", id: "growth",       label: "Growth Path",   icon: "⊛" },
+                { kind: "leaf", id: "registry",     label: "Type Registry", icon: "⊟" },
                 { kind: "leaf", id: "how-it-works", label: "How It Works",  icon: "⊙" },
                 { kind: "leaf", id: "settings",     label: "Settings",      icon: "⚙" },
             ],

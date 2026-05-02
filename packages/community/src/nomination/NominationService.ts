@@ -110,9 +110,19 @@ export class NominationService {
         this.loader?.save(n);
     }
 
-    confirm(id: string, resolvedBy: string): Nomination | null {
+    /** Nominee accepts the nomination (moves pending → accepted). */
+    acceptByNominee(id: string, nomineeId: string): Nomination | null {
         const n = this.nominations.get(id);
         if (!n || n.status !== "pending") return null;
+        if (n.nomineeId !== nomineeId) return null;
+        n.status = "accepted";
+        this.loader?.save(n);
+        return n;
+    }
+
+    confirm(id: string, resolvedBy: string): Nomination | null {
+        const n = this.nominations.get(id);
+        if (!n || (n.status !== "pending" && n.status !== "accepted")) return null;
         n.status     = "confirmed";
         n.resolvedAt = new Date();
         n.resolvedBy = resolvedBy;

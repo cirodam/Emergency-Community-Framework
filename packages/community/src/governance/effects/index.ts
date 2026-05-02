@@ -329,7 +329,9 @@ effectRegistry.register("accept-nomination", {
         } else if (n.roleId) {
             const role = domainSvc.getRole(n.roleId);
             if (role) {
-                role.memberId = n.nomineeId;
+                role.memberId      = n.nomineeId;
+                role.termStartDate = new Date();
+                role.termEndDate   = Constitution.getInstance().currentTermWindow().end;
                 domainSvc.saveRole(role);
             }
         }

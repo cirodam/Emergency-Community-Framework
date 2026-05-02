@@ -3,6 +3,75 @@ import { PersonService } from "../person/PersonService.js";
 import { Person } from "../person/Person.js";
 import { Constitution } from "../governance/Constitution.js";
 
+// ── Sample population seeder ──────────────────────────────────────────────────
+
+const FIRST_NAMES = [
+    "Alice","Benjamin","Clara","Daniel","Elena","Finn","Grace","Henry","Isla","Jacob",
+    "Kira","Liam","Maya","Noah","Olivia","Patrick","Quinn","Rachel","Samuel","Tara",
+    "Uma","Victor","Wren","Xavier","Yara","Zoe","Aaron","Beth","Cameron","Diana",
+    "Ethan","Fiona","George","Hannah","Ivan","Julia","Kevin","Laura","Marcus","Nina",
+    "Oscar","Priya","Quentin","Rosa","Simon","Theo","Uma","Violet","Walter","Xena",
+    "Yusuf","Zahra","Adrian","Bella","Connor","Delia","Emil","Freya","Graham","Holly",
+];
+
+const LAST_NAMES = [
+    "Anderson","Baker","Carter","Davis","Evans","Foster","Garcia","Harris","Ingram","Jones",
+    "Kim","Lewis","Martin","Nelson","Okafor","Patel","Quinn","Rivera","Smith","Taylor",
+    "Upton","Vargas","Walker","Xavier","Young","Zhang","Abbott","Brooks","Collins","Dean",
+    "Erikson","Fletcher","Grant","Hughes","Ivanova","Jenkins","Kumar","Lynch","Moore","Nguyen",
+    "Owen","Park","Reed","Santos","Torres","Underwood","Vance","Webb","Yamamoto","Ziegler",
+];
+
+function randomInt(min: number, max: number): number {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randomFrom<T>(arr: T[]): T {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function randomBirthDate(minAge: number, maxAge: number): Date {
+    const today = new Date();
+    const maxYearsAgo = maxAge * 365;
+    const minYearsAgo = minAge * 365;
+    const daysAgo = randomInt(minYearsAgo, maxYearsAgo);
+    const d = new Date(today);
+    d.setDate(d.getDate() - daysAgo);
+    return d;
+}
+
+async function seedPopulation(svc: PersonService): Promise<number> {
+    const count = randomInt(220, 280);
+    const usedHandles = new Set<string>();
+
+    for (let i = 0; i < count; i++) {
+        const firstName = randomFrom(FIRST_NAMES);
+        const lastName  = randomFrom(LAST_NAMES);
+
+        // Age distribution: ~20% children (0–17), ~65% working age (18–65), ~15% retired (66–85)
+        const roll = Math.random();
+        let birthDate: Date;
+        if (roll < 0.20)      birthDate = randomBirthDate(0,  17);
+        else if (roll < 0.85) birthDate = randomBirthDate(18, 65);
+        else                  birthDate = randomBirthDate(66, 85);
+
+        // Build a unique handle
+        const base = `${firstName[0].toLowerCase()}${lastName.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+        let handle = base;
+        let suffix = 2;
+        while (usedHandles.has(handle)) {
+            handle = `${base}${suffix++}`;
+        }
+        usedHandles.add(handle);
+
+        const isChild = birthDate > new Date(Date.now() - 18 * 365.25 * 86400_000);
+        const person = new Person(firstName, lastName, birthDate, handle, false, null, null, [], isChild);
+        await svc.add(person);
+    }
+
+    return count;
+}
+
 const svc = () => PersonService.getInstance();
 
 // GET /api/setup/status
@@ -21,7 +90,7 @@ export async function setup(req: Request, res: Response): Promise<void> {
         return;
     }
 
-    const { communityName, firstName, lastName, birthDate, handle, password, phone } = req.body ?? {};
+    const { communityName, firstName, lastName, birthDate, handle, password, phone, seedPopulation: doSeed } = req.body ?? {};
 
     if (typeof communityName !== "string" || !communityName.trim()) {
         res.status(400).json({ error: "communityName is required" }); return;
@@ -64,8 +133,15 @@ export async function setup(req: Request, res: Response): Promise<void> {
     Constitution.getInstance().setCommunityName(communityName.trim());
     Constitution.getInstance().save();
 
+    // Optionally seed a sample population for testing
+    let seededCount = 0;
+    if (doSeed === true) {
+        seededCount = await seedPopulation(svc());
+    }
+
     res.status(201).json({
         communityName: Constitution.getInstance().communityName,
+        seededCount,
         founder: {
             id:        person.id,
             firstName: person.firstName,

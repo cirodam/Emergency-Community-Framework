@@ -145,10 +145,22 @@ export const DEFAULT_CONSTITUTION: ConstitutionDocument = {
             constraints: { min: 0.01, max: 0.20 },
         },
         assemblyTermMonths: {
-            value: 6,
+            value: 12,
             authority: "assembly",
             description: "Duration of an assembly term in months.",
             constraints: { min: 1, max: 24 },
+        },
+        assemblyTermStartMonth: {
+            value: 6,
+            authority: "assembly",
+            description: "Calendar month (1–12) on which a new assembly term begins each cycle. Combined with assemblyTermStartDay to define the canonical term anchor date.",
+            constraints: { min: 1, max: 12 },
+        },
+        assemblyTermStartDay: {
+            value: 2,
+            authority: "assembly",
+            description: "Day of the month on which a new assembly term begins each cycle. Combined with assemblyTermStartMonth to define the canonical term anchor date.",
+            constraints: { min: 1, max: 31 },
         },
         deliberationPeriodDays: {
             value: 3,
@@ -530,6 +542,40 @@ export class Constitution {
     get deliberationPeriodDays(): number       { return this.get<number>("deliberationPeriodDays"); }
     get assemblyFraction(): number             { return this.get<number>("assemblyFraction"); }
     get assemblyTermMonths(): number           { return this.get<number>("assemblyTermMonths"); }
+    get assemblyTermStartMonth(): number       { return this.get<number>("assemblyTermStartMonth"); }
+    get assemblyTermStartDay(): number         { return this.get<number>("assemblyTermStartDay"); }
+
+    /**
+     * Computes the start and end dates of the active assembly term relative to `today`.
+     * The term anchor is the most recent occurrence of (assemblyTermStartMonth, assemblyTermStartDay)
+     * that is on or before `today`. The term ends `assemblyTermMonths` months after that anchor.
+     */
+    currentTermWindow(today: Date = new Date()): { start: Date; end: Date } {
+        const month  = this.assemblyTermStartMonth; // 1-based
+        const day    = this.assemblyTermStartDay;
+        const months = this.assemblyTermMonths;
+
+        // Try this calendar year's anchor first
+        let anchor = new Date(today.getFullYear(), month - 1, day);
+        if (anchor > today) {
+            // This year's anchor is in the future — use last year's
+            anchor = new Date(today.getFullYear() - 1, month - 1, day);
+        }
+
+        const end = new Date(anchor);
+        end.setMonth(end.getMonth() + months);
+
+        return { start: anchor, end };
+    }
+
+    /** ISO date string (YYYY-MM-DD) of the canonical next term start on or after `today`. */
+    nextTermStartDate(today: Date = new Date()): string {
+        const month = this.assemblyTermStartMonth;
+        const day   = this.assemblyTermStartDay;
+        let anchor  = new Date(today.getFullYear(), month - 1, day);
+        if (anchor < today) anchor = new Date(today.getFullYear() + 1, month - 1, day);
+        return anchor.toISOString().slice(0, 10);
+    }
     get bankDemurrageRate(): number            { return this.get<number>("bankDemurrageRate"); }
     get demurrageFloor(): number               { return this.get<number>("demurrageFloor"); }
     get kinPerPersonYear(): number             { return this.get<number>("kinPerPersonYear"); }

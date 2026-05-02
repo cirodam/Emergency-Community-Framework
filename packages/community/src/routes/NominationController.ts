@@ -3,6 +3,7 @@ import { NominationService } from "../nomination/NominationService.js";
 import { Nomination } from "../nomination/Nomination.js";
 import { PersonService } from "../person/PersonService.js";
 import { DomainService } from "../DomainService.js";
+import { MotionService } from "../governance/MotionService.js";
 
 type AuthedRequest = Request & { personId?: string };
 
@@ -125,29 +126,58 @@ export function createNomination(req: AuthedRequest, res: Response): void {
 }
 
 // PATCH /api/nominations/:id/confirm
+// Called by the nominee to accept the nomination.
+// - Pool nominations: immediately assigns the person (unchanged).
+// - Role nominations: marks as "accepted" and places an accept-nomination
+//   motion on the assembly docket for ratification.
 export function confirmNomination(req: AuthedRequest, res: Response): void {
     const personId = req.personId;
     if (!personId) { res.status(401).json({ error: "Authentication required" }); return; }
 
-    const n = svc().confirm(req.params.id as string, personId);
-    if (!n) { res.status(404).json({ error: "Nomination not found or already resolved" }); return; }
+    const nomination = svc().getById(req.params.id as string);
+    if (!nomination || nomination.status !== "pending") {
+        res.status(404).json({ error: "Nomination not found or already resolved" }); return;
+    }
 
     const domainSvc = DomainService.getInstance();
-    if (n.type === "pool" && n.poolId) {
-        const pool = domainSvc.getPool(n.poolId);
+
+    // ── Pool nominations: direct assignment (unchanged) ────────────────────
+    if (nomination.type === "pool" && nomination.poolId) {
+        const n = svc().confirm(req.params.id as string, personId);
+        if (!n) { res.status(404).json({ error: "Nomination not found or already resolved" }); return; }
+        const pool = domainSvc.getPool(n.poolId!);
         if (pool) {
             pool.addPerson(n.nomineeId);
             domainSvc.savePool(pool);
         }
-    } else {
-        const role = domainSvc.getRole(n.roleId);
-        if (role) {
-            role.memberId = n.nomineeId;
-            domainSvc.saveRole(role);
-        }
+        return void res.json({ nomination: toDto(n) });
     }
 
-    res.json(toDto(n));
+    // ── Role nominations: nominee accepts → place on assembly docket ───────
+    const n = svc().acceptByNominee(req.params.id as string, personId);
+    if (!n) { res.status(403).json({ error: "Not the nominee, or nomination is not pending" }); return; }
+
+    const nominee  = PersonService.getInstance().get(n.nomineeId);
+    const role     = domainSvc.getRole(n.roleId);
+    const unit     = domainSvc.getUnit(n.unitId);
+
+    const nomineeName = nominee ? `${nominee.firstName} ${nominee.lastName}` : n.nomineeId;
+    const roleLabel   = role?.title ?? n.roleId;
+    const unitLabel   = unit?.name  ?? n.unitId;
+
+    const motion = MotionService.getInstance().create({
+        body:           "assembly",
+        title:          `Confirm nomination: ${nomineeName} for ${roleLabel}`,
+        description:    `${nomineeName} has accepted the nomination for ${roleLabel}` +
+                        (unitLabel ? ` in ${unitLabel}` : "") +
+                        (n.statement ? `.\n\nStatement: "${n.statement}"` : "."),
+        proposerId:     n.nomineeId,
+        proposerHandle: nominee?.handle ?? n.nomineeId,
+        kind:           "accept-nomination",
+        payload:        JSON.stringify({ nominationId: n.id }),
+    });
+
+    res.json({ nomination: toDto(n), motionId: motion.id });
 }
 
 // PATCH /api/nominations/:id/decline

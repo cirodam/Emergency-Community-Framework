@@ -243,10 +243,12 @@ export interface SetupPayload {
     handle: string;
     password: string;
     phone?: string;
+    seedPopulation?: boolean;
 }
 
 export interface SetupResult {
     communityName: string;
+    seededCount: number;
     founder: { id: string; firstName: string; lastName: string; handle: string };
 }
 
@@ -296,12 +298,16 @@ export interface AssemblySlimPerson {
 }
 
 export interface AssemblyDto {
-    seats:         number;
-    fraction:      number;
-    termMonths:    number;
-    termStartDate: string | null;
-    population:    number;
-    seated:        AssemblySlimPerson[];
+    seats:                  number;
+    fraction:               number;
+    termMonths:             number;
+    termStartMonth:         number;
+    termStartDay:           number;
+    canonicalTermStartDate: string;
+    canonicalTermEndDate:   string;
+    termStartDate:          string | null;
+    population:             number;
+    seated:                 AssemblySlimPerson[];
 }
 
 export async function getAssembly(): Promise<AssemblyDto> {
@@ -1180,7 +1186,7 @@ export async function getNodePeers(): Promise<PeerRecordDto[]> {
 
 // ── Nominations & Vacancies ───────────────────────────────────────────────────
 
-export type NominationStatus = "pending" | "confirmed" | "declined";
+export type NominationStatus = "pending" | "accepted" | "confirmed" | "declined";
 
 export interface NominationDto {
     id:         string;
@@ -1264,13 +1270,13 @@ export async function createPoolNomination(data: {
     return res.json() as Promise<NominationDto>;
 }
 
-export async function confirmNomination(id: string): Promise<NominationDto> {
+export async function confirmNomination(id: string): Promise<{ nomination: NominationDto; motionId?: string }> {
     const res = await apiFetch(`/api/nominations/${encodeURIComponent(id)}/confirm`, { method: "PATCH" });
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Failed to confirm nomination");
     }
-    return res.json() as Promise<NominationDto>;
+    return res.json() as Promise<{ nomination: NominationDto; motionId?: string }>;
 }
 
 export async function declineNomination(id: string): Promise<NominationDto> {

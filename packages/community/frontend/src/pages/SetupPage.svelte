@@ -16,9 +16,11 @@
     let password      = $state("");
     let confirm       = $state("");
     let phone         = $state("");
+    let seedPopulation = $state(false);
 
     let error   = $state("");
     let loading = $state(false);
+    let seededCount = $state(0);
 
     // Auto-generate handle suggestion from name
     const suggestedHandle = $derived(
@@ -50,7 +52,8 @@
 
         loading = true;
         try {
-            await runSetup({ communityName, firstName, lastName, birthDate, handle, password, phone: phone.trim() || undefined });
+            const result = await runSetup({ communityName, firstName, lastName, birthDate, handle, password, phone: phone.trim() || undefined, seedPopulation });
+            seededCount = result.seededCount ?? 0;
             step = 3;
         } catch (e) {
             error = e instanceof Error ? e.message : "Setup failed";
@@ -79,6 +82,11 @@
                         placeholder="e.g. Sunridge Community"
                         autocomplete="off"
                     />
+                </label>
+
+                <label class="seed-checkbox">
+                    <input type="checkbox" bind:checked={seedPopulation} />
+                    <span>Seed sample population <span class="seed-hint">(adds ~250 test people)</span></span>
                 </label>
 
                 <button type="submit" class="btn-primary">Continue →</button>
@@ -149,7 +157,7 @@
                         ← Back
                     </button>
                     <button type="submit" class="btn-primary" disabled={loading}>
-                        {loading ? "Setting up…" : "Create community"}
+                        {loading ? (seedPopulation ? "Seeding population…" : "Setting up…") : "Create community"}
                     </button>
                 </div>
             </form>
@@ -159,6 +167,9 @@
                 <div class="done-icon">✓</div>
                 <h2>{communityName} is ready</h2>
                 <p>Welcome, {firstName}. Sign in to get started.</p>
+                {#if seededCount > 0}
+                    <p class="seeded-note">{seededCount} sample people added to the community.</p>
+                {/if}
                 <button class="btn-primary" onclick={onComplete}>Go to sign in</button>
             </div>
         {/if}
@@ -327,6 +338,41 @@
     .done h2 { margin: 0; font-size: 1.2rem; color: #14532d; }
     .done p  { margin: 0; color: #64748b; }
     .done .btn-primary { width: 100%; }
+
+    .seeded-note {
+        font-size: 0.82rem;
+        color: #16a34a;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 8px;
+        padding: 0.4rem 0.75rem;
+        margin: 0;
+        text-align: center;
+        width: 100%;
+    }
+
+    .seed-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        font-size: 0.88rem;
+        color: #475569;
+        padding: 0.25rem 0;
+    }
+
+    .seed-checkbox input[type="checkbox"] {
+        width: 1rem;
+        height: 1rem;
+        accent-color: #16a34a;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    .seed-hint {
+        color: #94a3b8;
+        font-size: 0.8rem;
+    }
 
     /* Step indicator */
     .steps {

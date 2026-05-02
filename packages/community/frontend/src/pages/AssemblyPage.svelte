@@ -12,7 +12,7 @@
 
     // Draw form
     let showDraw   = $state(false);
-    let drawDate   = $state(new Date().toISOString().slice(0, 10));
+    let drawDate   = $state("");
     let drawing    = $state(false);
     let drawError  = $state("");
 
@@ -65,6 +65,8 @@
                 getAssembly(),
                 listMotions({ body: "assembly" }),
             ]);
+            // pre-fill draw date with canonical term start
+            if (assembly && !drawDate) drawDate = assembly.canonicalTermStartDate;
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to load assembly";
         } finally { loading = false; }
@@ -167,8 +169,15 @@
             </div>
         </div>
 
+        <div class="term-window">
+            <span class="term-window-label">Current term</span>
+            <span class="term-window-dates">
+                {formatDate(assembly.canonicalTermStartDate)} → {formatDate(assembly.canonicalTermEndDate)}
+            </span>
+        </div>
+
         {#if assembly.termStartDate}
-            <p class="term-since">Term began {formatDate(assembly.termStartDate)} · {assembly.seated.length} of {assembly.seats} filled</p>
+            <p class="term-since">Drew {formatDate(assembly.termStartDate)} · {assembly.seated.length} of {assembly.seats} filled</p>
         {:else}
             <p class="term-since no-term">No term drawn yet.</p>
         {/if}
@@ -339,6 +348,18 @@
 
     .term-since { font-size: 0.78rem; color: #64748b; margin: -0.25rem 0 0; }
     .term-since.no-term { color: #94a3b8; font-style: italic; }
+    .term-window {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 8px;
+        padding: 0.5rem 0.85rem;
+        margin: 0.5rem 0 0.25rem;
+    }
+    .term-window-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #15803d; letter-spacing: 0.04em; }
+    .term-window-dates { font-size: 0.85rem; color: #166534; }
 
     /* ── Seat grid ─────────────────────────────────────────────────────────────── */
     .seat-grid {

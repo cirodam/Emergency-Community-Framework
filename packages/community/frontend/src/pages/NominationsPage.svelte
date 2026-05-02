@@ -34,8 +34,9 @@
 
     $effect(() => { load(); });
 
-    let pending = $derived(nominations.filter(n => n.status === "pending"));
-    let resolved = $derived(nominations.filter(n => n.status !== "pending"));
+    let pending  = $derived(nominations.filter(n => n.status === "pending"));
+    let accepted  = $derived(nominations.filter(n => n.status === "accepted"));
+    let resolved  = $derived(nominations.filter(n => n.status === "confirmed" || n.status === "declined"));
 
     function personName(id: string): string {
         const p = persons.find(p => p.id === id);
@@ -65,8 +66,8 @@
     async function doConfirm(id: string) {
         actionError = "";
         try {
-            const updated = await confirmNomination(id);
-            nominations = nominations.map(n => n.id === id ? updated : n);
+            const result = await confirmNomination(id);
+            nominations = nominations.map(n => n.id === id ? result.nomination : n);
         } catch (e) {
             actionError = e instanceof Error ? e.message : "Failed to confirm";
         }
@@ -110,7 +111,7 @@
 
         <!-- Pending nominations -->
         <section class="section">
-            <h3 class="section-title">Pending nominations {#if pending.length > 0}<span class="badge">{pending.length}</span>{/if}</h3>
+            <h3 class="section-title">Awaiting nominee response {#if pending.length > 0}<span class="badge">{pending.length}</span>{/if}</h3>
 
             {#if pending.length === 0}
                 <p class="empty-msg">No pending nominations.</p>
@@ -124,7 +125,7 @@
                                     <span class="card-sub">nominated by {personName(n.createdBy)}</span>
                                 </div>
                                 <div class="card-actions">
-                                    <button class="confirm-btn" onclick={() => doConfirm(n.id)}>Confirm</button>
+                                    <button class="confirm-btn" onclick={() => doConfirm(n.id)}>Accept</button>
                                     <button class="decline-btn" onclick={() => doDecline(n.id)}>Decline</button>
                                 </div>
                             </div>
@@ -139,6 +140,36 @@
                                 <p class="card-statement">"{n.statement}"</p>
                             {/if}
                             <p class="card-date">{formatDate(n.createdAt)}</p>
+                        </div>
+                    {/each}
+                </div>
+            {/if}
+        </section>
+
+        <!-- On assembly docket -->
+        <section class="section">
+            <h3 class="section-title">On assembly docket {#if accepted.length > 0}<span class="badge amber">{accepted.length}</span>{/if}</h3>
+
+            {#if accepted.length === 0}
+                <p class="empty-msg">No nominations awaiting assembly vote.</p>
+            {:else}
+                <div class="card-list">
+                    {#each accepted as n (n.id)}
+                        <div class="card docket-card">
+                            <div class="card-top">
+                                <div class="card-info">
+                                    <span class="card-name">{personName(n.nomineeId)}</span>
+                                    <span class="card-sub">nominated by {personName(n.createdBy)}</span>
+                                </div>
+                                <span class="status-badge accepted">Assembly vote</span>
+                            </div>
+                            <div class="card-meta">
+                                {roleTitle(n.roleId)} · {unitName(n.unitId)} · {domainName(n.domainId)}
+                            </div>
+                            {#if n.statement}
+                                <p class="card-statement">"{n.statement}"</p>
+                            {/if}
+                            <p class="card-date">Accepted {formatDate(n.createdAt)}</p>
                         </div>
                     {/each}
                 </div>
@@ -393,5 +424,12 @@
 .status-badge.declined {
     background: #fee2e2;
     color: #dc2626;
+}
+.status-badge.accepted {
+    background: #fef9c3;
+    color: #a16207;
+}
+.docket-card {
+    border-left: 3px solid #ca8a04;
 }
 </style>

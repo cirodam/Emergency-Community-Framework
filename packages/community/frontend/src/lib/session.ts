@@ -70,7 +70,7 @@ function createSessionStore() {
 
 export const session = createSessionStore();
 
-export type Page = "directory" | "constitution" | "settings" | "domains" | "domain" | "unit" | "leadership" | "assembly" | "pool" | "motion" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations" | "proposals" | "proposal" | "nodes" | "central-bank" | "social-insurance" | "vacancies" | "nominations" | "connections" | "growth" | "schedule" | "documents" | "bylaw" | "timeline" | "calendar";
+export type Page = "directory" | "constitution" | "settings" | "domains" | "domain" | "unit" | "leadership" | "assembly" | "pool" | "motion" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations" | "proposals" | "proposal" | "nodes" | "central-bank" | "social-insurance" | "vacancies" | "nominations" | "connections" | "growth" | "schedule" | "documents" | "bylaw" | "timeline" | "calendar" | "registry";
 
 function createPageStore() {
     const { subscribe, set } = writable<Page>("schedule");

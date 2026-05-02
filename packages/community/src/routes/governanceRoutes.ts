@@ -165,13 +165,19 @@ router.get("/assembly", (_req: Request, res: Response) => {
             .map(p => personToSlimDto(p!))
         : [];
 
+    const termWindow = constitution.currentTermWindow();
+
     res.json({
         seats,
-        fraction:      constitution.assemblyFraction,
-        termMonths:    constitution.assemblyTermMonths,
-        termStartDate: term?.termStartDate ?? null,
-        population:    persons.length,
-        seated:        seatedPersons,
+        fraction:               constitution.assemblyFraction,
+        termMonths:             constitution.assemblyTermMonths,
+        termStartMonth:         constitution.assemblyTermStartMonth,
+        termStartDay:           constitution.assemblyTermStartDay,
+        canonicalTermStartDate: termWindow.start.toISOString().slice(0, 10),
+        canonicalTermEndDate:   termWindow.end.toISOString().slice(0, 10),
+        termStartDate:          term?.termStartDate ?? null,
+        population:             persons.length,
+        seated:                 seatedPersons,
     });
 });
 
@@ -179,12 +185,13 @@ router.get("/assembly", (_req: Request, res: Response) => {
 // Randomly draws a new assembly term from eligible (non-disabled, adult) members.
 router.post("/assembly/draw", requireSteward, (req: Request, res: Response) => {
     const { termStartDate } = (req.body ?? {}) as { termStartDate?: string };
-    const startDate = termStartDate ?? new Date().toISOString().slice(0, 10);
+    const constitution = Constitution.getInstance();
+    // Default to the constitution's canonical term start date for the current cycle
+    const startDate = termStartDate ?? constitution.currentTermWindow().start.toISOString().slice(0, 10);
     if (isNaN(new Date(startDate).getTime())) {
         res.status(400).json({ error: "termStartDate must be a valid date" }); return;
     }
 
-    const constitution = Constitution.getInstance();
     const workingMin   = constitution.workingAgeMin;
     const now          = new Date();
     const eligible     = PersonService.getInstance().getAll()
@@ -216,11 +223,15 @@ router.post("/assembly/draw", requireSteward, (req: Request, res: Response) => {
 
     res.json({
         seats,
-        fraction:      constitution.assemblyFraction,
-        termMonths:    constitution.assemblyTermMonths,
-        termStartDate: term.termStartDate,
-        population:    eligible.length,
-        seated:        drawn.map(p => personToSlimDto(p)),
+        fraction:               constitution.assemblyFraction,
+        termMonths:             constitution.assemblyTermMonths,
+        termStartMonth:         constitution.assemblyTermStartMonth,
+        termStartDay:           constitution.assemblyTermStartDay,
+        canonicalTermStartDate: constitution.currentTermWindow().start.toISOString().slice(0, 10),
+        canonicalTermEndDate:   constitution.currentTermWindow().end.toISOString().slice(0, 10),
+        termStartDate:          term.termStartDate,
+        population:             eligible.length,
+        seated:                 drawn.map(p => personToSlimDto(p)),
     });
 });
 

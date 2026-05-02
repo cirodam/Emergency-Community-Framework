@@ -3,10 +3,13 @@
     import type { PersonDto } from "../lib/api.js";
     import { session } from "../lib/session.js";
 
+    const PAGE_SIZE = 25;
+
     let members: PersonDto[] = $state([]);
     let loading = $state(true);
     let error = $state("");
     let query = $state("");
+    let page = $state(1);
 
     // ── Expand / reset state ───────────────────────────────────────────────────
     let expandedId: string | null = $state(null);
@@ -49,6 +52,9 @@
               )
             : members
     );
+
+    const totalPages = $derived(Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)));
+    const paginated  = $derived(filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
 
     async function toggleExpand(id: string) {
         const newId = expandedId === id ? null : id;
@@ -141,6 +147,7 @@
         <input
             type="search"
             bind:value={query}
+            oninput={() => { page = 1; }}
             placeholder="Search by name or handle…"
             autocomplete="off"
             autocapitalize="none"
@@ -155,7 +162,7 @@
         <div class="loading-msg">No members found.</div>
     {:else}
         <div class="member-list">
-            {#each filtered as m (m.id)}
+            {#each paginated as m (m.id)}
                 <div class="member-card" class:expanded={expandedId === m.id}>
                     <button class="member-row" onclick={() => toggleExpand(m.id)}>
                         <div class="member-avatar">{m.firstName[0]}{m.lastName[0]}</div>
@@ -290,7 +297,28 @@
                 </div>
             {/each}
         </div>
-        <div class="count">{filtered.length} member{filtered.length !== 1 ? "s" : ""}</div>
+        {#if totalPages > 1}
+            <div class="pagination">
+                <button
+                    class="page-btn"
+                    onclick={() => { page = Math.max(1, page - 1); }}
+                    disabled={page === 1}
+                >← Prev</button>
+                <span class="page-info">Page {page} of {totalPages}</span>
+                <button
+                    class="page-btn"
+                    onclick={() => { page = Math.min(totalPages, page + 1); }}
+                    disabled={page === totalPages}
+                >Next →</button>
+            </div>
+        {/if}
+        <div class="count">
+            {#if totalPages > 1}
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} member{filtered.length !== 1 ? "s" : ""}
+            {:else}
+                {filtered.length} member{filtered.length !== 1 ? "s" : ""}
+            {/if}
+        </div>
     {/if}
 </div>
 
@@ -508,7 +536,36 @@
     .btn-steward-grant:disabled,
     .btn-steward-revoke:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    .count { text-align: center; font-size: 0.8rem; color: #94a3b8; margin-top: 0.75rem; }
+    .count { text-align: center; font-size: 0.8rem; color: #94a3b8; margin-top: 0.5rem; }
+
+    .pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .page-btn {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.45rem 1rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #0f172a;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+    }
+
+    .page-btn:hover:not(:disabled) { background: #f0fdf4; border-color: #16a34a; }
+    .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .page-info {
+        font-size: 0.85rem;
+        color: #475569;
+        white-space: nowrap;
+    }
 
     /* ── App permissions ── */
     .app-perms-section { margin-bottom: 0.75rem; }

@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 
-export type NominationStatus = "pending" | "confirmed" | "declined";
+export type NominationStatus = "pending" | "accepted" | "confirmed" | "declined";
 
 export class Nomination {
     readonly id: string;
