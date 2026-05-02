@@ -28,6 +28,14 @@
     let error       = $state("");
     let filter      = $state<ClassifiedCategory | "all">("all");
     let tab         = $state<"board" | "mine">("board");
+    let search      = $state("");
+
+    // Debounce search → reload
+    let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+    function onSearchInput() {
+        if (searchTimeout) clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => load(1), 300);
+    }
 
     // Pagination
     const PAGE_SIZE = 20;
@@ -74,7 +82,7 @@
         error   = "";
         try {
             const cat = filter === "all" ? undefined : filter;
-            const result = await listClassifieds(cat, p, PAGE_SIZE);
+            const result = await listClassifieds(cat, p, PAGE_SIZE, search || undefined);
             items = result.items;
             total = result.total;
             pages = result.pages;
@@ -265,6 +273,19 @@
             {/each}
         </div>
 
+        <div class="search-bar">
+            <input
+                class="search-input"
+                type="search"
+                placeholder="Search classifieds…"
+                bind:value={search}
+                oninput={onSearchInput}
+            />
+            {#if search}
+                <button class="search-clear" onclick={() => { search = ""; load(1); }} aria-label="Clear search">✕</button>
+            {/if}
+        </div>
+
         {#if loading}
             <div class="skeleton"></div>
             <div class="skeleton short"></div>
@@ -272,7 +293,7 @@
         {:else if error}
             <p class="error-msg">{error}</p>
         {:else if filtered.length === 0}
-            <p class="empty-msg">No classifieds in this category.</p>
+            <p class="empty-msg">{search ? "No classifieds match your search." : "No classifieds in this category."}</p>
         {:else}
             <div class="cl-list">
                 {#each filtered as c (c.id)}
@@ -481,6 +502,40 @@
     }
     .tab:hover  { color: #334155; }
     .tab.active { color: #0f172a; border-bottom-color: #0f172a; font-weight: 600; }
+
+    /* ── Search bar ── */
+    .search-bar {
+        position: relative;
+        margin-bottom: 1rem;
+    }
+    .search-input {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        padding: 0.5rem 2.25rem 0.5rem 0.75rem;
+        font-size: 0.9rem;
+        color: #0f172a;
+        background: #fff;
+        outline: none;
+        font-family: inherit;
+        transition: border-color 0.15s;
+    }
+    .search-input:focus { border-color: #3b82f6; }
+    .search-clear {
+        position: absolute;
+        right: 0.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #94a3b8;
+        font-size: 0.85rem;
+        cursor: pointer;
+        padding: 0.2rem 0.3rem;
+        line-height: 1;
+    }
+    .search-clear:hover { color: #475569; }
 
     /* ── Filter pills ── */
     .filter-bar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }

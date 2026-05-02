@@ -68,11 +68,13 @@
         "assembly-drawn":      "⚖",
         "bylaw-created":       "📕",
         "bylaw-amended":       "✏",
+        "bylaw-expired":       "⌛",
         "role-type-added":     "👤",
         "role-type-removed":   "✂",
         "unit-type-added":     "🏗",
         "unit-type-removed":   "✂",
         "unit-deployed":       "🏢",
+        "marketplace-founded": "🏪",
     };
 
     const COLOR: Record<CommunityLogType, string> = {
@@ -89,11 +91,13 @@
         "assembly-drawn":      "purple",
         "bylaw-created":       "blue",
         "bylaw-amended":       "blue",
+        "bylaw-expired":       "amber",
         "role-type-added":     "green",
         "role-type-removed":   "red",
         "unit-type-added":     "green",
         "unit-type-removed":   "red",
         "unit-deployed":       "green",
+        "marketplace-founded": "green",
     };
 </script>
 

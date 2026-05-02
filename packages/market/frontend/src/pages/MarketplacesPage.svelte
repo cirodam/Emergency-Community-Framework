@@ -1,6 +1,6 @@
 <script lang="ts">
     import {
-        listMarketplaces, createMarketplace, updateMarketplace, deleteMarketplace,
+        listMarketplaces, updateMarketplace, deleteMarketplace,
         listCommunityLocations, createCommunityLocation,
     } from "../lib/api.js";
     import type { MarketplaceDto, CommunityLocationDto } from "../lib/api.js";
@@ -12,7 +12,6 @@
     let error        = $state("");
 
     // Form state
-    let showForm   = $state(false);
     let editing    = $state<MarketplaceDto | null>(null);
     let formName   = $state("");
     let formLocId  = $state("");
@@ -72,28 +71,15 @@
         return locations.find(l => l.id === id)?.name ?? id;
     }
 
-    function openNew() {
-        editing = null;
-        formName = "";
-        formLocId = locations[0]?.id ?? "";
-        formDesc = "";
-        formError = "";
-        showLocForm = false;
-        locName = ""; locAddress = ""; locDesc = ""; locError = "";
-        showForm = true;
-    }
-
     function openEdit(m: MarketplaceDto) {
         editing = m;
         formName = m.name;
         formLocId = m.locationId;
         formDesc = m.description;
         formError = "";
-        showForm = true;
     }
 
     function closeForm() {
-        showForm = false;
         editing = null;
         formError = "";
         showLocForm = false;
@@ -113,11 +99,6 @@
                     name: formName.trim(), locationId: formLocId, locationName: locName, description: formDesc.trim(),
                 });
                 marketplaces = marketplaces.map(m => m.id === updated.id ? updated : m);
-            } else {
-                const created = await createMarketplace({
-                    name: formName.trim(), locationId: formLocId, locationName: locName, description: formDesc.trim(),
-                });
-                marketplaces = [...marketplaces, created].sort((a, b) => a.name.localeCompare(b.name));
             }
             closeForm();
         } catch (e) {
@@ -151,12 +132,12 @@
             <h2 class="page-title">Marketplaces</h2>
             <p class="page-sub">Physical marketplace locations in the community.</p>
         </div>
-        <button class="btn-add" onclick={openNew}>+ New marketplace</button>
+
     </div>
 
-    {#if showForm}
+    {#if editing !== null}
         <form class="mp-form" onsubmit={(e) => { e.preventDefault(); submit(); }}>
-            <h3 class="form-title">{editing ? "Edit marketplace" : "New marketplace"}</h3>
+            <h3 class="form-title">Edit marketplace</h3>
 
             {#if formError}
                 <p class="form-error">{formError}</p>
@@ -207,7 +188,7 @@
             <div class="form-actions">
                 <button class="btn-secondary" type="button" onclick={closeForm}>Cancel</button>
                 <button class="btn-primary" type="submit" disabled={saving || (locations.length === 0 && !showLocForm)}>
-                    {saving ? "Saving…" : editing ? "Save changes" : "Create marketplace"}
+                    {saving ? "Saving…" : "Save changes"}
                 </button>
             </div>
         </form>
@@ -262,16 +243,6 @@
 
     .page-title { font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0 0 0.2rem; }
     .page-sub   { font-size: 0.85rem; color: #64748b; margin: 0; }
-
-    .btn-add {
-        font-size: 0.85rem; font-weight: 600;
-        color: #fff; background: #16a34a;
-        border: none; border-radius: 0.5rem;
-        padding: 0.45rem 0.9rem; cursor: pointer;
-        white-space: nowrap; flex-shrink: 0;
-        transition: background 0.15s;
-    }
-    .btn-add:hover { background: #15803d; }
 
     /* ── Form ────────────────────────────────── */
     .mp-form {

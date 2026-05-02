@@ -24,9 +24,9 @@ export function listMyClassifieds(req: Request & { personId?: string }, res: Res
     res.json(svc().getByPoster(posterId));
 }
 
-// GET /api/classifieds?category=for-sale|wanted|free|job|notice&status=open&page=1&limit=20
+// GET /api/classifieds?category=for-sale|wanted|free|job|notice&status=open&page=1&limit=20&q=search
 export function listClassifieds(req: Request, res: Response): void {
-    const { category, status } = req.query;
+    const { category, status, q } = req.query;
     const cat = VALID_CATEGORIES.includes(category as ClassifiedCategory)
         ? (category as ClassifiedCategory)
         : undefined;
@@ -35,9 +35,17 @@ export function listClassifieds(req: Request, res: Response): void {
         ? svc().getAll()
         : svc().getOpen(cat);
 
-    const results = (!status || status === "open") && !cat
+    let results = (!status || status === "open") && !cat
         ? svc().getOpen()
         : all;
+
+    if (typeof q === "string" && q.trim()) {
+        const needle = q.trim().toLowerCase();
+        results = results.filter(c =>
+            c.title.toLowerCase().includes(needle) ||
+            c.description.toLowerCase().includes(needle),
+        );
+    }
 
     const limit  = Math.min(Math.max(parseInt(req.query.limit as string) || 20, 1), 100);
     const page   = Math.max(parseInt(req.query.page  as string) || 1, 1);

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getCommunityBudget, updateConstitutionParameter, simulateBudgetStep } from "../lib/api.js";
+    import { getCommunityBudget, simulateBudgetStep } from "../lib/api.js";
     import type { CommunityBudgetDto, BudgetDomainRow } from "../lib/api.js";
 
     let data: CommunityBudgetDto | null = $state(null);
@@ -8,37 +8,6 @@
 
     // Which domains are expanded
     let expanded: Set<string> = $state(new Set());
-
-    // Dues rate editor
-    let editingDues = $state(false);
-    let duesInput   = $state("");
-    let duesSaving  = $state(false);
-    let duesError   = $state("");
-
-    function startEditDues() {
-        if (!data) return;
-        duesInput  = (data.inflow.duesRate * 100).toFixed(2);
-        duesError  = "";
-        editingDues = true;
-    }
-
-    async function saveDues() {
-        const pct = parseFloat(duesInput);
-        if (isNaN(pct) || pct < 0 || pct > 10) {
-            duesError = "Enter a value between 0 and 10%"; return;
-        }
-        duesSaving = true;
-        duesError  = "";
-        try {
-            await updateConstitutionParameter("communityDuesRate", pct / 100);
-            await load();
-            editingDues = false;
-        } catch (e) {
-            duesError = e instanceof Error ? e.message : "Failed to save";
-        } finally {
-            duesSaving = false;
-        }
-    }
 
     const net = $derived(
         data ? data.inflow.estimatedMonthlyDues - data.outflow.monthlyTotal : 0
@@ -156,29 +125,8 @@
                     </div>
                     <div class="kv-row">
                         <span class="kv-label">Dues rate</span>
-                        {#if editingDues}
-                            <span class="dues-edit-row">
-                                <input
-                                    class="dues-input"
-                                    type="number"
-                                    min="0" max="10" step="0.1"
-                                    bind:value={duesInput}
-                                    onkeydown={(e) => { if (e.key === 'Enter') saveDues(); if (e.key === 'Escape') editingDues = false; }}
-                                />
-                                <span class="dues-pct-label">%</span>
-                                <button class="dues-save-btn" onclick={saveDues} disabled={duesSaving}>Save</button>
-                                <button class="dues-cancel-btn" onclick={() => editingDues = false} disabled={duesSaving}>✕</button>
-                            </span>
-                        {:else}
-                            <span class="kv-value dues-value">
-                                {(data.inflow.duesRate * 100).toFixed(1)}%
-                                <button class="dues-edit-btn" onclick={startEditDues} title="Change dues rate">✎</button>
-                            </span>
-                        {/if}
+                        <span class="kv-value">{(data.inflow.duesRate * 100).toFixed(1)}%</span>
                     </div>
-                    {#if duesError}
-                        <p class="dues-error">{duesError}</p>
-                    {/if}
                     <div class="kv-row highlight-row">
                         <span class="kv-label">Estimated monthly dues</span>
                         <span class="kv-value strong">{fmt(data.inflow.estimatedMonthlyDues)} <span class="unit">kin</span></span>
@@ -421,34 +369,6 @@
     .kv-value { font-size: 0.95rem; color: #0f172a; font-variant-numeric: tabular-nums; }
     .kv-value.strong { font-weight: 700; }
     .unit { font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; }
-
-    /* Dues rate editor */
-    .dues-value { display: flex; align-items: center; gap: 0.4rem; }
-    .dues-edit-btn {
-        background: none; border: none; cursor: pointer;
-        font-size: 0.8rem; color: #94a3b8; padding: 0 0.1rem;
-        line-height: 1;
-    }
-    .dues-edit-btn:hover { color: #3b82f6; }
-    .dues-edit-row { display: flex; align-items: center; gap: 0.35rem; }
-    .dues-input {
-        width: 4.5rem; padding: 0.2rem 0.4rem;
-        border: 1px solid #3b82f6; border-radius: 6px;
-        font-size: 0.9rem; font-family: inherit;
-        text-align: right;
-    }
-    .dues-pct-label { font-size: 0.85rem; color: #64748b; }
-    .dues-save-btn {
-        padding: 0.2rem 0.6rem; border: none; border-radius: 6px;
-        background: #3b82f6; color: #fff; font-size: 0.8rem;
-        cursor: pointer; font-family: inherit;
-    }
-    .dues-save-btn:disabled { opacity: 0.6; cursor: default; }
-    .dues-cancel-btn {
-        background: none; border: none; cursor: pointer;
-        font-size: 0.85rem; color: #94a3b8; padding: 0;
-    }
-    .dues-error { font-size: 0.78rem; color: #dc2626; margin: 0 1.1rem 0.5rem; }
 
     /* Net row */
     .net-row {

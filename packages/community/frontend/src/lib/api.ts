@@ -472,6 +472,8 @@ export interface BylawDto {
     version:   number;
     /** null = assembly-scope. Pool/domain id = scoped to that body. */
     scope:     string | null;
+    /** ISO 8601 datetime after which this bylaw is considered expired. null/undefined = no expiry. */
+    expiresAt?: string | null;
 }
 
 export async function listBylaws(): Promise<BylawDto[]> {
@@ -1555,11 +1557,13 @@ export type CommunityLogType =
     | "assembly-drawn"
     | "bylaw-created"
     | "bylaw-amended"
+    | "bylaw-expired"
     | "role-type-added"
     | "role-type-removed"
     | "unit-type-added"
     | "unit-type-removed"
-    | "unit-deployed";
+    | "unit-deployed"
+    | "marketplace-founded";
 
 export interface CommunityLogEntry {
     id:         string;

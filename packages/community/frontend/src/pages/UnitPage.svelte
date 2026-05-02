@@ -357,7 +357,6 @@
                                 </div>
                             {:else if !role.memberId}
                                 <div class="vacant-actions">
-                                    <button class="assign-btn" onclick={() => startAssign(role)}>+ Assign member</button>
                                     {#if nominatingRoleId !== role.id}
                                         <button class="nominate-btn" onclick={() => startNominate(role.id)}>Nominate</button>
                                     {/if}

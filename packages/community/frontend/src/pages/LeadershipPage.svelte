@@ -1,34 +1,11 @@
 <script lang="ts">
-    import { listPools, createPool } from "../lib/api.js";
+    import { listPools } from "../lib/api.js";
     import type { PoolDto } from "../lib/api.js";
-    import { currentPage, selectedPoolId, session } from "../lib/session.js";
+    import { currentPage, selectedPoolId } from "../lib/session.js";
 
     let pools: PoolDto[] = $state([]);
     let loading = $state(true);
     let error   = $state("");
-
-    let creating    = $state(false);
-    let newName     = $state("");
-    let newDesc     = $state("");
-    let createError = $state("");
-    let saving      = $state(false);
-
-    async function submitCreate() {
-        if (!newName.trim()) { createError = "Pool name is required."; return; }
-        saving = true;
-        createError = "";
-        try {
-            const pool = await createPool(newName.trim(), newDesc.trim());
-            pools = [...pools, pool];
-            newName = "";
-            newDesc = "";
-            creating = false;
-        } catch (e) {
-            createError = e instanceof Error ? e.message : "Failed to create pool";
-        } finally {
-            saving = false;
-        }
-    }
 
     async function load() {
         loading = true;
@@ -76,22 +53,7 @@
     <!-- ── Leader Pools ───────────────────────────────────────────────────── -->
     <div class="pools-header">
         <span class="pools-label">Leader Pools</span>
-        {#if $session?.isSteward}
-            <button class="add-pool-btn" onclick={() => { creating = !creating; createError = ""; }}>＋ New pool</button>
-        {/if}
     </div>
-
-    {#if creating}
-        <div class="create-form">
-            <input class="create-input" placeholder="Pool name" bind:value={newName} />
-            <input class="create-input" placeholder="Description (optional)" bind:value={newDesc} />
-            {#if createError}<p class="create-error">{createError}</p>{/if}
-            <div class="create-actions">
-                <button class="btn-save" onclick={submitCreate} disabled={saving}>{saving ? "Saving…" : "Create"}</button>
-                <button class="btn-cancel" onclick={() => { creating = false; createError = ""; }}>Cancel</button>
-            </div>
-        </div>
-    {/if}
 
     {#if loading}
         <div class="skeleton"></div>
@@ -200,9 +162,6 @@
     .pools-header {
         margin-top: 0.5rem;
         padding: 0 0.25rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
     }
 
     .pools-label {
@@ -212,67 +171,6 @@
         letter-spacing: 0.07em;
         color: #94a3b8;
     }
-
-    .add-pool-btn {
-        background: transparent;
-        border: 1px dashed #86efac;
-        border-radius: 6px;
-        color: #15803d;
-        font-size: 0.75rem;
-        padding: 0.2rem 0.6rem;
-        cursor: pointer;
-    }
-    .add-pool-btn:hover { background: #f0fdf4; }
-
-    .create-form {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
-        padding: 1rem;
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-
-    .create-input {
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        padding: 0.45rem 0.6rem;
-        font-size: 0.875rem;
-        font-family: inherit;
-        background: #fff;
-        color: #111827;
-        width: 100%;
-        box-sizing: border-box;
-    }
-    .create-input:focus { outline: 2px solid #86efac; }
-
-    .create-error { font-size: 0.8rem; color: #dc2626; margin: 0; }
-
-    .create-actions { display: flex; gap: 0.5rem; }
-
-    .btn-save {
-        background: #15803d;
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        padding: 0.4rem 1rem;
-        font-size: 0.85rem;
-        cursor: pointer;
-    }
-    .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
-    .btn-save:hover:not(:disabled) { background: #166534; }
-
-    .btn-cancel {
-        background: transparent;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        padding: 0.4rem 0.8rem;
-        font-size: 0.85rem;
-        cursor: pointer;
-        color: #374151;
-    }
-    .btn-cancel:hover { background: #f1f5f9; }
 
     /* ── Utility ─────────────────────────────────────────────────────────── */
     .skeleton {

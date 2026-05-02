@@ -1,7 +1,7 @@
 <script lang="ts">
     import { listPersons, getPerson, setPassword, grantSteward, revokeSteward, suspendFromApp, unsuspendFromApp } from "../lib/api.js";
     import type { PersonDto } from "../lib/api.js";
-    import { session, currentPage } from "../lib/session.js";
+    import { session } from "../lib/session.js";
 
     let members: PersonDto[] = $state([]);
     let loading = $state(true);
@@ -135,7 +135,6 @@
 <div class="directory-page">
     <div class="page-header">
         <h2 class="page-title">Directory</h2>
-        <button class="btn-add" onclick={() => currentPage.go("add-person")}>+ Add</button>
     </div>
 
     <div class="search-row">

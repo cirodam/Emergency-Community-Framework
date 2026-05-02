@@ -7,6 +7,7 @@ import { effectRegistry } from "../EffectRegistry.js";
 import { Constitution } from "../Constitution.js";
 import { ConstitutionLoader } from "../ConstitutionLoader.js";
 import { LeaderPool } from "../LeaderPool.js";
+import { Person } from "../../person/Person.js";
 import { PersonService } from "../../person/PersonService.js";
 import { DomainService } from "../../DomainService.js";
 import { NominationService } from "../../nomination/NominationService.js";
@@ -18,6 +19,8 @@ import { UnitType } from "../../common/domain/UnitType.js";
 import { FunctionalUnit } from "../../common/domain/FunctionalUnit.js";
 import { CommunityRole } from "../../common/CommunityRole.js";
 import { UnitTemplateRegistry } from "../../common/domain/UnitTemplateRegistry.js";
+import { LocationService } from "../../location/LocationService.js";
+import { Location } from "../../location/Location.js";
 
 // ── amend-constitution ────────────────────────────────────────────────────────
 // Payload: { parameter: string, newValue: number | boolean }
@@ -46,6 +49,170 @@ effectRegistry.register("amend-constitution", {
         motion.outcomeNote =
             `Constitution amended: "${parameter}" changed from ${oldValue} to ${newValue} ` +
             `(v${constitution.toDocument().version}).`;
+    },
+});
+
+// ── set-dues-rate ─────────────────────────────────────────────────────────────
+// Payload: { rate: number }  — a percentage value, e.g. 2 means 2% per month
+// Authority: referendum (the whole community votes on dues).
+
+effectRegistry.register("set-dues-rate", {
+    label:    "Set dues rate",
+    bodyHint: "referendum",
+    validate(raw) {
+        if (typeof raw !== "object" || raw === null) return "Payload must be an object";
+        const p = raw as Record<string, unknown>;
+        if (typeof p.rate !== "number" || isNaN(p.rate) || p.rate < 0 || p.rate > 10)
+            return "payload.rate must be a number between 0 and 10 (percent)";
+        return null;
+    },
+    handler({ motion, payload }) {
+        const pct          = payload.rate as number;
+        const rateDecimal  = pct / 100;
+        const constitution = Constitution.getInstance();
+        const oldPct       = Math.round(constitution.communityDuesRate * 10_000) / 100;
+        constitution.amend("communityDuesRate", rateDecimal, motion.id);
+        new ConstitutionLoader().save();
+        motion.outcomeNote = `Community dues rate changed from ${oldPct}% to ${pct}% per month.`;
+        try {
+            CommunityLogService.getInstance().write(
+                "constitution-amended",
+                `Dues rate set to ${pct}% per month (was ${oldPct}%).`,
+                { actorId: motion.proposerId },
+            );
+        } catch { /* non-fatal */ }
+    },
+});
+
+// ── set-retirement-age ────────────────────────────────────────────────────────
+// Payload: { age: number }  — whole years, 55–75.
+// Authority: referendum.
+
+effectRegistry.register("set-retirement-age", {
+    label:    "Set retirement age",
+    bodyHint: "referendum",
+    validate(raw) {
+        if (typeof raw !== "object" || raw === null) return "Payload must be an object";
+        const p = raw as Record<string, unknown>;
+        if (
+            typeof p.age !== "number" || isNaN(p.age) ||
+            !Number.isInteger(p.age) || p.age < 55 || p.age > 75
+        ) return "payload.age must be a whole number between 55 and 75";
+        return null;
+    },
+    handler({ motion, payload }) {
+        const age          = payload.age as number;
+        const constitution = Constitution.getInstance();
+        const oldAge       = constitution.retirementAge;
+        constitution.amend("retirementAge", age, motion.id);
+        new ConstitutionLoader().save();
+        motion.outcomeNote = `Retirement age changed from ${oldAge} to ${age} years.`;
+        try {
+            CommunityLogService.getInstance().write(
+                "constitution-amended",
+                `Retirement age set to ${age} years (was ${oldAge}).`,
+                { actorId: motion.proposerId },
+            );
+        } catch { /* non-fatal */ }
+    },
+});
+
+// ── set-retirement-payout ─────────────────────────────────────────────────────
+// Payload: { amount: number }  — kin per month per retiree, 0–100,000.
+// Authority: referendum.
+
+effectRegistry.register("set-retirement-payout", {
+    label:    "Set retirement payout",
+    bodyHint: "referendum",
+    validate(raw) {
+        if (typeof raw !== "object" || raw === null) return "Payload must be an object";
+        const p = raw as Record<string, unknown>;
+        if (
+            typeof p.amount !== "number" || isNaN(p.amount) ||
+            !Number.isInteger(p.amount) || p.amount < 0 || p.amount > 100_000
+        ) return "payload.amount must be a whole number between 0 and 100,000";
+        return null;
+    },
+    handler({ motion, payload }) {
+        const amount       = payload.amount as number;
+        const constitution = Constitution.getInstance();
+        const oldAmount    = constitution.retirementPayoutRate;
+        constitution.amend("retirementPayoutRate", amount, motion.id);
+        new ConstitutionLoader().save();
+        motion.outcomeNote = `Monthly retirement payout changed from ${oldAmount} to ${amount} kin/month.`;
+        try {
+            CommunityLogService.getInstance().write(
+                "constitution-amended",
+                `Monthly retirement payout set to ${amount} kin/month (was ${oldAmount}).`,
+                { actorId: motion.proposerId },
+            );
+        } catch { /* non-fatal */ }
+    },
+});
+
+// ── add-person ────────────────────────────────────────────────────────────────
+// Adds a new person to the community via motion rather than direct admin action.
+// Different from membership applications: this is a deliberate community decision
+// to bring someone in (e.g. a newborn, a transfer from another community, etc.).
+// Payload: { firstName, lastName, birthDate, phone?, bornInCommunity? }
+
+effectRegistry.register("add-person", {
+    label:    "Add person",
+    bodyHint: "assembly",
+    validate(raw) {
+        if (typeof raw !== "object" || raw === null) return "Payload must be an object";
+        const p = raw as Record<string, unknown>;
+        if (typeof p.firstName !== "string" || !p.firstName.trim())
+            return "payload.firstName must be a non-empty string";
+        if (typeof p.lastName !== "string" || !p.lastName.trim())
+            return "payload.lastName must be a non-empty string";
+        if (typeof p.birthDate !== "string" || isNaN(new Date(p.birthDate).getTime()))
+            return "payload.birthDate must be a valid ISO date string (YYYY-MM-DD)";
+        return null;
+    },
+    handler({ motion, payload }) {
+        const firstName       = (payload.firstName as string).trim();
+        const lastName        = (payload.lastName  as string).trim();
+        const birthDate       = new Date(payload.birthDate as string);
+        const phone           = typeof payload.phone === "string" && payload.phone.trim()
+            ? payload.phone.trim() : null;
+        const bornInCommunity = payload.bornInCommunity === true;
+
+        const svc  = PersonService.getInstance();
+
+        // Derive a unique handle
+        const base = `${firstName}_${lastName}`.toLowerCase().replace(/[^a-z0-9_]/g, "");
+        let handle = base;
+        let suffix = 2;
+        while (svc.getByHandle(handle)) {
+            handle = `${base}_${suffix++}`;
+        }
+
+        const person = new Person(
+            firstName,
+            lastName,
+            birthDate,
+            handle,
+            false,
+            null,
+            phone,
+            [],
+            bornInCommunity,
+        );
+
+        // Fire-and-forget: join handlers open bank accounts etc. asynchronously.
+        svc.add(person).catch((err: unknown) => {
+            console.error("[governance] add-person join handler failed:", err);
+        });
+
+        motion.outcomeNote = `${firstName} ${lastName} (@${handle}) added to the community.`;
+        try {
+            CommunityLogService.getInstance().write(
+                "member-joined",
+                `${firstName} ${lastName} (@${handle}) added via motion.`,
+                { actorId: motion.proposerId },
+            );
+        } catch { /* non-fatal */ }
     },
 });
 
@@ -257,24 +424,31 @@ effectRegistry.register("create-bylaw", {
             return "payload.title must be a non-empty string";
         if (p.preamble !== undefined && p.preamble !== null && typeof p.preamble !== "string")
             return "payload.preamble must be a string";
+        if (p.sunsetYears !== undefined && p.sunsetYears !== null) {
+            if (typeof p.sunsetYears !== "number" || !Number.isInteger(p.sunsetYears) || p.sunsetYears < 1)
+                return "payload.sunsetYears must be a positive integer";
+        }
         return null;
     },
     handler({ motion, payload }) {
         const scope  = motion.body === "assembly" ? null : motion.body;
         const loader = new BylawLoader();
+        const sunsetYears = typeof payload.sunsetYears === "number" ? payload.sunsetYears : undefined;
         const bylaw  = loader.create(
             (payload.title as string).trim(),
             (payload.preamble as string | undefined)?.trim() || undefined,
             scope,
+            sunsetYears,
         );
 
-        const scopeLabel = scope ? ` (scoped to pool/body: ${scope})` : " (universal)";
-        motion.outcomeNote = `Bylaw created: "${bylaw.title}"${scopeLabel} (id: ${bylaw.id}).`;
+        const scopeLabel  = scope ? ` (scoped to pool/body: ${scope})` : " (universal)";
+        const sunsetLabel = bylaw.expiresAt ? ` · expires ${new Date(bylaw.expiresAt).toLocaleDateString()}` : "";
+        motion.outcomeNote = `Bylaw created: "${bylaw.title}"${scopeLabel}${sunsetLabel} (id: ${bylaw.id}).`;
 
         try {
             CommunityLogService.getInstance().write(
                 "bylaw-created",
-                `New bylaw adopted: "${bylaw.title}"${scopeLabel}.`,
+                `New bylaw adopted: "${bylaw.title}"${scopeLabel}${sunsetLabel}.`,
                 { actorId: motion.proposerId, refId: bylaw.id },
             );
         } catch { /* non-fatal */ }
@@ -299,6 +473,10 @@ effectRegistry.register("amend-bylaw", {
         }
         if (p.preamble !== undefined && p.preamble !== null && typeof p.preamble !== "string")
             return "payload.preamble must be a string";
+        if (p.renewYears !== undefined && p.renewYears !== null) {
+            if (typeof p.renewYears !== "number" || !Number.isInteger(p.renewYears) || p.renewYears < 1)
+                return "payload.renewYears must be a positive integer";
+        }
         return null;
     },
     handler({ motion, payload }) {
@@ -324,16 +502,24 @@ effectRegistry.register("amend-bylaw", {
                 ? payload.preamble.trim()
                 : undefined;
         }
+        if (typeof payload.renewYears === "number" && payload.renewYears > 0) {
+            bylaw.expiresAt = new Date(
+                Date.now() + payload.renewYears * 365.25 * 24 * 3600 * 1000,
+            ).toISOString();
+        }
         bylaw.version += 1;
         loader.save(bylaw);
 
-        const titleNote = bylaw.title !== oldTitle ? ` (renamed from "${oldTitle}")` : "";
-        motion.outcomeNote = `Bylaw "${bylaw.title}"${titleNote} amended to v${bylaw.version} (id: ${bylaw.id}).`;
+        const titleNote  = bylaw.title !== oldTitle ? ` (renamed from "${oldTitle}")` : "";
+        const renewNote  = typeof payload.renewYears === "number"
+            ? ` · renewed for ${payload.renewYears} year${payload.renewYears !== 1 ? "s" : ""}, expires ${new Date(bylaw.expiresAt!).toLocaleDateString()}`
+            : "";
+        motion.outcomeNote = `Bylaw "${bylaw.title}"${titleNote} amended to v${bylaw.version}${renewNote} (id: ${bylaw.id}).`;
 
         try {
             CommunityLogService.getInstance().write(
                 "bylaw-amended",
-                `Bylaw amended: "${bylaw.title}"${titleNote} now at v${bylaw.version}.`,
+                `Bylaw amended: "${bylaw.title}"${titleNote} now at v${bylaw.version}${renewNote}.`,
                 { actorId: motion.proposerId, refId: bylaw.id },
             );
         } catch { /* non-fatal */ }
@@ -566,6 +752,68 @@ effectRegistry.register("deploy-unit", {
                 "unit-deployed",
                 `Functional unit “${unit.name}” deployed in ${domain.name}${roleNote}.`,
                 { actorId: motion.proposerId, refId: unit.id },
+            );
+        } catch { /* non-fatal */ }
+    },
+});
+// ── found-marketplace ─────────────────────────────────────────────────────────
+// Payload: { name, locationName, locationAddress, description? }
+// Creates a community location and registers a new marketplace in the market
+// service. Market service is called fire-and-forget via MARKET_URL.
+
+effectRegistry.register("found-marketplace", {
+    label:    "Found a marketplace",
+    bodyHint: "assembly",
+    validate(raw) {
+        if (typeof raw !== "object" || raw === null) return "Payload must be an object";
+        const p = raw as Record<string, unknown>;
+        if (typeof p.name !== "string" || !p.name.trim())
+            return "payload.name must be a non-empty string";
+        if (typeof p.locationName !== "string" || !p.locationName.trim())
+            return "payload.locationName must be a non-empty string";
+        if (typeof p.locationAddress !== "string" || !p.locationAddress.trim())
+            return "payload.locationAddress must be a non-empty string";
+        return null;
+    },
+    handler({ motion, payload }) {
+        const name            = (payload.name            as string).trim();
+        const locationName    = (payload.locationName    as string).trim();
+        const locationAddress = (payload.locationAddress as string).trim();
+        const description     = typeof payload.description === "string" ? payload.description.trim() : "";
+
+        // Create the location in the community service (same process).
+        const loc = new Location(locationName, locationAddress);
+        LocationService.getInstance().create(loc);
+
+        motion.outcomeNote =
+            `Marketplace "${name}" at "${locationName}" approved (location id: ${loc.id}).` +
+            ` Registering with market service…`;
+
+        // Fire-and-forget: create the marketplace in the market service.
+        const marketUrl = process.env.MARKET_URL ?? "http://localhost:3003";
+        fetch(`${marketUrl}/api/marketplaces`, {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({
+                name,
+                locationId:   loc.id,
+                locationName,
+                description,
+            }),
+        }).then(async res => {
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({})) as { error?: string };
+                console.error(`[found-marketplace] market service error: ${body.error ?? res.status}`);
+            }
+        }).catch(err => {
+            console.error(`[found-marketplace] could not reach market service: ${(err as Error).message}`);
+        });
+
+        try {
+            CommunityLogService.getInstance().write(
+                "marketplace-founded",
+                `Marketplace "${name}" founded at "${locationName}".`,
+                { actorId: motion.proposerId },
             );
         } catch { /* non-fatal */ }
     },

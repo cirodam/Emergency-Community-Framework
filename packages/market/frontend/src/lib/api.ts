@@ -67,9 +67,10 @@ export interface Classified {
     expiresAt:      string;
 }
 
-export async function listClassifieds(category?: ClassifiedCategory, page = 1, limit = 20): Promise<Page<Classified>> {
+export async function listClassifieds(category?: ClassifiedCategory, page = 1, limit = 20, q?: string): Promise<Page<Classified>> {
     const params = new URLSearchParams();
     if (category) params.set("category", category);
+    if (q?.trim()) params.set("q", q.trim());
     params.set("page",  String(page));
     params.set("limit", String(limit));
     const res = await fetch(`/api/classifieds?${params}`);
@@ -240,9 +241,10 @@ export interface ServiceProfileDto {
     updatedAt:      string;
 }
 
-export async function listServices(category?: ServiceCategory, page = 1, limit = 20): Promise<Page<ServiceProfileDto>> {
+export async function listServices(category?: ServiceCategory, page = 1, limit = 20, q?: string): Promise<Page<ServiceProfileDto>> {
     const params = new URLSearchParams();
     if (category) params.set("category", category);
+    if (q?.trim()) params.set("q", q.trim());
     params.set("page",  String(page));
     params.set("limit", String(limit));
     const res = await fetch(`/api/services?${params}`);

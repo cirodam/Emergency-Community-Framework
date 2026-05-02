@@ -26,7 +26,10 @@ export class BylawLoader {
         return rows.map(r => JSON.parse(r.data) as GoverningDocument);
     }
 
-    create(title: string, preamble?: string, scope: string | null = null): GoverningDocument {
+    create(title: string, preamble?: string, scope: string | null = null, sunsetYears?: number): GoverningDocument {
+        const expiresAt = (sunsetYears && sunsetYears > 0)
+            ? new Date(Date.now() + sunsetYears * 365.25 * 24 * 3600 * 1000).toISOString()
+            : null;
         const bylaw: GoverningDocument = {
             id:        randomUUID(),
             type:      "bylaw",
@@ -36,6 +39,7 @@ export class BylawLoader {
             adoptedAt: new Date().toISOString(),
             version:   1,
             scope,
+            expiresAt,
         };
         this.save(bylaw);
         return bylaw;

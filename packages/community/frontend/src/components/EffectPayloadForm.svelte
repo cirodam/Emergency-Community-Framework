@@ -52,10 +52,25 @@
     let selectedPoolId   = $state("");
     let nominationId     = $state("");
 
-    // create-bylaw / amend-bylaw fields
-    let bylawTitle    = $state("");
-    let bylawPreamble = $state("");
-    let bylawId       = $state("");
+    // set-dues-rate fields
+    let duesRatePct = $state("");
+
+    // set-retirement-age / set-retirement-payout fields
+    let retirementAgeInput    = $state("");
+    let retirementPayoutInput = $state("");
+
+    // add-person fields
+    let apFirstName      = $state("");
+    let apLastName       = $state("");
+    let apBirthDate      = $state("");
+    let apPhone          = $state("");
+    let apBornInCommunity = $state(false);
+
+    let bylawTitle       = $state("");
+    let bylawPreamble    = $state("");
+    let bylawId          = $state("");
+    let bylawSunsetYears = $state("");
+    let bylawRenewYears  = $state("");
 
     // add-role-type fields
     let rtTitle     = $state("");
@@ -87,6 +102,12 @@
         deployRoles = deployRoles.filter((_, idx) => idx !== i);
     }
 
+    // found-marketplace fields
+    let mpName            = $state("");
+    let mpLocationName    = $state("");
+    let mpLocationAddress = $state("");
+    let mpDescription     = $state("");
+
     // schedule-community-event fields
     let evtTitle            = $state("");
     let evtDate             = $state("");
@@ -113,6 +134,28 @@
                 const n = Number(amendNum);
                 if (!amendNum || isNaN(n)) { payload = {}; return; }
                 payload = { parameter: amendParam, newValue: n };
+            }
+        } else if (kind === "set-dues-rate") {
+            const r = parseFloat(duesRatePct);
+            payload = (!duesRatePct || isNaN(r) || r < 0 || r > 10) ? {} : { rate: r };
+        } else if (kind === "set-retirement-age") {
+            const a = parseInt(retirementAgeInput, 10);
+            payload = (!retirementAgeInput || isNaN(a) || a < 55 || a > 75) ? {} : { age: a };
+        } else if (kind === "set-retirement-payout") {
+            const amt = parseInt(retirementPayoutInput, 10);
+            payload = (!retirementPayoutInput || isNaN(amt) || amt < 0 || amt > 100_000) ? {} : { amount: amt };
+        } else if (kind === "add-person") {
+            const fn = apFirstName.trim();
+            const ln = apLastName.trim();
+            if (!fn || !ln || !apBirthDate) { payload = {}; }
+            else {
+                payload = {
+                    firstName:       fn,
+                    lastName:        ln,
+                    birthDate:       apBirthDate,
+                    ...(apPhone.trim() ? { phone: apPhone.trim() } : {}),
+                    ...(apBornInCommunity ? { bornInCommunity: true } : {}),
+                };
             }
         } else if (kind === "suspend-member" || kind === "reinstate-member") {
             payload = selectedPersonId ? { personId: selectedPersonId } : {};
@@ -147,12 +190,23 @@
             };
         } else if (kind === "create-bylaw") {
             const title = bylawTitle.trim();
+            const sy = bylawSunsetYears.trim() ? parseInt(bylawSunsetYears.trim(), 10) : null;
             payload = title
-                ? { title, ...(bylawPreamble.trim() ? { preamble: bylawPreamble.trim() } : {}) }
+                ? {
+                    title,
+                    ...(bylawPreamble.trim() ? { preamble: bylawPreamble.trim() } : {}),
+                    ...(sy && sy > 0 ? { sunsetYears: sy } : {}),
+                  }
                 : {};
         } else if (kind === "amend-bylaw") {
+            const ry = bylawRenewYears.trim() ? parseInt(bylawRenewYears.trim(), 10) : null;
             payload = bylawId
-                ? { bylawId, ...(bylawTitle.trim() ? { title: bylawTitle.trim() } : {}), ...(bylawPreamble.trim() ? { preamble: bylawPreamble.trim() } : {}) }
+                ? {
+                    bylawId,
+                    ...(bylawTitle.trim()    ? { title:      bylawTitle.trim() }    : {}),
+                    ...(bylawPreamble.trim() ? { preamble:   bylawPreamble.trim() } : {}),
+                    ...(ry && ry > 0         ? { renewYears: ry }                   : {}),
+                  }
                 : {};
         } else if (kind === "add-role-type") {
             const title = rtTitle.trim();
@@ -189,6 +243,17 @@
                 ...(deployUnitName.trim() ? { name:        deployUnitName.trim() } : {}),
                 ...(deployUnitDesc.trim() ? { description: deployUnitDesc.trim() } : {}),
                 ...(validRoles.length     ? { roles: validRoles }                  : {}),
+            };
+        } else if (kind === "found-marketplace") {
+            const name    = mpName.trim();
+            const locName = mpLocationName.trim();
+            const locAddr = mpLocationAddress.trim();
+            if (!name || !locName || !locAddr) { payload = {}; return; }
+            payload = {
+                name,
+                locationName:    locName,
+                locationAddress: locAddr,
+                ...(mpDescription.trim() ? { description: mpDescription.trim() } : {}),
             };
         } else {
             payload = {};
@@ -230,6 +295,50 @@
             {/if}
         {/if}
     {/if}
+{:else if kind === "set-dues-rate"}
+    <input
+        class="input"
+        type="number"
+        placeholder="New dues rate (% per month, e.g. 2 = 2%)"
+        bind:value={duesRatePct}
+        min="0" max="10" step="0.1"
+    />
+    {#if constitution}
+        <p class="hint">Current rate: <strong>{(constitution.parameters["communityDuesRate"]?.value as number * 100 ?? 0).toFixed(2)}%</strong> / month &nbsp;·&nbsp; allowed range: 0–10%</p>
+    {/if}
+{:else if kind === "set-retirement-age"}
+    <input
+        class="input"
+        type="number"
+        placeholder="New retirement age (years, 55–75)"
+        bind:value={retirementAgeInput}
+        min="55" max="75" step="1"
+    />
+    {#if constitution}
+        <p class="hint">Current age: <strong>{constitution.parameters["retirementAge"]?.value ?? 65} years</strong> &nbsp;·&nbsp; allowed range: 55–75</p>
+    {/if}
+{:else if kind === "set-retirement-payout"}
+    <input
+        class="input"
+        type="number"
+        placeholder="New monthly payout per retiree (kin)"
+        bind:value={retirementPayoutInput}
+        min="0" max="100000" step="1"
+    />
+    {#if constitution}
+        <p class="hint">Current payout: <strong>{constitution.parameters["retirementPayoutRate"]?.value ?? 500} kin/month</strong> &nbsp;·&nbsp; allowed range: 0–100,000</p>
+    {/if}
+{:else if kind === "add-person"}
+    <input class="input" type="text" placeholder="First name *" bind:value={apFirstName} />
+    <input class="input" type="text" placeholder="Last name *" bind:value={apLastName} />
+    <label class="hint-label">Date of birth *
+        <input class="input" type="date" bind:value={apBirthDate} />
+    </label>
+    <input class="input" type="tel" placeholder="Phone (optional, E.164 e.g. +15551234567)" bind:value={apPhone} />
+    <label class="checkbox-row">
+        <input type="checkbox" bind:checked={apBornInCommunity} />
+        Born in community (receives birth grant instead of back-endowment)
+    </label>
 {:else if kind === "suspend-member" || kind === "reinstate-member"}
     {#if !persons.length}
         <p class="hint">Loading members…</p>
@@ -318,20 +427,22 @@
 {:else if kind === "create-bylaw"}
     <input class="input" type="text" placeholder="Bylaw title *" bind:value={bylawTitle} />
     <textarea class="input textarea" placeholder="Preamble (optional)" bind:value={bylawPreamble} rows="3"></textarea>
+    <input class="input" type="number" placeholder="Sunset after (years, optional — leave blank for permanent)" bind:value={bylawSunsetYears} min="1" />
 {:else if kind === "amend-bylaw"}
     {#if !bylaws.length}
         <p class="hint">Loading bylaws…</p>
     {:else}
-        <select class="input select" bind:value={bylawId} onchange={() => { bylawTitle = ""; bylawPreamble = ""; }}>
+        <select class="input select" bind:value={bylawId} onchange={() => { bylawTitle = ""; bylawPreamble = ""; bylawRenewYears = ""; }}>
             <option value="">— choose bylaw —</option>
             {#each bylaws as b (b.id)}
-                <option value={b.id}>{b.title}{b.scope ? ` [pool: ${b.scope}]` : ""}</option>
+                <option value={b.id}>{b.title}{b.scope ? ` [pool: ${b.scope}]` : ""}{b.expiresAt ? ` · expires ${new Date(b.expiresAt).getFullYear()}` : ""}</option>
             {/each}
         </select>
     {/if}
     {#if bylawId}
         <input class="input" type="text" placeholder="New title (leave blank to keep current)" bind:value={bylawTitle} />
         <textarea class="input textarea" placeholder="New preamble (leave blank to keep current)" bind:value={bylawPreamble} rows="3"></textarea>
+        <input class="input" type="number" placeholder="Renew for (years, optional — extends or sets expiry)" bind:value={bylawRenewYears} min="1" />
     {/if}
 {:else if kind === "add-role-type"}
     <input class="input" type="text" placeholder="Role title * (e.g. Nurse Practitioner)" bind:value={rtTitle} />
@@ -401,6 +512,11 @@
         {/each}
         <button type="button" class="add-slot-btn" onclick={addDeployRoleSlot}>+ Add role slot</button>
     {/if}
+{:else if kind === "found-marketplace"}
+    <input class="input" type="text" placeholder="Marketplace name *" bind:value={mpName} />
+    <input class="input" type="text" placeholder="Location name * (e.g. Riverside Park)" bind:value={mpLocationName} />
+    <input class="input" type="text" placeholder="Location address *" bind:value={mpLocationAddress} />
+    <textarea class="input textarea" placeholder="Description (optional)" bind:value={mpDescription} rows="2"></textarea>
 {/if}
 
 <style>
@@ -418,6 +534,8 @@
     .select { cursor: pointer; }
     .textarea { resize: vertical; min-height: 3.5rem; font-family: inherit; }
     .hint { font-size: 0.78rem; color: #64748b; margin: 0; }
+    .hint-label { font-size: 0.78rem; color: #64748b; display: flex; flex-direction: column; gap: 0.25rem; }
+    .checkbox-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; color: #475569; cursor: pointer; }
     .row { display: flex; gap: 0.5rem; align-items: flex-end; }
     .field { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
     .field-check { flex-direction: row; align-items: center; gap: 0.35rem; flex: 0 0 auto; padding-bottom: 0.45rem; }

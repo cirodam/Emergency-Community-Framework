@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getConstitution, listBylaws, createBylaw, deleteBylaw } from "../lib/api.js";
+    import { getConstitution, listBylaws, deleteBylaw } from "../lib/api.js";
     import type { ConstitutionDocument, BylawDto } from "../lib/api.js";
     import { currentPage, session, selectedBylawId } from "../lib/session.js";
 
@@ -23,28 +23,6 @@
 
     $effect(() => { load(); });
 
-    // ── New bylaw form ────────────────────────────────────────────────────────
-    let showForm    = $state(false);
-    let newTitle    = $state("");
-    let newPreamble = $state("");
-    let creating    = $state(false);
-    let createError = $state("");
-
-    async function submitCreate() {
-        createError = "";
-        if (!newTitle.trim()) { createError = "Title is required."; return; }
-        creating = true;
-        try {
-            const bylaw = await createBylaw(newTitle.trim(), newPreamble.trim() || undefined);
-            bylaws = [...bylaws, bylaw];
-            showForm = false; newTitle = ""; newPreamble = "";
-        } catch (e) {
-            createError = e instanceof Error ? e.message : "Failed to create bylaw";
-        } finally {
-            creating = false;
-        }
-    }
-
     async function handleDelete(bylaw: BylawDto, e: MouseEvent) {
         e.stopPropagation();
         if (!confirm(`Delete "${bylaw.title}"? This cannot be undone.`)) return;
@@ -66,14 +44,25 @@
     function formatDate(iso: string): string {
         return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
     }
+
+    function expiryStatus(bylaw: BylawDto): "expired" | "soon" | "none" {
+        if (!bylaw.expiresAt) return "none";
+        const now      = Date.now();
+        const expiry   = new Date(bylaw.expiresAt).getTime();
+        if (expiry <= now)                              return "expired";
+        if (expiry - now <= 90 * 24 * 3600 * 1000)    return "soon";
+        return "none";
+    }
+
+    function expiryLabel(bylaw: BylawDto): string {
+        if (!bylaw.expiresAt) return "";
+        return `Expires ${formatDate(bylaw.expiresAt)}`;
+    }
 </script>
 
 <div class="docs-page">
     <div class="page-header">
         <h2 class="page-title">Governing Documents</h2>
-        {#if isSteward && !showForm}
-            <button class="new-btn" onclick={() => showForm = true}>+ New Bylaw</button>
-        {/if}
     </div>
 
     {#if loading}
@@ -110,27 +99,7 @@
             {/if}
         </div>
 
-        {#if showForm}
-            <div class="new-form">
-                <label class="field">
-                    <span>Title</span>
-                    <input type="text" bind:value={newTitle} placeholder="e.g. Membership Bylaw" disabled={creating} />
-                </label>
-                <label class="field">
-                    <span>Preamble <small>(optional)</small></span>
-                    <textarea rows={3} bind:value={newPreamble} placeholder="Introductory text…" disabled={creating}></textarea>
-                </label>
-                {#if createError}<p class="field-error">{createError}</p>{/if}
-                <div class="form-actions">
-                    <button class="btn-primary" onclick={submitCreate} disabled={creating || !newTitle.trim()}>
-                        {creating ? "Creating…" : "Create Bylaw"}
-                    </button>
-                    <button class="btn-cancel" onclick={() => { showForm = false; createError = ""; }} disabled={creating}>Cancel</button>
-                </div>
-            </div>
-        {/if}
-
-        {#if bylaws.length === 0 && !showForm}
+        {#if bylaws.length === 0}
             <div class="empty-state">No bylaws have been adopted yet.</div>
         {:else}
             <ul class="doc-list">
@@ -141,6 +110,11 @@
                             <div class="doc-meta">
                                 Version {bylaw.version} · Adopted {formatDate(bylaw.adoptedAt)}
                             </div>
+                            {#if bylaw.expiresAt}
+                                <div class="expiry-badge expiry-{expiryStatus(bylaw)}">
+                                    {expiryStatus(bylaw) === "expired" ? "⚠ Expired" : "⏳"} {expiryLabel(bylaw)}
+                                </div>
+                            {/if}
                             {#if bylaw.articles.length > 0}
                                 <div class="doc-toc">{bylaw.articles.length} article{bylaw.articles.length !== 1 ? "s" : ""}</div>
                             {:else}
@@ -172,25 +146,10 @@
     }
 
     .page-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
         margin-bottom: 1.25rem;
     }
 
     .page-title { margin: 0; font-size: 1.2rem; font-weight: 700; color: #0f172a; }
-
-    .new-btn {
-        background: #16a34a;
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-        font-size: 0.875rem;
-        font-weight: 600;
-        cursor: pointer;
-    }
-    .new-btn:hover { background: #15803d; }
 
     .section-label {
         font-size: 0.78rem;
@@ -239,6 +198,23 @@
     .doc-toc   { font-size: 0.78rem; color: #94a3b8; }
     .doc-toc.empty { font-style: italic; }
 
+    .expiry-badge {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 600;
+        border-radius: 4px;
+        padding: 0.1rem 0.45rem;
+        margin: 0.2rem 0 0.15rem;
+    }
+    .expiry-badge.expiry-expired {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+    .expiry-badge.expiry-soon {
+        background: #fef3c7;
+        color: #b45309;
+    }
+
     .doc-card-actions { display: flex; align-items: center; gap: 0.4rem; }
 
     .doc-arrow { font-size: 1.3rem; color: #94a3b8; flex-shrink: 0; }
@@ -256,62 +232,6 @@
     }
     .doc-card:hover .delete-btn { opacity: 1; }
     .delete-btn:hover { background: #fef2f2; }
-
-    /* New bylaw form */
-    .new-form {
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 14px;
-        padding: 1.25rem;
-        margin-bottom: 1rem;
-        display: flex;
-        flex-direction: column;
-        gap: 0.85rem;
-    }
-
-    .field { display: flex; flex-direction: column; gap: 0.35rem; }
-    .field span { font-size: 0.85rem; font-weight: 500; color: #374151; }
-    .field small { font-weight: 400; opacity: 0.6; }
-
-    .field input,
-    .field textarea {
-        border: 1px solid #cbd5e1;
-        border-radius: 10px;
-        font-size: 0.95rem;
-        padding: 0.65rem 0.9rem;
-        outline: none;
-        resize: vertical;
-        font-family: inherit;
-        transition: border-color 0.15s;
-    }
-    .field input:focus, .field textarea:focus { border-color: #16a34a; }
-
-    .field-error { font-size: 0.82rem; color: #dc2626; margin: 0; }
-
-    .form-actions { display: flex; gap: 0.75rem; align-items: center; }
-
-    .btn-primary {
-        padding: 0.7rem 1.5rem;
-        background: #16a34a;
-        color: #fff;
-        border: none;
-        border-radius: 10px;
-        font-size: 0.95rem;
-        font-weight: 600;
-        cursor: pointer;
-    }
-    .btn-primary:disabled { background: #86efac; cursor: default; }
-    .btn-primary:not(:disabled):hover { background: #15803d; }
-
-    .btn-cancel {
-        padding: 0.7rem 1rem;
-        background: none;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        font-size: 0.9rem;
-        cursor: pointer;
-        color: #64748b;
-    }
 
     .empty-state { padding: 3rem 0; text-align: center; color: #94a3b8; font-size: 0.9rem; }
     .state-msg   { padding: 3rem 0; text-align: center; color: #94a3b8; }

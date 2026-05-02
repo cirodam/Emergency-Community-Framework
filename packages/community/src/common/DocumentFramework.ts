@@ -39,6 +39,13 @@ export interface GoverningDocument {
      * created or amended by a motion from that body (or the assembly).
      */
     scope:     string | null;
+    /**
+     * ISO 8601 datetime after which this bylaw is considered expired.
+     * null / undefined = no expiry (bylaw is permanent until repealed).
+     * Expired bylaws are NOT auto-deleted; the community must consciously
+     * re-adopt or renew them via a motion.
+     */
+    expiresAt?: string | null;
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────

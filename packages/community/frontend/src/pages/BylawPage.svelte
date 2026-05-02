@@ -113,7 +113,20 @@
                 <span class="doc-meta-label">Version {doc.version}</span>
                 <span class="doc-meta-sep">·</span>
                 <span class="doc-meta-label">Adopted {formatDate(doc.adoptedAt)}</span>
+                {#if doc.expiresAt}
+                    <span class="doc-meta-sep">·</span>
+                    <span class="doc-meta-label">Expires {formatDate(doc.expiresAt)}</span>
+                {/if}
             </div>
+            {#if doc.expiresAt}
+                {@const now = Date.now()}
+                {@const expiry = new Date(doc.expiresAt).getTime()}
+                {#if expiry <= now}
+                    <div class="expiry-banner expiry-expired">⚠ This bylaw has expired. The community should re-adopt or repeal it via a motion.</div>
+                {:else if expiry - now <= 90 * 24 * 3600 * 1000}
+                    <div class="expiry-banner expiry-soon">⏳ This bylaw expires on {formatDate(doc.expiresAt)}. Consider renewing it via an amend-bylaw motion.</div>
+                {/if}
+            {/if}
             <h1 class="doc-title">{doc.title}</h1>
             {#if doc.preamble}
                 <p class="doc-preamble">{doc.preamble}</p>
@@ -259,6 +272,24 @@
     .back-btn:hover { text-decoration: underline; }
 
     .doc-header { margin-bottom: 2rem; }
+
+    .expiry-banner {
+        border-radius: 6px;
+        padding: 0.6rem 0.9rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin: 0.75rem 0;
+    }
+    .expiry-banner.expiry-expired {
+        background: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #fca5a5;
+    }
+    .expiry-banner.expiry-soon {
+        background: #fef3c7;
+        color: #b45309;
+        border: 1px solid #fcd34d;
+    }
 
     /* .doc-meta-row / .doc-meta-sep — shared in app.css under .doc-viewer */
     .doc-meta-label { font-size: 0.8rem; color: #94a3b8; }
