@@ -2,7 +2,7 @@
     import TransactionRow from "../components/TransactionRow.svelte";
     import ErrorBanner from "../components/ErrorBanner.svelte";
     import { session } from "../lib/session.js";
-    import { getTransactions } from "../lib/api.js";
+    import { getMyAccountTransactions } from "../lib/api.js";
     import type { TransactionDto } from "../lib/api.js";
 
     const s = $derived($session!);
@@ -30,7 +30,7 @@
         loading = true;
         error = "";
         try {
-            txs = await getTransactions(s.primaryAccountId, selectedMonth || undefined);
+            txs = await getMyAccountTransactions(s.primaryAccountHandle, selectedMonth || undefined);
             // newest first
             txs = txs.slice().sort((a, b) => b.timestamp.localeCompare(a.timestamp));
         } catch (e) {
@@ -63,7 +63,7 @@
     {:else}
         <div class="tx-list">
             {#each txs as tx (tx.id)}
-                <TransactionRow {tx} perspectiveAccountId={s.primaryAccountId} />
+                <TransactionRow {tx} perspectiveAccountHandle={s.primaryAccountHandle} />
             {/each}
         </div>
     {/if}

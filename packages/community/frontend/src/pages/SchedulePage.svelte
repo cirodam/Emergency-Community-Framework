@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { listShifts, createShift, claimShift, unclaimShift, deleteShift, listDomains, listPersons, listRoles, listUnits, listLocations } from "../lib/api.js";
-    import type { ShiftDto, DomainDto, PersonDto, RoleDto, UnitDto, LocationDto } from "../lib/api.js";
+    import { listShifts, createShift, claimShift, unclaimShift, deleteShift, listDomains, listRoles, listUnits, listLocations } from "../lib/api.js";
+    import type { ShiftDto, DomainDto, RoleDto, UnitDto, LocationDto } from "../lib/api.js";
     import { session } from "../lib/session.js";
 
     // ── Week navigation ────────────────────────────────────────────────────────
@@ -52,7 +52,6 @@
     let shifts:    ShiftDto[]    = $state([]);
     let domains:   DomainDto[]   = $state([]);
     let units:     UnitDto[]     = $state([]);
-    let persons:   PersonDto[]   = $state([]);
     let roles:     RoleDto[]     = $state([]);
     let locations: LocationDto[] = $state([]);
     let loading = $state(true);
@@ -67,11 +66,10 @@
         try {
             const from = weekStart.toISOString();
             const to   = addDays(weekStart, 7).toISOString();
-            [shifts, domains, units, persons, roles, locations] = await Promise.all([
+            [shifts, domains, units, roles, locations] = await Promise.all([
                 listShifts({ from, to, domainId: filterDomainId || undefined }),
                 listDomains(),
                 listUnits(),
-                listPersons(),
                 listRoles(),
                 listLocations(),
             ]);
@@ -97,11 +95,7 @@
 
     // ── Derived: group shifts by calendar day ──────────────────────────────────
 
-    // ── Person & domain lookup ─────────────────────────────────────────────────
-
-    const personMap = $derived(
-        new Map(persons.map(p => [p.id, p]))
-    );
+    // ── Domain lookup ─────────────────────────────────────────────────────────
 
     const domainMap = $derived(
         new Map(domains.map(d => [d.id, d]))
@@ -157,7 +151,7 @@
         roleTitle: string;
         domainId: string;
         unitId: string;
-        memberId: string | null;
+        memberHandle: string | null;
         date: string;       // YYYY-MM-DD
         startTime: string;  // HH:MM
         endTime: string;    // HH:MM
@@ -183,7 +177,7 @@
                             roleTitle: role.title,
                             domainId,
                             unitId,
-                            memberId: role.memberId,
+                            memberHandle: role.memberHandle,
                             date: isoDate(day),
                             startTime: slot.startTime,
                             endTime: slot.endTime,
@@ -208,12 +202,6 @@
             };
         })
     );
-
-    function personName(id: string | null): string {
-        if (!id) return "Unassigned";
-        const p = personMap.get(id);
-        return p ? `${p.firstName} ${p.lastName}` : id;
-    }
 
     // ── Claim / unclaim ────────────────────────────────────────────────────────
 
@@ -298,7 +286,7 @@
     }
 
     const isSteward = $derived($session?.isSteward ?? false);
-    const myId      = $derived($session?.personId ?? "");
+    const myHandle  = $derived($session?.handle ?? "");
     const today     = $derived(isoDate(new Date()));
 </script>
 
@@ -416,7 +404,7 @@
                                 {#if unitMap.get(rs.unitId)?.locationId}
                                     <div class="shift-location">📍 {locationMap.get(unitMap.get(rs.unitId)!.locationId!)?.name ?? ""}</div>
                                 {/if}
-                                <div class="shift-person">{personName(rs.memberId)}</div>
+                                <div class="shift-person">{rs.memberHandle ?? ""}</div>
                             </div>
                         {/each}
 
@@ -432,7 +420,7 @@
                                 <div class="shift-domain">{domainMap.get(shift.domainId)?.name ?? shift.domainId}</div>
 
                                 {#if !shift.isOpen}
-                                    <div class="shift-person">{personName(shift.assignedPersonId)}</div>
+                                    <div class="shift-person">{shift.assignedHandle ?? ""}</div>
                                 {/if}
 
                                 {#if shift.note}
@@ -440,9 +428,9 @@
                                 {/if}
 
                                 <div class="shift-actions">
-                                    {#if shift.isOpen && myId}
+                                    {#if shift.isOpen && myHandle}
                                         <button class="claim-btn" onclick={() => handleClaim(shift)}>Claim</button>
-                                    {:else if shift.assignedPersonId === myId}
+                                    {:else if shift.assignedHandle === myHandle}
                                         <button class="unclaim-btn" onclick={() => handleUnclaim(shift)}>Drop shift</button>
                                     {/if}
                                     {#if isSteward}

@@ -62,7 +62,6 @@
             <label class="field">
                 <span>Handle</span>
                 <div class="handle-input">
-                    <span class="at">@</span>
                     <input
                         type="text"
                         bind:value={handle}
@@ -152,13 +151,6 @@
     }
 
     .handle-input:focus-within { border-color: #16a34a; }
-
-    .at {
-        padding: 0 0.5rem 0 1rem;
-        color: #94a3b8;
-        font-size: 1rem;
-        user-select: none;
-    }
 
     .handle-input input {
         border: none;

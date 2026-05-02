@@ -1,31 +1,37 @@
 import { Request, Response } from "express";
 import { ShiftService } from "../shift/ShiftService.js";
 import { Shift } from "../shift/Shift.js";
+import { PersonService } from "../person/PersonService.js";
 
 const svc = () => ShiftService.getInstance();
+const ppl = () => PersonService.getInstance();
 
 function toDto(shift: Shift) {
     return {
-        id:               shift.id,
-        domainId:         shift.domainId,
-        label:            shift.label,
-        startAt:          shift.startAt,
-        endAt:            shift.endAt,
-        assignedPersonId: shift.assignedPersonId,
-        note:             shift.note,
-        createdBy:        shift.createdBy,
-        createdAt:        shift.createdAt,
-        isOpen:           shift.isOpen,
+        id:             shift.id,
+        domainId:       shift.domainId,
+        label:          shift.label,
+        startAt:        shift.startAt,
+        endAt:          shift.endAt,
+        assignedHandle: shift.assignedPersonId
+            ? (ppl().get(shift.assignedPersonId)?.handle ?? null)
+            : null,
+        note:           shift.note,
+        createdBy:      shift.createdBy,
+        createdAt:      shift.createdAt,
+        isOpen:         shift.isOpen,
     };
 }
 
 // GET /api/shifts
-// Query params: domainId, personId, open (bool), from+to (ISO range)
+// Query params: domainId, handle, open (bool), from+to (ISO range)
 export function listShifts(req: Request, res: Response): void {
-    const { domainId, personId, open, from, to } = req.query as Record<string, string | undefined>;
+    const { domainId, handle, open, from, to } = req.query as Record<string, string | undefined>;
 
-    if (personId) {
-        res.json(svc().getByPerson(personId).map(toDto));
+    if (handle) {
+        const person = ppl().getByHandle(handle);
+        if (!person) { res.json([]); return; }
+        res.json(svc().getByPerson(person.id).map(toDto));
         return;
     }
     if (from && to) {
@@ -80,12 +86,18 @@ export function createShift(req: Request, res: Response): void {
 }
 
 // POST /api/shifts/:id/claim
-// Body: { personId? } — defaults to authenticated user
+// Body: { handle? } — defaults to authenticated user
 export function claimShift(req: Request, res: Response): void {
     const authPersonId: string = (req as typeof req & { personId?: string }).personId ?? "";
-    const personId: string = (req.body as { personId?: string })?.personId ?? authPersonId;
+    const { handle } = (req.body ?? {}) as { handle?: string };
 
-    if (!personId) { res.status(400).json({ error: "personId is required" }); return; }
+    let personId = authPersonId;
+    if (handle) {
+        const target = ppl().getByHandle(handle);
+        if (!target) { res.status(404).json({ error: "Person not found" }); return; }
+        personId = target.id;
+    }
+    if (!personId) { res.status(400).json({ error: "Authentication required" }); return; }
 
     try {
         const shift = svc().claim(req.params.id as string, personId);
@@ -106,14 +118,16 @@ export function unclaimShift(req: Request, res: Response): void {
 }
 
 // PATCH /api/shifts/:id/assign
-// Body: { personId }
+// Body: { handle }
 export function reassignShift(req: Request, res: Response): void {
-    const { personId } = req.body ?? {};
-    if (typeof personId !== "string" || !personId) {
-        res.status(400).json({ error: "personId is required" }); return;
+    const { handle } = req.body ?? {};
+    if (typeof handle !== "string" || !handle) {
+        res.status(400).json({ error: "handle is required" }); return;
     }
+    const target = ppl().getByHandle(handle);
+    if (!target) { res.status(404).json({ error: "Person not found" }); return; }
     try {
-        const shift = svc().reassign(req.params.id as string, personId);
+        const shift = svc().reassign(req.params.id as string, target.id);
         res.json(toDto(shift));
     } catch (err) {
         res.status(400).json({ error: (err as Error).message });

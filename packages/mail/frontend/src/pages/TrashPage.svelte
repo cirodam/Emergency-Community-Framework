@@ -84,7 +84,7 @@
                         <span class="message-subject">{msg.subject || "(no subject)"}</span>
                         <span class="message-date">{formatDate(msg.sentAt)}</span>
                     </div>
-                    <div class="message-from">From: {msg.fromPersonId}</div>
+                    <div class="message-from">From: {msg.fromHandle}</div>
                     <div class="message-actions">
                         <button class="icon-btn restore-btn" title="Restore to inbox" onclick={(e) => restore(msg, e)}>↩ Restore</button>
                         <button class="icon-btn delete-btn" title="Delete forever" onclick={(e) => permaDelete(msg, e)}>✕ Delete forever</button>

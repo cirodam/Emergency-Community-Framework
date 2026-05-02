@@ -154,7 +154,7 @@ effectRegistry.register("set-retirement-payout", {
 // Adds a new person to the community via motion rather than direct admin action.
 // Different from membership applications: this is a deliberate community decision
 // to bring someone in (e.g. a newborn, a transfer from another community, etc.).
-// Payload: { firstName, lastName, birthDate, phone?, bornInCommunity? }
+// Payload: { firstName, lastName, birthDate, phone? }
 
 effectRegistry.register("add-person", {
     label:    "Add person",
@@ -171,12 +171,11 @@ effectRegistry.register("add-person", {
         return null;
     },
     handler({ motion, payload }) {
-        const firstName       = (payload.firstName as string).trim();
-        const lastName        = (payload.lastName  as string).trim();
-        const birthDate       = new Date(payload.birthDate as string);
-        const phone           = typeof payload.phone === "string" && payload.phone.trim()
+        const firstName = (payload.firstName as string).trim();
+        const lastName  = (payload.lastName  as string).trim();
+        const birthDate = new Date(payload.birthDate as string);
+        const phone     = typeof payload.phone === "string" && payload.phone.trim()
             ? payload.phone.trim() : null;
-        const bornInCommunity = payload.bornInCommunity === true;
 
         const svc  = PersonService.getInstance();
 
@@ -197,7 +196,6 @@ effectRegistry.register("add-person", {
             null,
             phone,
             [],
-            bornInCommunity,
         );
 
         // Fire-and-forget: join handlers open bank accounts etc. asynchronously.

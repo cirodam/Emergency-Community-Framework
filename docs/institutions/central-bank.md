@@ -65,9 +65,7 @@ A person who joins at 40 has lived 40 years during which kin was not being issue
 
 The split here is:
 - 80% (`endowmentPoolFraction`) to the social insurance pool — the bulk of a life's accumulated entitlement is deferred retirement.
-- Of the remaining 20%: a fixed seed balance (`endowmentSeedBalance`, default 1,000 kin) goes to the member's account so they can participate immediately. The rest goes to the community treasury.
-
-The seed balance grounds new members in the scale of the economy. Without it, a new member might feel they have to earn their way in before spending anything. The endowment is their stake; the seed is their first handful.
+- The remaining 20% goes to the community treasury.
 
 **3. Birth grant (on birth)**
 When a member's child is born, the central bank issues a small fixed amount (`birthGrant`, default 500 kin) to the community fund, which forwards it to the newborn's account. Unlike the join endowment — which compensates for prior years — the birth grant simply marks the start. The newborn has no prior years to compensate for.
@@ -144,7 +142,6 @@ Monetary policy parameters are governed by referendum:
 | `demurrageFloor` | Balance protected from demurrage | 1,000 kin |
 | `birthdayCirculationFraction` | Share of annual issuance going directly to the member | 20% |
 | `endowmentPoolFraction` | Share of join endowment going to social insurance pool | 80% |
-| `endowmentSeedBalance` | Fixed kin to member's account on joining | 1,000 kin |
 | `birthGrant` | One-time issuance on birth | 500 kin |
 | `retirementAge` | Age at which social insurance payments begin | 65 |
 | `retirementPayoutRate` | Monthly flat payment to eligible retirees | 500 kin/mo |

@@ -56,9 +56,9 @@
     const totalPages = $derived(Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)));
     const paginated  = $derived(filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
 
-    async function toggleExpand(id: string) {
-        const newId = expandedId === id ? null : id;
-        expandedId = newId;
+    async function toggleExpand(handle: string) {
+        const newHandle = expandedId === handle ? null : handle;
+        expandedId = newHandle;
         expandedDetail = null;
         newPass    = "";
         resetError = "";
@@ -67,18 +67,18 @@
         suspendingApp = null;
         suspendReason = "";
         suspendError  = "";
-        if (newId) {
+        if (newHandle) {
             detailLoading = true;
-            try { expandedDetail = await getPerson(newId); } catch { /* keep null */ }
+            try { expandedDetail = await getPerson(newHandle); } catch { /* keep null */ }
             finally { detailLoading = false; }
         }
     }
 
-    async function doResetPassword(personId: string) {
+    async function doResetPassword(handle: string) {
         if (newPass.length < 8) { resetError = "Password must be at least 8 characters"; return; }
         resetting = true; resetError = ""; resetOk = false;
         try {
-            await setPassword(personId, newPass);
+            await setPassword(handle, newPass);
             resetOk = true;
             newPass = "";
         } catch (e) {
@@ -88,11 +88,11 @@
         }
     }
 
-    async function doGrantSteward(personId: string) {
+    async function doGrantSteward(handle: string) {
         stewardWorking = true; stewardError = "";
         try {
-            const updated = await grantSteward(personId);
-            members = members.map(m => m.id === personId ? updated : m);
+            const updated = await grantSteward(handle);
+            members = members.map(m => m.handle === handle ? updated : m);
         } catch (e) {
             stewardError = e instanceof Error ? e.message : "Failed to grant stewardship";
         } finally {
@@ -100,11 +100,11 @@
         }
     }
 
-    async function doRevokeSteward(personId: string) {
+    async function doRevokeSteward(handle: string) {
         stewardWorking = true; stewardError = "";
         try {
-            const updated = await revokeSteward(personId);
-            members = members.map(m => m.id === personId ? updated : m);
+            const updated = await revokeSteward(handle);
+            members = members.map(m => m.handle === handle ? updated : m);
         } catch (e) {
             stewardError = e instanceof Error ? e.message : "Failed to revoke stewardship";
         } finally {
@@ -112,11 +112,11 @@
         }
     }
 
-    async function doSuspend(personId: string, app: string) {
+    async function doSuspend(handle: string, app: string) {
         suspendWorking = true; suspendError = "";
         try {
-            await suspendFromApp(personId, app, suspendReason);
-            expandedDetail = await getPerson(personId);
+            await suspendFromApp(handle, app, suspendReason);
+            expandedDetail = await getPerson(handle);
             suspendingApp = null; suspendReason = "";
         } catch (e) {
             suspendError = e instanceof Error ? e.message : "Failed to suspend";
@@ -125,11 +125,11 @@
         }
     }
 
-    async function doUnsuspend(personId: string, app: string) {
+    async function doUnsuspend(handle: string, app: string) {
         suspendWorking = true; suspendError = "";
         try {
-            await unsuspendFromApp(personId, app);
-            expandedDetail = await getPerson(personId);
+            await unsuspendFromApp(handle, app);
+            expandedDetail = await getPerson(handle);
         } catch (e) {
             suspendError = e instanceof Error ? e.message : "Failed to lift suspension";
         } finally {
@@ -162,13 +162,13 @@
         <div class="loading-msg">No members found.</div>
     {:else}
         <div class="member-list">
-            {#each paginated as m (m.id)}
-                <div class="member-card" class:expanded={expandedId === m.id}>
-                    <button class="member-row" onclick={() => toggleExpand(m.id)}>
+            {#each paginated as m (m.handle)}
+                <div class="member-card" class:expanded={expandedId === m.handle}>
+                    <button class="member-row" onclick={() => toggleExpand(m.handle)}>
                         <div class="member-avatar">{m.firstName[0]}{m.lastName[0]}</div>
                         <div class="member-info">
                             <span class="member-name">{m.firstName} {m.lastName}</span>
-                            <span class="member-handle">@{m.handle}</span>
+                            <span class="member-handle">{m.handle}</span>
                         </div>
                         {#if m.isSteward}
                             <span class="badge steward">Steward</span>
@@ -178,10 +178,10 @@
                         {:else if m.disabled}
                             <span class="badge exempt">Exempt</span>
                         {/if}
-                        <span class="chevron">{expandedId === m.id ? "▲" : "▼"}</span>
+                        <span class="chevron">{expandedId === m.handle ? "▲" : "▼"}</span>
                     </button>
 
-                    {#if expandedId === m.id}
+                    {#if expandedId === m.handle}
                         <div class="member-detail">
                             {#if expandedDetail?.phone}
                                 <p class="detail-phone">📞 {expandedDetail.phone}</p>
@@ -204,11 +204,11 @@
                                                     {/each}
                                                 {/if}
                                             </div>
-                                            {#if $session?.isSteward && m.id !== $session.personId}
+                                            {#if $session?.isSteward && m.handle !== $session.handle}
                                                 {#if perms.length === 0}
                                                     <button
                                                         class="btn-lift"
-                                                        onclick={() => doUnsuspend(m.id, app)}
+                                                        onclick={() => doUnsuspend(m.handle, app)}
                                                         disabled={suspendWorking}
                                                     >{suspendWorking ? "…" : "Lift"}</button>
                                                 {:else if suspendingApp === app}
@@ -220,7 +220,7 @@
                                                         />
                                                         <button
                                                             class="btn-suspend-confirm"
-                                                            onclick={() => doSuspend(m.id, app)}
+                                                            onclick={() => doSuspend(m.handle, app)}
                                                             disabled={suspendWorking}
                                                         >{suspendWorking ? "…" : "Confirm"}</button>
                                                         <button
@@ -253,11 +253,11 @@
                                             placeholder="New password (min 8 chars)"
                                             autocomplete="new-password"
                                             disabled={resetting}
-                                            onkeydown={(e) => e.key === "Enter" && doResetPassword(m.id)}
+                                            onkeydown={(e) => e.key === "Enter" && doResetPassword(m.handle)}
                                         />
                                         <button
                                             class="btn-reset"
-                                            onclick={() => doResetPassword(m.id)}
+                                            onclick={() => doResetPassword(m.handle)}
                                             disabled={resetting || newPass.length < 8}
                                         >
                                             {resetting ? "…" : "Set"}
@@ -271,7 +271,7 @@
                                     {#if m.steward}
                                         <button
                                             class="btn-steward-revoke"
-                                            onclick={() => doRevokeSteward(m.id)}
+                                            onclick={() => doRevokeSteward(m.handle)}
                                             disabled={stewardWorking}
                                         >
                                             {stewardWorking ? "…" : "Remove steward grant"}
@@ -282,7 +282,7 @@
                                     {:else if !m.isSteward}
                                         <button
                                             class="btn-steward-grant"
-                                            onclick={() => doGrantSteward(m.id)}
+                                            onclick={() => doGrantSteward(m.handle)}
                                             disabled={stewardWorking}
                                         >
                                             {stewardWorking ? "…" : "Make steward"}

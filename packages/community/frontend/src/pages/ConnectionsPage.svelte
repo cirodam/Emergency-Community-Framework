@@ -118,7 +118,6 @@
                         <label class="field">
                             <span>Community handle</span>
                             <div class="handle-wrap">
-                                <span class="at">@</span>
                                 <input type="text" bind:value={applyHandle} placeholder="riverside" disabled={applyLoading} autocapitalize="none" />
                             </div>
                         </label>
@@ -359,12 +358,6 @@
         background: #fff;
     }
     .handle-wrap:focus-within { border-color: #16a34a; box-shadow: 0 0 0 2px #bbf7d0; }
-    .at {
-        padding: 0.5rem 0.5rem 0.5rem 0.75rem;
-        color: #94a3b8;
-        font-size: 0.875rem;
-        user-select: none;
-    }
     .handle-wrap input {
         border: none;
         padding: 0.5rem 0.75rem 0.5rem 0;

@@ -1,22 +1,29 @@
 import { Request, Response } from "express";
 import { AssociationService } from "../association/AssociationService.js";
 import { Association } from "../association/Association.js";
+import { HandleRegistry } from "../HandleRegistry.js";
+import { PersonService } from "../person/PersonService.js";
 
 type AuthedRequest = Request & { personId?: string };
 
 const svc = () => AssociationService.getInstance();
+const ppl = () => PersonService.getInstance();
+
+function resolveHandle(personId: string): string {
+    return ppl().get(personId)?.handle ?? personId;
+}
 
 function toDto(a: Association) {
     return {
-        id:           a.id,
-        name:         a.name,
-        handle:       a.handle,
-        description:  a.description,
-        active:       a.active,
-        memberIds:    a.memberIds,
-        adminIds:     a.adminIds,
-        memberCount:  a.memberIds.length,
-        registeredAt: a.registeredAt,
+        id:             a.id,
+        name:           a.name,
+        handle:         a.handle,
+        description:    a.description,
+        active:         a.active,
+        memberHandles:  a.memberIds.map(resolveHandle),
+        adminHandles:   a.adminIds.map(resolveHandle),
+        memberCount:    a.memberIds.length,
+        registeredAt:   a.registeredAt,
     };
 }
 
@@ -49,7 +56,7 @@ export function createAssociation(req: AuthedRequest, res: Response): void {
     }
 
     const slug = handle.toLowerCase().replace(/[^a-z0-9_]/g, "_");
-    if (svc().isHandleTaken(slug)) {
+    if (HandleRegistry.getInstance().isTaken(slug)) {
         res.status(409).json({ error: `Handle "${slug}" is already taken` }); return;
     }
 
@@ -78,7 +85,7 @@ export function updateAssociation(req: AuthedRequest, res: Response): void {
 }
 
 // POST /api/associations/:id/members
-// Body: { personId }
+// Body: { handle }
 // Requires auth + must be an admin
 export function addMember(req: AuthedRequest, res: Response): void {
     const actorId = req.personId;
@@ -88,16 +95,18 @@ export function addMember(req: AuthedRequest, res: Response): void {
     if (!a) { res.status(404).json({ error: "Association not found" }); return; }
     if (!a.isAdmin(actorId)) { res.status(403).json({ error: "Only admins can manage members" }); return; }
 
-    const { personId } = req.body ?? {};
-    if (typeof personId !== "string" || !personId) {
-        res.status(400).json({ error: "personId is required" }); return;
+    const { handle } = req.body ?? {};
+    if (typeof handle !== "string" || !handle) {
+        res.status(400).json({ error: "handle is required" }); return;
     }
+    const target = ppl().getByHandle(handle);
+    if (!target) { res.status(404).json({ error: "Person not found" }); return; }
 
-    const updated = svc().addMember(a.id, personId);
+    const updated = svc().addMember(a.id, target.id);
     res.status(201).json(toDto(updated!));
 }
 
-// DELETE /api/associations/:id/members/:personId
+// DELETE /api/associations/:id/members/:handle
 // Requires auth + must be an admin (or the member removing themselves)
 export function removeMember(req: AuthedRequest, res: Response): void {
     const actorId = req.personId;
@@ -106,19 +115,20 @@ export function removeMember(req: AuthedRequest, res: Response): void {
     const a = svc().getById(req.params.id as string);
     if (!a) { res.status(404).json({ error: "Association not found" }); return; }
 
-    const targetId = req.params.personId as string;
-    const isSelf   = actorId === targetId;
+    const target = ppl().getByHandle(req.params.handle as string);
+    if (!target) { res.status(404).json({ error: "Person not found" }); return; }
+    const isSelf = actorId === target.id;
     if (!isSelf && !a.isAdmin(actorId)) {
         res.status(403).json({ error: "Only admins can remove other members" }); return;
     }
 
-    const updated = svc().removeMember(a.id, targetId);
+    const updated = svc().removeMember(a.id, target.id);
     if (!updated) { res.status(404).json({ error: "Association not found" }); return; }
     res.json(toDto(updated));
 }
 
 // POST /api/associations/:id/admins
-// Body: { personId }
+// Body: { handle }
 // Requires auth + must be an admin
 export function addAdmin(req: AuthedRequest, res: Response): void {
     const actorId = req.personId;
@@ -128,16 +138,18 @@ export function addAdmin(req: AuthedRequest, res: Response): void {
     if (!a) { res.status(404).json({ error: "Association not found" }); return; }
     if (!a.isAdmin(actorId)) { res.status(403).json({ error: "Only admins can promote members" }); return; }
 
-    const { personId } = req.body ?? {};
-    if (typeof personId !== "string" || !personId) {
-        res.status(400).json({ error: "personId is required" }); return;
+    const { handle } = req.body ?? {};
+    if (typeof handle !== "string" || !handle) {
+        res.status(400).json({ error: "handle is required" }); return;
     }
+    const target = ppl().getByHandle(handle);
+    if (!target) { res.status(404).json({ error: "Person not found" }); return; }
 
-    const updated = svc().addAdmin(a.id, personId);
+    const updated = svc().addAdmin(a.id, target.id);
     res.status(201).json(toDto(updated!));
 }
 
-// DELETE /api/associations/:id/admins/:personId
+// DELETE /api/associations/:id/admins/:handle
 // Requires auth + must be an admin; cannot remove the last admin
 export function removeAdmin(req: AuthedRequest, res: Response): void {
     const actorId = req.personId;
@@ -147,12 +159,13 @@ export function removeAdmin(req: AuthedRequest, res: Response): void {
     if (!a) { res.status(404).json({ error: "Association not found" }); return; }
     if (!a.isAdmin(actorId)) { res.status(403).json({ error: "Only admins can change admin status" }); return; }
 
-    const targetId = req.params.personId as string;
-    if (a.adminIds.length === 1 && a.adminIds[0] === targetId) {
+    const target = ppl().getByHandle(req.params.handle as string);
+    if (!target) { res.status(404).json({ error: "Person not found" }); return; }
+    if (a.adminIds.length === 1 && a.adminIds[0] === target.id) {
         res.status(400).json({ error: "Cannot remove the last admin" }); return;
     }
 
-    const updated = svc().removeAdmin(a.id, targetId);
+    const updated = svc().removeAdmin(a.id, target.id);
     if (!updated) { res.status(404).json({ error: "Association not found" }); return; }
     res.json(toDto(updated));
 }

@@ -46,7 +46,7 @@ router.get(   "/pools/:id",                   domains.getPool);
 router.post(  "/pools",                       ...requireSteward, domains.createPool);
 router.patch( "/pools/:id",                   ...requireSteward, domains.updatePool);
 router.post(  "/pools/:id/members",           ...requireSteward, domains.addPoolMember);
-router.delete("/pools/:id/members/:personId", ...requireSteward, domains.removePoolMember);
+router.delete("/pools/:id/members/:handle", ...requireSteward, domains.removePoolMember);
 router.delete("/pools/:id",                   ...requireSteward, domains.deletePool);
 
 export default router;

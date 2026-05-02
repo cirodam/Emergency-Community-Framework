@@ -20,7 +20,8 @@ async function apiFetch(input: string, init: RequestInit = {}): Promise<Response
 }
 
 export interface PersonDto {
-    id: string;
+    /** Only present in the login response; not exposed in list/detail endpoints. */
+    id?: string;
     firstName: string;
     lastName: string;
     handle: string;
@@ -31,7 +32,7 @@ export interface PersonDto {
     isSteward: boolean;
     joinDate: string;
     hasPassword: boolean;
-    /** Present on individual GET /api/persons/:id; absent from list responses. */
+    /** Present on individual GET /api/persons/:handle; absent from list responses. */
     appPermissions?: Record<string, string[]>;
 }
 
@@ -237,6 +238,7 @@ export async function getSetupStatus(): Promise<{ needsSetup: boolean }> {
 
 export interface SetupPayload {
     communityName: string;
+    communityHandle: string;
     firstName: string;
     lastName: string;
     birthDate: string;   // ISO date string, e.g. "1990-04-25"
@@ -336,8 +338,8 @@ export async function clearAssembly(): Promise<void> {
 
 
 
-export async function getPerson(id: string): Promise<PersonDto> {
-    const res = await apiFetch(`/api/persons/${encodeURIComponent(id)}`);
+export async function getPerson(handle: string): Promise<PersonDto> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(handle)}`);
     if (!res.ok) throw new Error("Member not found");
     return res.json() as Promise<PersonDto>;
 }
@@ -346,7 +348,6 @@ export async function addPerson(data: {
     firstName: string;
     lastName: string;
     birthDate: string;
-    bornInCommunity?: boolean;
     phone?: string | null;
 }): Promise<PersonDto> {
     const res = await apiFetch("/api/persons", {
@@ -360,8 +361,8 @@ export async function addPerson(data: {
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
-export async function setPassword(personId: string, password: string): Promise<void> {
-    const res = await apiFetch(`/api/persons/${encodeURIComponent(personId)}/password`, {
+export async function setPassword(handle: string, password: string): Promise<void> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(handle)}/password`, {
         method: "POST",
         body: JSON.stringify({ password }),
     });
@@ -371,8 +372,8 @@ export async function setPassword(personId: string, password: string): Promise<v
     }
 }
 
-export async function setPin(personId: string, pin: string): Promise<void> {
-    const res = await apiFetch(`/api/persons/${encodeURIComponent(personId)}/pin`, {
+export async function setPin(handle: string, pin: string): Promise<void> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(handle)}/pin`, {
         method: "POST",
         body: JSON.stringify({ pin }),
     });
@@ -382,8 +383,8 @@ export async function setPin(personId: string, pin: string): Promise<void> {
     }
 }
 
-export async function updatePerson(personId: string, patch: { phone?: string }): Promise<PersonDto> {
-    const res = await apiFetch(`/api/persons/${encodeURIComponent(personId)}`, {
+export async function updatePerson(handle: string, patch: { phone?: string }): Promise<PersonDto> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(handle)}`, {
         method: "PATCH",
         body: JSON.stringify(patch),
     });
@@ -394,8 +395,8 @@ export async function updatePerson(personId: string, patch: { phone?: string }):
     return res.json() as Promise<PersonDto>;
 }
 
-export async function grantSteward(personId: string): Promise<PersonDto> {
-    const res = await apiFetch(`/api/persons/${encodeURIComponent(personId)}/steward`, { method: "POST" });
+export async function grantSteward(handle: string): Promise<PersonDto> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(handle)}/steward`, { method: "POST" });
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Failed to grant stewardship");
@@ -403,8 +404,8 @@ export async function grantSteward(personId: string): Promise<PersonDto> {
     return res.json() as Promise<PersonDto>;
 }
 
-export async function revokeSteward(personId: string): Promise<PersonDto> {
-    const res = await apiFetch(`/api/persons/${encodeURIComponent(personId)}/steward`, { method: "DELETE" });
+export async function revokeSteward(handle: string): Promise<PersonDto> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(handle)}/steward`, { method: "DELETE" });
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Failed to revoke stewardship");
@@ -412,8 +413,8 @@ export async function revokeSteward(personId: string): Promise<PersonDto> {
     return res.json() as Promise<PersonDto>;
 }
 
-export async function suspendFromApp(personId: string, app: string, reason: string): Promise<AppSuspension> {
-    const res = await apiFetch(`/api/persons/${encodeURIComponent(personId)}/app-suspensions`, {
+export async function suspendFromApp(handle: string, app: string, reason: string): Promise<AppSuspension> {
+    const res = await apiFetch(`/api/persons/${encodeURIComponent(handle)}/app-suspensions`, {
         method: "POST",
         body: JSON.stringify({ app, reason }),
     });
@@ -424,9 +425,9 @@ export async function suspendFromApp(personId: string, app: string, reason: stri
     return res.json() as Promise<AppSuspension>;
 }
 
-export async function unsuspendFromApp(personId: string, app: string): Promise<void> {
+export async function unsuspendFromApp(handle: string, app: string): Promise<void> {
     const res = await apiFetch(
-        `/api/persons/${encodeURIComponent(personId)}/app-suspensions/${encodeURIComponent(app)}`,
+        `/api/persons/${encodeURIComponent(handle)}/app-suspensions/${encodeURIComponent(app)}`,
         { method: "DELETE" },
     );
     if (!res.ok) {
@@ -570,15 +571,15 @@ export async function simulateBudgetStep(): Promise<SimulateStepResult> {
 // ── Associations ──────────────────────────────────────────────────────────────
 
 export interface AssociationDto {
-    id:           string;
-    name:         string;
-    handle:       string;
-    description:  string;
-    active:       boolean;
-    memberIds:    string[];
-    adminIds:     string[];
-    memberCount:  number;
-    registeredAt: string;
+    id:             string;
+    name:           string;
+    handle:         string;
+    description:    string;
+    active:         boolean;
+    memberHandles:  string[];
+    adminHandles:   string[];
+    memberCount:    number;
+    registeredAt:   string;
 }
 
 export async function listAssociations(): Promise<AssociationDto[]> {
@@ -617,10 +618,10 @@ export async function updateAssociation(id: string, patch: { name?: string; desc
     return res.json() as Promise<AssociationDto>;
 }
 
-export async function addAssociationMember(id: string, personId: string): Promise<AssociationDto> {
+export async function addAssociationMember(id: string, handle: string): Promise<AssociationDto> {
     const res = await apiFetch(`/api/associations/${encodeURIComponent(id)}/members`, {
         method: "POST",
-        body: JSON.stringify({ personId }),
+        body: JSON.stringify({ handle }),
     });
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
@@ -629,8 +630,8 @@ export async function addAssociationMember(id: string, personId: string): Promis
     return res.json() as Promise<AssociationDto>;
 }
 
-export async function removeAssociationMember(id: string, personId: string): Promise<AssociationDto> {
-    const res = await apiFetch(`/api/associations/${encodeURIComponent(id)}/members/${encodeURIComponent(personId)}`, {
+export async function removeAssociationMember(id: string, handle: string): Promise<AssociationDto> {
+    const res = await apiFetch(`/api/associations/${encodeURIComponent(id)}/members/${encodeURIComponent(handle)}`, {
         method: "DELETE",
     });
     if (!res.ok) {
@@ -640,10 +641,10 @@ export async function removeAssociationMember(id: string, personId: string): Pro
     return res.json() as Promise<AssociationDto>;
 }
 
-export async function addAssociationAdmin(id: string, personId: string): Promise<AssociationDto> {
+export async function addAssociationAdmin(id: string, handle: string): Promise<AssociationDto> {
     const res = await apiFetch(`/api/associations/${encodeURIComponent(id)}/admins`, {
         method: "POST",
-        body: JSON.stringify({ personId }),
+        body: JSON.stringify({ handle }),
     });
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
@@ -652,8 +653,8 @@ export async function addAssociationAdmin(id: string, personId: string): Promise
     return res.json() as Promise<AssociationDto>;
 }
 
-export async function removeAssociationAdmin(id: string, personId: string): Promise<AssociationDto> {
-    const res = await apiFetch(`/api/associations/${encodeURIComponent(id)}/admins/${encodeURIComponent(personId)}`, {
+export async function removeAssociationAdmin(id: string, handle: string): Promise<AssociationDto> {
+    const res = await apiFetch(`/api/associations/${encodeURIComponent(id)}/admins/${encodeURIComponent(handle)}`, {
         method: "DELETE",
     });
     if (!res.ok) {
@@ -680,7 +681,7 @@ export interface UnitDto {
     name: string;
     description: string;
     type: string;
-    personIds: string[];
+    personHandles: string[];
     roleIds: string[];
     locationId: string | null;
     createdAt: string;
@@ -816,7 +817,7 @@ export interface RoleDto {
     roleTypeId:     string | null;
     title:          string;
     description:    string;
-    memberId:       string | null;
+    memberHandle:   string | null;
     kinPerMonth:    number;
     funded:         boolean;
     termStartDate:  string | null;
@@ -881,7 +882,7 @@ export async function updateRole(id: string, patch: {
     description?: string;
     kinPerMonth?: number;
     funded?: boolean;
-    memberId?: string | null;
+    memberHandle?: string | null;
     weeklySchedule?: ScheduleSlot[];
 }): Promise<RoleDto> {
     const res = await apiFetch(`/api/roles/${encodeURIComponent(id)}`, {
@@ -910,7 +911,7 @@ export interface PoolDto {
     name: string;
     description: string;
     mandate: string;
-    personIds: string[];
+    personHandles: string[];
     createdAt: string;
 }
 
@@ -950,10 +951,10 @@ export async function updatePool(id: string, data: { mandate?: string; name?: st
     return res.json() as Promise<PoolDto>;
 }
 
-export async function addPoolMember(poolId: string, personId: string): Promise<PoolDto> {
+export async function addPoolMember(poolId: string, handle: string): Promise<PoolDto> {
     const res = await apiFetch(`/api/pools/${encodeURIComponent(poolId)}/members`, {
         method: "POST",
-        body: JSON.stringify({ personId }),
+        body: JSON.stringify({ handle }),
     });
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
@@ -962,8 +963,8 @@ export async function addPoolMember(poolId: string, personId: string): Promise<P
     return res.json() as Promise<PoolDto>;
 }
 
-export async function removePoolMember(poolId: string, personId: string): Promise<PoolDto> {
-    const res = await apiFetch(`/api/pools/${encodeURIComponent(poolId)}/members/${encodeURIComponent(personId)}`, {
+export async function removePoolMember(poolId: string, handle: string): Promise<PoolDto> {
+    const res = await apiFetch(`/api/pools/${encodeURIComponent(poolId)}/members/${encodeURIComponent(handle)}`, {
         method: "DELETE",
     });
     if (!res.ok) {
@@ -984,24 +985,24 @@ export async function deletePool(poolId: string): Promise<void> {
 // ── Member applications ───────────────────────────────────────────────────────
 
 export interface ApplicationVoucher {
-    id: string;
-    name: string;
+    handle: string | null;
+    name:   string;
 }
 
 export interface ApplicationDto {
-    id: string;
-    firstName: string;
-    lastName: string;
-    birthDate: string;
-    message: string;
-    status: "pending" | "admitted" | "withdrawn";
-    voucherIds: string[];
-    vouchers: ApplicationVoucher[];
-    vouchesRequired: number;
-    submittedBy: string;
-    submittedByName: string;
-    submittedAt: string;
-    admittedAt: string | null;
+    id:                string;
+    firstName:         string;
+    lastName:          string;
+    birthDate:         string;
+    message:           string;
+    status:            "pending" | "admitted" | "withdrawn";
+    voucherHandles:    string[];
+    vouchers:          ApplicationVoucher[];
+    vouchesRequired:   number;
+    submittedByHandle: string | null;
+    submittedByName:   string;
+    submittedAt:       string;
+    admittedAt:        string | null;
 }
 
 export async function listApplications(): Promise<ApplicationDto[]> {
@@ -1189,20 +1190,20 @@ export async function getNodePeers(): Promise<PeerRecordDto[]> {
 export type NominationStatus = "pending" | "accepted" | "confirmed" | "declined";
 
 export interface NominationDto {
-    id:         string;
-    createdAt:  string;
-    createdBy:  string;
-    type:       "role" | "pool";
-    roleId:     string;
-    unitId:     string;
-    domainId:   string;
-    poolId:     string | null;
-    poolName:   string | null;
-    nomineeId:  string;
-    statement:  string;
-    status:     NominationStatus;
-    resolvedAt: string | null;
-    resolvedBy: string | null;
+    id:               string;
+    createdAt:        string;
+    createdByHandle:  string | null;
+    type:             "role" | "pool";
+    roleId:           string;
+    unitId:           string;
+    domainId:         string;
+    poolId:           string | null;
+    poolName:         string | null;
+    nomineeHandle:    string | null;
+    statement:        string;
+    status:           NominationStatus;
+    resolvedAt:       string | null;
+    resolvedBy:       string | null;
 }
 
 export interface VacancyDto {
@@ -1216,14 +1217,14 @@ export interface VacancyDto {
 }
 
 export interface ExpiringRoleDto {
-    roleId:      string;
-    roleTitle:   string;
-    memberId:    string;
-    termEndDate: string;
-    unitId:      string;
-    unitName:    string;
-    domainId:    string;
-    domainName:  string;
+    roleId:       string;
+    roleTitle:    string;
+    memberHandle: string | null;
+    termEndDate:  string;
+    unitId:       string;
+    unitName:     string;
+    domainId:     string;
+    domainName:   string;
 }
 
 export async function listVacancies(): Promise<VacancyDto[]> {
@@ -1239,9 +1240,9 @@ export async function listNominations(): Promise<NominationDto[]> {
 }
 
 export async function createNomination(data: {
-    roleId:    string;
-    nomineeId: string;
-    statement: string;
+    roleId:        string;
+    nomineeHandle: string;
+    statement:     string;
 }): Promise<NominationDto> {
     const res = await apiFetch("/api/nominations", {
         method: "POST",
@@ -1255,9 +1256,9 @@ export async function createNomination(data: {
 }
 
 export async function createPoolNomination(data: {
-    poolId:    string;
-    nomineeId: string;
-    statement: string;
+    poolId:        string;
+    nomineeHandle: string;
+    statement:     string;
 }): Promise<NominationDto> {
     const res = await apiFetch("/api/nominations/pool", {
         method: "POST",
@@ -1302,14 +1303,12 @@ export type VoteThresholdKey = "thresholdSimpleMajority" | "thresholdSupermajori
 
 export interface MotionComment {
     id:           string;
-    authorId:     string;
     authorHandle: string;
     body:         string;
     createdAt:    string;
 }
 
 export interface MotionVote {
-    personId:  string;
     handle:    string;
     vote:      "approve" | "reject" | "abstain";
     votedAt:   string;
@@ -1327,7 +1326,6 @@ export interface MotionDto {
     stage:                MotionStage;
     title:                string;
     description:          string;
-    proposerId:           string;
     proposerHandle:       string;
     createdAt:            string;
     deliberationStartedAt: string | null;
@@ -1477,7 +1475,7 @@ export interface ShiftDto {
     label:            string;
     startAt:          string;
     endAt:            string;
-    assignedPersonId: string | null;
+    assignedHandle:   string | null;
     note:             string | null;
     createdBy:        string;
     createdAt:        string;
@@ -1486,14 +1484,14 @@ export interface ShiftDto {
 
 export async function listShifts(opts: {
     domainId?: string;
-    personId?: string;
+    handle?: string;
     open?: boolean;
     from?: string;
     to?: string;
 } = {}): Promise<ShiftDto[]> {
     const params = new URLSearchParams();
     if (opts.domainId) params.set("domainId", opts.domainId);
-    if (opts.personId) params.set("personId", opts.personId);
+    if (opts.handle)   params.set("handle", opts.handle);
     if (opts.open)     params.set("open", "true");
     if (opts.from)     params.set("from", opts.from);
     if (opts.to)       params.set("to", opts.to);
@@ -1595,7 +1593,7 @@ export async function getCommunityLog(opts: { limit?: number; before?: string } 
 export type RecurrenceRule = "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
 
 export interface CalendarRsvp {
-    personId:    string;
+    handle:      string | null;
     status:      "yes" | "no" | "maybe";
     respondedAt: string;
 }
@@ -1609,9 +1607,9 @@ export interface CalendarEventDto {
     endAt:            string | null;
     allDay:           boolean;
     cancelledAt:      string | null;
-    organizerId:      string;
+    organizerId:      string | null;  // handle when organizerType=person, org ID when org
     organizerType:    "person" | "org";
-    createdBy:        string;
+    createdByHandle:  string | null;
     createdAt:        string;
     rsvps:            CalendarRsvp[];
     recurrence:       RecurrenceRule | null;
@@ -1631,15 +1629,16 @@ export async function listCalendarEvents(opts: { from?: string; to?: string; upc
 }
 
 export async function createCalendarEvent(data: {
-    title:            string;
-    startAt:          string;
-    organizerId:      string;
-    organizerType:    "person" | "org";
-    endAt?:           string | null;
-    allDay?:          boolean;
-    description?:     string | null;
-    location?:        string | null;
-    recurrence?:      RecurrenceRule | null;
+    title:             string;
+    startAt:           string;
+    organizerHandle?:  string;       // required when organizerType = 'person'
+    organizerId?:      string;       // required when organizerType = 'org'
+    organizerType:     "person" | "org";
+    endAt?:            string | null;
+    allDay?:           boolean;
+    description?:      string | null;
+    location?:         string | null;
+    recurrence?:       RecurrenceRule | null;
     recurrenceEndsAt?: string | null;
 }): Promise<CalendarEventDto> {
     const res = await apiFetch("/api/calendar", {
@@ -1685,11 +1684,11 @@ export async function cancelCalendarEvent(id: string): Promise<CalendarEventDto>
     return res.json() as Promise<CalendarEventDto>;
 }
 
-export async function rsvpCalendarEvent(id: string, personId: string, status: "yes" | "no" | "maybe"): Promise<CalendarEventDto> {
+export async function rsvpCalendarEvent(id: string, status: "yes" | "no" | "maybe"): Promise<CalendarEventDto> {
     const res = await apiFetch(`/api/calendar/${encodeURIComponent(id)}/rsvp`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ personId, status }),
+        body:    JSON.stringify({ status }),
     });
     if (!res.ok) {
         const b = await res.json().catch(() => ({})) as { error?: string };
@@ -1698,8 +1697,8 @@ export async function rsvpCalendarEvent(id: string, personId: string, status: "y
     return res.json() as Promise<CalendarEventDto>;
 }
 
-export async function removeCalendarRsvp(id: string, personId: string): Promise<CalendarEventDto> {
-    const res = await apiFetch(`/api/calendar/${encodeURIComponent(id)}/rsvp/${encodeURIComponent(personId)}`, { method: "DELETE" });
+export async function removeCalendarRsvp(id: string, handle: string): Promise<CalendarEventDto> {
+    const res = await apiFetch(`/api/calendar/${encodeURIComponent(id)}/rsvp/${encodeURIComponent(handle)}`, { method: "DELETE" });
     if (!res.ok) {
         const b = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(b.error ?? "Failed to remove RSVP");

@@ -9,8 +9,8 @@ router.post(  "/associations",                       requireAuth, associations.c
 router.get(   "/associations/:id",                   associations.getAssociation);
 router.patch( "/associations/:id",                   requireAuth, associations.updateAssociation);
 router.post(  "/associations/:id/members",           requireAuth, associations.addMember);
-router.delete("/associations/:id/members/:personId", requireAuth, associations.removeMember);
+router.delete("/associations/:id/members/:handle", requireAuth, associations.removeMember);
 router.post(  "/associations/:id/admins",            requireAuth, associations.addAdmin);
-router.delete("/associations/:id/admins/:personId",  requireAuth, associations.removeAdmin);
+router.delete("/associations/:id/admins/:handle",   requireAuth, associations.removeAdmin);
 
 export default router;

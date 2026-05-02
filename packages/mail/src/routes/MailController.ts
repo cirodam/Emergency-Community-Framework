@@ -1,7 +1,27 @@
 import { Request, Response } from "express";
 import { MessageService } from "../MessageService.js";
+import type { AuthedRequest } from "@ecf/core";
+
+const COMMUNITY_URL = process.env.COMMUNITY_URL ?? "http://localhost:3002";
 
 function svc(): MessageService { return MessageService.getInstance(); }
+
+// ── Person directory proxy ─────────────────────────────────────────────────
+
+// GET /api/persons — proxies to the community service so the mail frontend
+// can look up recipients by name / handle without a separate auth call.
+export async function listPersons(req: Request, res: Response): Promise<void> {
+    const auth = req.headers["authorization"];
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (auth) headers["Authorization"] = auth as string;
+    try {
+        const upstream = await fetch(`${COMMUNITY_URL}/api/persons`, { headers });
+        if (!upstream.ok) { res.status(upstream.status).json({ error: "Failed to fetch persons" }); return; }
+        res.json(await upstream.json());
+    } catch {
+        res.status(502).json({ error: "Community service unavailable" });
+    }
+}
 
 // ── Threads ────────────────────────────────────────────────────────────────
 
@@ -53,24 +73,51 @@ export function getUnreadCount(req: Request & { personId?: string }, res: Respon
 // ── Send ───────────────────────────────────────────────────────────────────
 
 // POST /api/messages
-// Body: { toPersonIds: string[], subject?, body, threadId? }
-//       toPersonIds may also be sent as the legacy toPersonId: string for
-//       backwards compat with existing clients.
-export function sendMessage(req: Request & { personId?: string }, res: Response): void {
+// Body: { toHandles: string[], subject?, body, threadId? }
+//       toHandles is the preferred field. Legacy: toPersonId / toPersonIds (UUIDs) still accepted.
+export async function sendMessage(req: Request & { personId?: string; credential?: { handle: string } }, res: Response): Promise<void> {
     const fromPersonId = req.personId;
     if (!fromPersonId) { res.status(401).json({ error: "Not authenticated" }); return; }
+    const fromHandle = (req as AuthedRequest).credential?.handle ?? fromPersonId;
 
-    const { toPersonIds, toPersonId, subject, body, threadId } = req.body ?? {};
+    const { toHandles, toPersonIds, toPersonId, subject, body, threadId } = req.body ?? {};
 
-    // Accept both array and legacy single-string form
-    const recipients: string[] = Array.isArray(toPersonIds)
-        ? toPersonIds
-        : typeof toPersonId === "string" && toPersonId.trim()
-            ? [toPersonId.trim()]
-            : [];
+    // Prefer toHandles; fall back to legacy UUID fields
+    let resolvedIds: string[]    = [];
+    let resolvedHandles: string[] = [];
 
-    if (!recipients.length) {
-        res.status(400).json({ error: "toPersonIds is required" }); return;
+    if (Array.isArray(toHandles) && toHandles.length) {
+        // Resolve each handle → personId via community service
+        const auth = req.headers["authorization"] as string | undefined;
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (auth) headers["Authorization"] = auth;
+        try {
+            const upstream = await fetch(`${COMMUNITY_URL}/api/persons`, { headers });
+            if (!upstream.ok) { res.status(502).json({ error: "Could not reach community service" }); return; }
+            const persons = await upstream.json() as Array<{ id: string; handle: string }>;
+            const byHandle = new Map(persons.map(p => [p.handle, p.id]));
+            for (const h of toHandles as string[]) {
+                const id = byHandle.get(h);
+                if (!id) { res.status(422).json({ error: `Unknown handle: ${h}` }); return; }
+                resolvedIds.push(id);
+                resolvedHandles.push(h);
+            }
+        } catch {
+            res.status(502).json({ error: "Community service unavailable" }); return;
+        }
+    } else {
+        // Legacy UUID path
+        const legacyIds: string[] = Array.isArray(toPersonIds)
+            ? toPersonIds
+            : typeof toPersonId === "string" && toPersonId.trim()
+                ? [toPersonId.trim()]
+                : [];
+        resolvedIds = legacyIds;
+        resolvedHandles = legacyIds; // no handle info available — use ID as fallback
+    }
+
+    if (!resolvedIds.length) {
+        res.status(400).json({ error: "toHandles is required" }); return;
     }
     if (typeof body !== "string" || !body.trim()) {
         res.status(400).json({ error: "body is required" }); return;
@@ -79,7 +126,7 @@ export function sendMessage(req: Request & { personId?: string }, res: Response)
     const subjectStr = typeof subject === "string" ? subject : "";
 
     try {
-        const msg = svc().send(fromPersonId, recipients, subjectStr, body.trim(), threadId as string | undefined);
+        const msg = svc().send(fromPersonId, fromHandle, resolvedIds, resolvedHandles, subjectStr, body.trim(), threadId as string | undefined);
         res.status(201).json(msg);
     } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to send";
@@ -164,6 +211,7 @@ export function receiveExternalMessage(req: Request, res: Response): void {
         subject:     typeof subject === "string" ? subject : "(no subject)",
         fromHandle,
         toPersonIds,
+        toHandles:   Array.isArray(req.body?.toHandles) ? req.body.toHandles as string[] : toPersonIds,
         body:        body.trim(),
         sentAt:      typeof sentAt === "string" ? sentAt : new Date().toISOString(),
     });
@@ -222,18 +270,23 @@ export function listDrafts(req: Request & { personId?: string }, res: Response):
 }
 
 // PUT /api/drafts/:id  (create or update — client generates ID)
-// Body: { toPersonIds?, subject?, body? }
+// Body: { toHandles?, subject?, body? }
 export function saveDraft(req: Request & { personId?: string }, res: Response): void {
     const personId = req.personId;
     if (!personId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
     const id = req.params.id as string;
-    const { toPersonIds, subject, body } = req.body ?? {};
+    const { toHandles, toPersonIds, subject, body } = req.body ?? {};
+
+    // Accept toHandles (preferred) or legacy toPersonIds
+    const handles: string[] = Array.isArray(toHandles) ? toHandles
+        : Array.isArray(toPersonIds) ? toPersonIds
+        : [];
 
     const draft = svc().saveDraft(
         personId,
         id,
-        Array.isArray(toPersonIds) ? toPersonIds : [],
+        handles,
         typeof subject === "string" ? subject : "",
         typeof body    === "string" ? body    : "",
     );

@@ -23,7 +23,7 @@ async function getMailUrl(): Promise<string> {
     return _mailUrl;
 }
 
-export async function sendMailMessage(toPersonId: string, subject: string, body: string): Promise<void> {
+export async function sendMailMessage(toHandle: string, subject: string, body: string): Promise<void> {
     const mailUrl = await getMailUrl();
     const token   = getToken();
     const res     = await fetch(`${mailUrl}/api/messages`, {
@@ -32,7 +32,7 @@ export async function sendMailMessage(toPersonId: string, subject: string, body:
             "Content-Type":  "application/json",
             ...(token ? { "Authorization": `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ toPersonId, subject, body }),
+        body: JSON.stringify({ toHandles: [toHandle], subject, body }),
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({})) as { error?: string };
@@ -54,14 +54,12 @@ export type ClassifiedStatus   = "open" | "closed" | "cancelled" | "expired";
 
 export interface Classified {
     id:             string;
-    posterId:       string;
     posterHandle:   string;
     category:       ClassifiedCategory;
     title:          string;
     description:    string;
     price:          number;
     status:         ClassifiedStatus;
-    counterpartyId: string | null;
     createdAt:      string;
     updatedAt:      string;
     expiresAt:      string;
@@ -151,7 +149,6 @@ export interface StallDto {
     id:              string;
     marketplaceId:   string;
     marketplaceName: string;
-    holderId:        string;
     holderHandle:    string;
     name:            string;
     description:     string;
@@ -228,7 +225,6 @@ export type ServiceAvailability = "available" | "busy" | "by-appointment";
 
 export interface ServiceProfileDto {
     id:             string;
-    providerId:     string;
     providerHandle: string;
     name:           string;
     category:       ServiceCategory;

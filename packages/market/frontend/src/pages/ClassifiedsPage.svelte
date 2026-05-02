@@ -185,7 +185,7 @@
                          : "respond to";
             const subject = `Re: ${c.title}`;
             const body    = `Hi ${c.posterHandle},\n\nI'd like to ${action} your classified "${c.title}".\n\n${msgBody.trim()}`;
-            await sendMailMessage(c.posterId, subject, body);
+            await sendMailMessage(c.posterHandle, subject, body);
             msgSent = true;
             setTimeout(() => { msgId = null; msgSent = false; }, 1500);
         } catch (e) {
@@ -305,7 +305,7 @@
                         <div class="cl-title">{c.title}</div>
                         {#if c.description}<p class="cl-desc">{c.description}</p>{/if}
                         <p class="cl-meta">
-                            Posted by {c.posterHandle || c.posterId}
+                            Posted by {c.posterHandle}
                             · expires in {daysLeft(c.expiresAt)}d
                         </p>
 
@@ -331,10 +331,10 @@
                             {/if}
                         {:else}
                             <div class="card-actions">
-                                {#if myId && myId !== c.posterId}
+                                {#if $session?.handle && $session.handle !== c.posterHandle}
                                     <button class="btn-primary" onclick={() => openMessage(c)}>Message poster</button>
                                 {/if}
-                                {#if $isCoordinator && myId !== c.posterId}
+                                {#if $isCoordinator && $session?.handle !== c.posterHandle}
                                     <button class="action-btn danger" onclick={() => handleAdminRemove(c.id)} title="Remove as coordinator">⚑ Remove</button>
                                 {/if}
                             </div>

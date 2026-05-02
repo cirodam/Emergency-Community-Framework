@@ -35,16 +35,22 @@ export class BankClient {
         return headers;
     }
 
-    async getPrimaryAccountAsync(
+    async getAccounts(
         ownerId: string,
-    ): Promise<{ accountId: string; currency: string; amount: number } | undefined> {
+    ): Promise<{ accountId: string; currency: string; amount: number; label: string; handle: string; primary: boolean }[]> {
         const res = await fetch(`${this.baseUrl}/api/accounts/${encodeURIComponent(ownerId)}`, {
             headers: this.signedGetHeaders(),
         });
-        if (res.status === 404) return undefined;
+        if (res.status === 404) return [];
         if (!res.ok) throw new Error(`[BankClient] getAccounts(${ownerId}) failed: ${res.status}`);
-        const accounts = (await res.json()) as { accountId: string; currency: string; amount: number; label: string }[];
-        return accounts.find(a => a.label === "primary") ?? accounts[0];
+        return res.json() as Promise<{ accountId: string; currency: string; amount: number; label: string; handle: string; primary: boolean }[]>;
+    }
+
+    async getPrimaryAccountAsync(
+        ownerId: string,
+    ): Promise<{ accountId: string; currency: string; amount: number; handle: string; primary: boolean } | undefined> {
+        const accounts = await this.getAccounts(ownerId);
+        return accounts.find(a => a.primary) ?? accounts[0];
     }
 
     async getAccountById(
@@ -59,19 +65,21 @@ export class BankClient {
     }
 
     async openAccount(
-        ownerId:       string,
-        ownerName:     string,
-        currency:      "kin" | "kithe" = this.defaultCurrency,
-        overdraftLimit: number | null  = 0,
-    ): Promise<{ accountId: string; currency: string; amount: number }> {
-        const body = JSON.stringify({ ownerId, ownerName, currency, overdraftLimit });
+        ownerId:        string,
+        ownerName:      string,
+        currency:       "kin" | "kithe" = this.defaultCurrency,
+        overdraftLimit: number | null   = 0,
+        handle?:        string,
+        primary?:       boolean,
+    ): Promise<{ accountId: string; currency: string; amount: number; handle: string; primary: boolean }> {
+        const body = JSON.stringify({ ownerId, ownerName, currency, overdraftLimit, handle, primary });
         const res  = await fetch(`${this.baseUrl}/api/accounts`, {
             method:  "POST",
             headers: this.signedHeaders(body),
             body,
         });
         if (!res.ok) throw new Error(`[BankClient] openAccount(${ownerId}) failed: ${res.status}`);
-        return res.json() as Promise<{ accountId: string; currency: string; amount: number }>;
+        return res.json() as Promise<{ accountId: string; currency: string; amount: number; handle: string; primary: boolean }>;
     }
 
     async createOwner(

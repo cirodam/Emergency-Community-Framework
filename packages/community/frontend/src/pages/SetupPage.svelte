@@ -8,7 +8,8 @@
     // Step 1 = community info, Step 2 = founder info, Step 3 = done
     let step = $state(1);
 
-    let communityName = $state("");
+    let communityName   = $state("");
+    let communityHandle = $state("");
     let firstName     = $state("");
     let lastName      = $state("");
     let birthDate     = $state("");
@@ -21,6 +22,17 @@
     let error   = $state("");
     let loading = $state(false);
     let seededCount = $state(0);
+
+    // Auto-generate community handle from community name
+    const suggestedCommunityHandle = $derived(
+        communityName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+    );
+
+    $effect(() => {
+        if (!communityHandle && suggestedCommunityHandle) {
+            communityHandle = suggestedCommunityHandle;
+        }
+    });
 
     // Auto-generate handle suggestion from name
     const suggestedHandle = $derived(
@@ -36,7 +48,8 @@
     function nextStep() {
         error = "";
         if (step === 1) {
-            if (!communityName.trim()) { error = "Enter a community name"; return; }
+            if (!communityName.trim())   { error = "Enter a community name"; return; }
+            if (!communityHandle.trim()) { error = "Enter a community handle"; return; }
             step = 2;
         }
     }
@@ -52,7 +65,7 @@
 
         loading = true;
         try {
-            const result = await runSetup({ communityName, firstName, lastName, birthDate, handle, password, phone: phone.trim() || undefined, seedPopulation });
+            const result = await runSetup({ communityName, communityHandle, firstName, lastName, birthDate, handle, password, phone: phone.trim() || undefined, seedPopulation });
             seededCount = result.seededCount ?? 0;
             step = 3;
         } catch (e) {
@@ -82,6 +95,19 @@
                         placeholder="e.g. Sunridge Community"
                         autocomplete="off"
                     />
+                </label>
+
+                <label class="field">
+                    <span>Community handle</span>
+                    <input
+                        type="text"
+                        bind:value={communityHandle}
+                        placeholder="e.g. sunridge-community"
+                        autocomplete="off"
+                        autocapitalize="none"
+                        spellcheck={false}
+                    />
+                    <span class="hint">Lowercase letters, numbers, and hyphens</span>
                 </label>
 
                 <label class="seed-checkbox">
@@ -118,7 +144,6 @@
                 <label class="field">
                     <span>Handle</span>
                     <div class="handle-input">
-                        <span class="at">@</span>
                         <input
                             type="text"
                             bind:value={handle}
@@ -270,7 +295,6 @@
 
     .handle-input:focus-within { border-color: #16a34a; }
 
-    .at { padding: 0 0.4rem 0 0.9rem; color: #94a3b8; user-select: none; }
 
     .handle-input input {
         border: none !important;

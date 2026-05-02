@@ -247,9 +247,9 @@
                             {#if s.status === "inactive"}<span class="badge inactive-badge">Inactive</span>{/if}
                         </div>
                         <h3 class="stall-title" onclick={() => openStall(s.id)}>{s.name}</h3>
-                        <p class="stall-meta">{mpName(s.marketplaceId)} · {s.holderHandle || s.holderId}</p>
+                        <p class="stall-meta">{mpName(s.marketplaceId)} · {s.holderHandle}</p>
                         {#if s.description}<p class="stall-desc">{s.description}</p>{/if}
-                        {#if myId === s.holderId}
+                        {#if $session?.handle === s.holderHandle}
                             <div class="card-actions">
                                 <button onclick={() => startEdit(s)}>Edit</button>
                                 <button class="btn-danger" onclick={() => handleDelete(s.id)}>Delete</button>

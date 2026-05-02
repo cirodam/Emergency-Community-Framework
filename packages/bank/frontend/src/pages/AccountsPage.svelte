@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { session, currentPage, selectedAccountId } from "../lib/session.js";
+    import { session, currentPage, selectedAccountHandle } from "../lib/session.js";
     import { getMyAccounts, createMyAccount, deleteMyAccount, renameMyAccount } from "../lib/api.js";
     import type { AccountDto } from "../lib/api.js";
     import ErrorBanner from "../components/ErrorBanner.svelte";
@@ -21,53 +21,53 @@
     $effect(() => { load(); });
 
     function viewAccount(a: AccountDto) {
-        selectedAccountId.set(a.accountId);
+        selectedAccountHandle.set(a.handle);
         currentPage.go("account");
     }
 
     // ── Rename ─────────────────────────────────────────────────────────────
-    let renamingId  = $state<string | null>(null);
-    let renameValue = $state("");
-    let renameError = $state("");
+    let renamingHandle = $state<string | null>(null);
+    let renameValue    = $state("");
+    let renameError    = $state("");
 
     function startRename(a: AccountDto, e: Event) {
         e.stopPropagation();
-        renamingId = a.accountId; renameValue = a.label; renameError = "";
+        renamingHandle = a.handle; renameValue = a.label; renameError = "";
     }
 
     async function commitRename(a: AccountDto) {
         const trimmed = renameValue.trim();
-        if (!trimmed || trimmed === a.label) { renamingId = null; return; }
+        if (!trimmed || trimmed === a.label) { renamingHandle = null; return; }
         try {
-            const updated = await renameMyAccount(a.accountId, trimmed);
-            accounts = accounts.map(x => x.accountId === a.accountId ? updated : x);
+            const updated = await renameMyAccount(a.handle, trimmed);
+            accounts = accounts.map(x => x.handle === a.handle ? updated : x);
         } catch (e) {
             renameError = e instanceof Error ? e.message : "Rename failed";
-        } finally { renamingId = null; }
+        } finally { renamingHandle = null; }
     }
 
     // ── Delete ─────────────────────────────────────────────────────────────
-    let confirmingDeleteId = $state<string | null>(null);
-    let deleteError        = $state("");
+    let confirmingDeleteHandle = $state<string | null>(null);
+    let deleteError             = $state("");
 
     function startDelete(a: AccountDto, e: Event) {
         e.stopPropagation();
         if (a.amount !== 0) {
-            deleteError        = `"${a.label}" has a balance of ${a.amount} — transfer funds away first.`;
-            confirmingDeleteId = a.accountId;
+            deleteError            = `"${a.label}" has a balance of ${a.amount} — transfer funds away first.`;
+            confirmingDeleteHandle = a.handle;
             return;
         }
-        deleteError = ""; confirmingDeleteId = a.accountId;
+        deleteError = ""; confirmingDeleteHandle = a.handle;
     }
 
     async function executeDelete(a: AccountDto) {
         try {
-            await deleteMyAccount(a.accountId);
-            accounts = accounts.filter(x => x.accountId !== a.accountId);
-            if ($selectedAccountId === a.accountId) selectedAccountId.set("");
+            await deleteMyAccount(a.handle);
+            accounts = accounts.filter(x => x.handle !== a.handle);
+            if ($selectedAccountHandle === a.handle) selectedAccountHandle.set("");
         } catch (e) {
             deleteError = e instanceof Error ? e.message : "Delete failed";
-        } finally { confirmingDeleteId = null; }
+        } finally { confirmingDeleteHandle = null; }
     }
 
     // ── Add ────────────────────────────────────────────────────────────────
@@ -119,29 +119,29 @@
         </div>
     {:else}
         <div class="account-cards">
-            {#each accounts as a (a.accountId)}
+            {#each accounts as a (a.handle)}
                 <!-- Rename overlay -->
-                {#if renamingId === a.accountId}
+                {#if renamingHandle === a.handle}
                     <div class="account-card renaming">
                         <input
                             class="rename-input"
                             type="text"
                             bind:value={renameValue}
-                            onkeydown={(e) => { if (e.key === "Enter") commitRename(a); if (e.key === "Escape") renamingId = null; }}
+                            onkeydown={(e) => { if (e.key === "Enter") commitRename(a); if (e.key === "Escape") renamingHandle = null; }}
                             onblur={() => commitRename(a)}
                         />
                         {#if renameError}<p class="inline-error">{renameError}</p>{/if}
                     </div>
                 <!-- Delete confirm overlay -->
-                {:else if confirmingDeleteId === a.accountId}
+                {:else if confirmingDeleteHandle === a.handle}
                     <div class="account-card confirm-card">
                         {#if deleteError}
                             <p class="inline-error">{deleteError}</p>
-                            <button class="btn-sm" onclick={() => { confirmingDeleteId = null; deleteError = ""; }}>OK</button>
+                            <button class="btn-sm" onclick={() => { confirmingDeleteHandle = null; deleteError = ""; }}>OK</button>
                         {:else}
                             <p class="confirm-text">Close <strong>"{a.label}"</strong>?</p>
                             <div class="confirm-row">
-                                <button class="btn-sm" onclick={() => confirmingDeleteId = null}>Cancel</button>
+                                <button class="btn-sm" onclick={() => confirmingDeleteHandle = null}>Cancel</button>
                                 <button class="btn-sm danger" onclick={() => executeDelete(a)}>Close account</button>
                             </div>
                         {/if}
@@ -155,7 +155,7 @@
                                 <span class="balance-amount">{formatBalance(a)}</span>
                                 <span class="balance-currency">{a.currency}</span>
                             </div>
-                            <div class="card-meta">{a.accountId.slice(0, 8)}…</div>
+                            <div class="card-meta">@{a.handle}</div>
                         </div>
                         <div class="card-actions" onclick={(e) => e.stopPropagation()} role="none">
                             <button class="card-action-btn" onclick={(e) => startRename(a, e)} title="Rename">✎</button>

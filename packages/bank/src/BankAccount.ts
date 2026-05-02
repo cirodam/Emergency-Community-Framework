@@ -10,12 +10,18 @@ export interface AccountRecord {
     amount: number;
     overdraftLimit: number;
     createdAt: Date;
+    handle: string;
+    primary: boolean;
 }
 
 export class BankAccount {
     readonly accountId: string;
     readonly ownerId: string;
     label: string;
+    /** URL-safe handle unique per owner, e.g. "savings", "household". */
+    handle: string;
+    /** True for the owner's default account — resolved when no account handle is given. */
+    primary: boolean;
     readonly currency: Currency;
     /**
      * The minimum balance allowed (inclusive). Debits that would push the balance below
@@ -31,10 +37,19 @@ export class BankAccount {
     /** Convenience alias — kin accounts used this name historically. */
     get kin(): number { return this._amount; }
 
-    constructor(owner: IEconomicActor, label: string, currency: Currency, overdraftLimit: number = 0) {
+    constructor(
+        owner: IEconomicActor,
+        label: string,
+        currency: Currency,
+        overdraftLimit: number = 0,
+        handle: string = "",
+        primary: boolean = false,
+    ) {
         this.accountId = randomUUID();
         this.ownerId = owner.getId();
         this.label = label;
+        this.handle = handle || label.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+        this.primary = primary;
         this.currency = currency;
         this.overdraftLimit = overdraftLimit;
         this.createdAt = new Date();
@@ -56,7 +71,7 @@ export class BankAccount {
      */
     static restore(r: AccountRecord): BankAccount {
         const stub: IEconomicActor = { getId: () => r.ownerId, getDisplayName: () => "", getHandle: () => "" };
-        const account = new BankAccount(stub, r.label, r.currency, r.overdraftLimit);
+        const account = new BankAccount(stub, r.label, r.currency, r.overdraftLimit, r.handle, r.primary);
         const a = account as unknown as Record<string, unknown>;
         a["accountId"] = r.accountId;
         a["ownerId"]   = r.ownerId;

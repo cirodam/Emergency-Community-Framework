@@ -40,13 +40,13 @@
     let outcomeNote     = $state("");
     let submittingOutcome = $state(false);
 
-    const me = $derived($session?.personId ?? null);
+    const me = $derived($session?.handle ?? null);
     const isSteward = $derived(($session as any)?.isSteward ?? false);
     const isReferendum = $derived(motion?.body === "referendum");
     const isClerk      = $derived(motion !== null && !isReferendum);
 
     const myVote = $derived(
-        motion ? motion.votes.find(v => v.personId === me) ?? null : null
+        motion ? motion.votes.find(v => v.handle === me) ?? null : null
     );
 
     async function load() {
@@ -239,7 +239,7 @@
         {/if}
 
         <!-- Withdraw (proposer, not resolved) -->
-        {#if me === motion.proposerId && motion.stage !== "resolved"}
+        {#if me === motion.proposerHandle && motion.stage !== "resolved"}
             <button class="btn-withdraw" onclick={doWithdraw}>Withdraw motion</button>
         {/if}
 
@@ -292,7 +292,7 @@
         {#if isReferendum && motion.votes.length > 0}
             <details class="votes-detail">
                 <summary>Votes ({motion.votes.length})</summary>
-                {#each motion.votes as v (v.personId)}
+                {#each motion.votes as v (v.handle)}
                     <div class="vote-row">
                         <span class="vote-handle">{v.handle}</span>
                         <span class="vote-val vote-{v.vote}">{v.vote}</span>

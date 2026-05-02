@@ -1,6 +1,7 @@
 import logger from "../logger.js";
 import { Association } from "./Association.js";
 import { AssociationLoader } from "./AssociationLoader.js";
+import { HandleRegistry } from "../HandleRegistry.js";
 
 export class AssociationService {
     private static instance: AssociationService;
@@ -21,6 +22,7 @@ export class AssociationService {
         for (const a of loader.loadAll()) {
             this.associations.set(a.id, a);
             this.handleIndex.set(a.handle, a.id);
+            HandleRegistry.getInstance().register(a.handle, "association", a.id);
         }
         logger.info(`[AssociationService] loaded ${this.associations.size} association(s)`);
     }
@@ -53,6 +55,7 @@ export class AssociationService {
     create(a: Association): void {
         this.associations.set(a.id, a);
         this.handleIndex.set(a.handle, a.id);
+        HandleRegistry.getInstance().register(a.handle, "association", a.id);
         this.loader?.save(a);
     }
 

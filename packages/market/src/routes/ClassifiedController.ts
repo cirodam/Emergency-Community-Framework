@@ -2,7 +2,13 @@ import { Request, Response } from "express";
 import { ClassifiedService } from "../ClassifiedService.js";
 import { BankClient } from "@ecf/core";
 import { NodeService, type PersonCredential } from "@ecf/core";
-import { ClassifiedCategory } from "../Classified.js";
+import { ClassifiedCategory, type Classified } from "../Classified.js";
+
+/** Strip internal person IDs from classified responses. */
+function toDto(c: Classified) {
+    const { posterId: _p, counterpartyId: _c, ...rest } = c;
+    return rest;
+}
 
 const BANK_URL = process.env.BANK_URL ?? "http://localhost:3001";
 
@@ -21,7 +27,7 @@ const svc = () => ClassifiedService.getInstance();
 export function listMyClassifieds(req: Request & { personId?: string }, res: Response): void {
     const posterId = req.personId;
     if (!posterId) { res.status(401).json({ error: "Not authenticated" }); return; }
-    res.json(svc().getByPoster(posterId));
+    res.json(svc().getByPoster(posterId).map(toDto));
 }
 
 // GET /api/classifieds?category=for-sale|wanted|free|job|notice&status=open&page=1&limit=20&q=search
@@ -54,7 +60,7 @@ export function listClassifieds(req: Request, res: Response): void {
     const offset = (Math.min(page, pages) - 1) * limit;
 
     res.json({
-        items: results.slice(offset, offset + limit),
+        items: results.slice(offset, offset + limit).map(toDto),
         total,
         page:  Math.min(page, pages),
         pages,
@@ -65,7 +71,7 @@ export function listClassifieds(req: Request, res: Response): void {
 export function getClassified(req: Request, res: Response): void {
     const c = svc().get(req.params.id as string);
     if (!c) { res.status(404).json({ error: "Classified not found" }); return; }
-    res.json(c);
+    res.json(toDto(c));
 }
 
 // POST /api/classifieds
@@ -102,7 +108,7 @@ export function createClassified(req: Request & { personId?: string; credential?
         description,
         resolvedPrice,
     );
-    res.status(201).json(c);
+    res.status(201).json(toDto(c));
 }
 
 // POST /api/classifieds (uses posterHandle from credential)
@@ -138,7 +144,7 @@ export function createClassifiedWithHandle(req: Request & { personId?: string; c
         description,
         resolvedPrice,
     );
-    res.status(201).json(c);
+    res.status(201).json(toDto(c));
 }
 
 // PATCH /api/classifieds/:id
@@ -158,7 +164,7 @@ export function updateClassified(req: Request & { personId?: string }, res: Resp
     }
 
     try {
-        res.json(svc().update(req.params.id as string, callerId, patch));
+        res.json(toDto(svc().update(req.params.id as string, callerId, patch)));
     } catch (err) {
         const msg = (err as Error).message;
         const status = msg.includes("not found") ? 404 : msg.includes("Not your") ? 403 : 422;
@@ -172,7 +178,7 @@ export function cancelClassified(req: Request & { personId?: string }, res: Resp
     if (!callerId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
     try {
-        res.json(svc().cancel(req.params.id as string, callerId));
+        res.json(toDto(svc().cancel(req.params.id as string, callerId)));
     } catch (err) {
         const msg = (err as Error).message;
         const status = msg.includes("not found") ? 404 : msg.includes("Not your") ? 403 : 422;
@@ -197,7 +203,7 @@ export async function claimClassified(
 
     // No payment needed for free/job/notice or zero-price ads
     if (c.price <= 0 || c.category === "free" || c.category === "job" || c.category === "notice") {
-        res.json(svc().markClosed(c.id, claimantId));
+        res.json(toDto(svc().markClosed(c.id, claimantId)));
         return;
     }
 
@@ -231,13 +237,13 @@ export async function claimClassified(
         }
     }
 
-    res.json(svc().markClosed(c.id, claimantId));
+    res.json(toDto(svc().markClosed(c.id, claimantId)));
 }
 
 // DELETE /api/admin/classifieds/:id — coordinator/admin: cancel any listing
 export function adminCancelClassified(req: Request, res: Response): void {
     try {
-        res.json(ClassifiedService.getInstance().adminCancel(req.params.id as string));
+        res.json(toDto(ClassifiedService.getInstance().adminCancel(req.params.id as string)));
     } catch (err) {
         const msg = (err as Error).message;
         res.status(msg.includes("not found") ? 404 : 422).json({ error: msg });

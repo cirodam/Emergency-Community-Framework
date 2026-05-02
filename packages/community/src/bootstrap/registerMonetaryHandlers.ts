@@ -26,7 +26,7 @@ export function registerMonetaryHandlers(bank: BankClient): void {
         const constitution = Constitution.getInstance();
 
         try {
-            const memberAccount = await bank.openAccount(person.id, displayName, "kin");
+            const memberAccount = await bank.openAccount(person.id, displayName, "kin", 0, person.handle, true);
             logger.info(`[community] opened bank account for @${person.handle}`);
             try { CommunityLogService.getInstance().write("member-joined", `${person.firstName} ${person.lastName} joined the community`, { actorId: person.id, refId: person.id }); } catch { /* */ }
 
@@ -35,52 +35,33 @@ export function registerMonetaryHandlers(bank: BankClient): void {
                 return;
             }
 
-            if (person.bornInCommunity) {
-                // ── Born into the community ───────────────────────────────────
-                // No back-endowment — this person has no prior years to credit.
-                // Issue a fixed birth grant into the community fund, which
-                // forwards it directly to the member. Their kin accrual begins
-                // on their first birthday via the anniversary handler.
-                const grantAmount = constitution.birthGrant;
-                if (grantAmount > 0) {
-                    await centralBank.issue(grantAmount, treasury.accountId,       "birth grant — community fund");
-                    await treasury.transfer(memberAccount.accountId, grantAmount,  "birth grant — to member");
-                    logger.info(`[community] issued birth grant for @${person.handle}: ${grantAmount} kin`);
-                } else {
-                    logger.info(`[community] birth grant is 0 — no issuance for @${person.handle}`);
-                }
-            } else {
-                // ── Joining from outside ──────────────────────────────────────
-                // Age-derived back-endowment: floor(age in years) × kinPerPersonYear.
-                // All kin is issued into the community fund first; the fund then
-                // distributes per policy: pool fraction → insurance fund,
-                // seed balance → member, remainder stays in the community fund.
-                const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
-                const ageInYears  = Math.floor((Date.now() - person.birthDate.getTime()) / MS_PER_YEAR);
-                const endowment   = ageInYears * constitution.kinPerPersonYear;
+            // Age-derived back-endowment: floor(age in years) × kinPerPersonYear.
+            // All kin is issued into the community fund first; the fund then
+            // distributes per policy: pool fraction → insurance fund,
+            // remainder stays in the community treasury.
+            // For newborns (age 0) the endowment is 0 and no issuance occurs.
+            const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
+            const ageInYears  = Math.floor((Date.now() - person.birthDate.getTime()) / MS_PER_YEAR);
+            const endowment   = ageInYears * constitution.kinPerPersonYear;
 
-                if (endowment <= 0) {
-                    logger.info(`[community] zero endowment for @${person.handle} (age ${ageInYears}) — skipping issuance`);
-                    return;
-                }
-
-                const poolAmount     = Math.floor(endowment * constitution.endowmentPoolFraction);
-                const circulating    = endowment - poolAmount;
-                const seedAmount     = Math.min(constitution.endowmentSeedBalance, circulating);
-                const treasuryAmount = circulating - seedAmount;
-
-                await centralBank.issue(endowment, treasury.accountId,              "join endowment — community fund");
-                await treasury.transfer(siBank.poolAccountId,    poolAmount,        "join endowment — insurance fund");
-                await treasury.transfer(memberAccount.accountId, seedAmount,        "join endowment — member seed balance");
-                // treasuryAmount remains in the community fund
-
-                siBank.recordContribution(person.id, poolAmount);
-
-                logger.info(
-                    `[community] issued join endowment for @${person.handle}: ` +
-                    `${endowment} kin (community fund: ${treasuryAmount}, insurance: ${poolAmount}, member seed: ${seedAmount})`,
-                );
+            if (endowment <= 0) {
+                logger.info(`[community] zero endowment for @${person.handle} (age ${ageInYears}) — skipping issuance`);
+                return;
             }
+
+            const poolAmount     = Math.floor(endowment * constitution.endowmentPoolFraction);
+            const treasuryAmount = endowment - poolAmount;
+
+            await centralBank.issue(endowment, treasury.accountId,          "join endowment — community fund");
+            await treasury.transfer(siBank.poolAccountId, poolAmount,       "join endowment — insurance fund");
+            // treasuryAmount remains in the community fund
+
+            siBank.recordContribution(person.id, poolAmount);
+
+            logger.info(
+                `[community] issued join endowment for @${person.handle}: ` +
+                `${endowment} kin (community treasury: ${treasuryAmount}, insurance: ${poolAmount})`,
+            );
         } catch (err) {
             logger.warn(`[community] join handler failed for @${person.handle}: ${(err as Error).message}`);
         }

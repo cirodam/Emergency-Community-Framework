@@ -1,8 +1,9 @@
 import { type Request, type Response } from "express";
-import { NodeService, sendMessage, type EcfMessage } from "@ecf/core";
+import { NodeService, sendMessage, type EcfMessage, parseAddress } from "@ecf/core";
 import { CentralBank } from "../domains/central_bank/CentralBank.js";
 import { FederationMembershipService } from "../FederationMembershipService.js";
 import { nodeBankClient as bank } from "../nodeBankClient.js";
+import { PersonService } from "../person/PersonService.js";
 
 export interface TransferRouteBody {
     address: { community: string; federation?: string; commonwealth?: string; globe?: string };
@@ -117,6 +118,91 @@ export async function sendTransfer(
 }
 
 // ── EcfMessage handler ────────────────────────────────────────────────────────
+
+/**
+ * POST /api/transfers/send
+ * Auth: requireAuth (person credential)
+ *
+ * Handle-based local transfer. Resolves `toAddress` (e.g. "alice@riverside")
+ * and debits the sender's primary account, crediting the recipient's primary
+ * account — entirely within this community's bank.
+ *
+ * Body: {
+ *   toAddress: string,   — e.g. "alice" or "savings@alice" (community segment ignored for local transfers)
+ *   amount:    number,
+ *   memo?:     string,
+ * }
+ */
+export async function sendTransferByHandle(
+    req: Request & { personId?: string },
+    res: Response,
+): Promise<void> {
+    const senderId = req.personId;
+    if (!senderId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+    const { toAddress: rawAddress, amount, memo } = req.body ?? {};
+
+    if (typeof rawAddress !== "string" || !rawAddress.trim()) {
+        res.status(400).json({ error: "toAddress is required" }); return;
+    }
+    if (typeof amount !== "number" || amount <= 0) {
+        res.status(400).json({ error: "amount must be a positive number" }); return;
+    }
+
+    let parsed;
+    try {
+        parsed = parseAddress(rawAddress.trim());
+    } catch (err) {
+        res.status(400).json({ error: (err as Error).message }); return;
+    }
+
+    const entityHandle = parsed.entity;
+    if (!entityHandle) {
+        res.status(400).json({ error: "toAddress must include a person handle" }); return;
+    }
+
+    const recipient = PersonService.getInstance().getByHandle(entityHandle);
+    if (!recipient) {
+        res.status(404).json({ error: `No person found with handle "${entityHandle}"` }); return;
+    }
+
+    // Resolve the recipient's bank account
+    const toAccountHandle = parsed.account;
+    let toAccount: { accountId: string } | undefined;
+    if (toAccountHandle) {
+        const accounts = await bank().getAccounts(recipient.id);
+        toAccount = accounts.find((a: { handle?: string }) => a.handle === toAccountHandle);
+        if (!toAccount) {
+            res.status(404).json({ error: `Recipient has no account with handle "${toAccountHandle}"` }); return;
+        }
+    } else {
+        toAccount = await bank().getPrimaryAccountAsync(recipient.id);
+        if (!toAccount) {
+            res.status(404).json({ error: "Recipient has no primary account" }); return;
+        }
+    }
+
+    // Resolve the sender's primary account
+    const fromAccount = await bank().getPrimaryAccountAsync(senderId);
+    if (!fromAccount) {
+        res.status(404).json({ error: "You have no primary account" }); return;
+    }
+
+    try {
+        await bank().transfer(
+            fromAccount.accountId,
+            toAccount.accountId,
+            amount,
+            typeof memo === "string" ? memo : "",
+        );
+    } catch (err) {
+        res.status(422).json({ error: (err as Error).message }); return;
+    }
+
+    res.status(201).json({ ok: true, amount, toAddress: rawAddress });
+}
+
+
 
 /**
  * MessageDispatcher handler for "bank.transfer.receive".

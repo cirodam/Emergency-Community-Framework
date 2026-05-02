@@ -43,7 +43,7 @@
                     }
                     if (attempt < 4) await new Promise(res => setTimeout(res, 1000));
                 }
-                const primary = accounts.find(a => a.label === "primary") ?? accounts[0];
+                const primary = accounts.find(a => a.primary) ?? accounts[0];
                 // Decode appPermissions from the credential token (base64url JSON)
                 let appPermissions: Record<string, string[]> = {};
                 try {
@@ -52,11 +52,11 @@
                     appPermissions = cred.appPermissions ?? {};
                 } catch { /* token not decodeable — no elevated perms */ }
                 const data: SessionData = {
-                    personId:         payload.id,
-                    handle:           payload.handle,
-                    displayName:      `${payload.firstName} ${payload.lastName}`,
-                    token:            payload.token,
-                    primaryAccountId: primary?.accountId ?? "",
+                    personId:             payload.id,
+                    handle:               payload.handle,
+                    displayName:          `${payload.firstName} ${payload.lastName}`,
+                    token:                payload.token,
+                    primaryAccountHandle: primary?.handle ?? "",
                     appPermissions,
                 };
                 session.login(data);

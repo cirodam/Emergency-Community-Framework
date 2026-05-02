@@ -1,20 +1,36 @@
 <script lang="ts">
-    import { sendMessage, saveDraft, deleteDraft } from "../lib/api.js";
+    import { sendMessage, saveDraft, deleteDraft, getPersons, type PersonDto } from "../lib/api.js";
     import { currentPage, selectedThreadId, selectedDraft } from "../lib/session.js";
     import { randomUUID } from "../lib/uuid.js";
 
     // Pre-fill from draft if one was selected
     const draft = $selectedDraft;
-    let draftId    = $state(draft?.id ?? randomUUID());
-    let toPersonId = $state(draft?.toPersonIds[0] ?? "");
-    let subject    = $state(draft?.subject ?? "");
-    let body       = $state(draft?.body ?? "");
-    let sending    = $state(false);
-    let error      = $state("");
-    let savedAt    = $state<string | null>(null);
+    let draftId      = $state(draft?.id ?? randomUUID());
+    let toHandle     = $state(draft?.toHandles[0] ?? "");
+    let toInputValue = $state("");
+    let subject      = $state(draft?.subject ?? "");
+    let body         = $state(draft?.body ?? "");
+    let sending      = $state(false);
+    let error        = $state("");
+    let savedAt      = $state<string | null>(null);
+
+    let allPersons   = $state<PersonDto[]>([]);
+    let suggestions  = $state<PersonDto[]>([]);
+    let showDropdown = $state(false);
+    let activeIndex  = $state(-1);
 
     // Clear the selected draft so returning to Compose opens a blank form
     selectedDraft.set(null);
+
+    // Pre-load directory; if draft had a recipient, resolve its display name
+    getPersons().then(persons => {
+        allPersons = persons;
+        if (toHandle) {
+            const match = persons.find(p => p.handle === toHandle);
+            if (match) toInputValue = `${match.firstName} ${match.lastName} (@${match.handle})`;
+            else toInputValue = `@${toHandle}`;
+        }
+    }).catch(() => {});
 
     let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -24,18 +40,71 @@
     }
 
     async function autoSave() {
-        if (!toPersonId.trim() && !subject.trim() && !body.trim()) return;
+        if (!toHandle.trim() && !subject.trim() && !body.trim()) return;
         try {
-            await saveDraft(draftId, toPersonId.trim() ? [toPersonId.trim()] : [], subject, body);
+            await saveDraft(draftId, toHandle.trim() ? [toHandle.trim()] : [], subject, body);
             savedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         } catch { /* non-fatal */ }
     }
 
+    function onToInput(e: Event) {
+        const val = (e.target as HTMLInputElement).value;
+        toInputValue = val;
+        toHandle = "";   // clear until a suggestion is confirmed
+        activeIndex = -1;
+
+        if (!val.trim()) {
+            suggestions = [];
+            showDropdown = false;
+            scheduleSave();
+            return;
+        }
+
+        const q = val.toLowerCase();
+        suggestions = allPersons.filter(p =>
+            !p.disabled && !p.retired &&
+            (`${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
+             p.handle.toLowerCase().includes(q))
+        ).slice(0, 8);
+        showDropdown = suggestions.length > 0;
+        scheduleSave();
+    }
+
+    function selectPerson(p: PersonDto) {
+        toHandle     = p.handle;
+        toInputValue = `${p.firstName} ${p.lastName} (@${p.handle})`;
+        suggestions  = [];
+        showDropdown = false;
+        activeIndex  = -1;
+        scheduleSave();
+    }
+
+    function onToKeydown(e: KeyboardEvent) {
+        if (!showDropdown) return;
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            activeIndex = Math.min(activeIndex + 1, suggestions.length - 1);
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            activeIndex = Math.max(activeIndex - 1, 0);
+        } else if (e.key === "Enter" && activeIndex >= 0) {
+            e.preventDefault();
+            selectPerson(suggestions[activeIndex]);
+        } else if (e.key === "Escape") {
+            showDropdown = false;
+        }
+    }
+
+    function onToBlur() {
+        // Small delay so a mousedown on a suggestion fires before blur closes dropdown
+        setTimeout(() => { showDropdown = false; }, 150);
+    }
+
     async function send() {
-        if (!toPersonId.trim() || !body.trim()) return;
+        if (!toHandle.trim() || !body.trim()) return;
         sending = true; error = "";
         try {
-            const msg = await sendMessage(toPersonId.trim(), subject.trim(), body.trim());
+            const msg = await sendMessage(toHandle.trim(), subject.trim(), body.trim());
             // Delete draft on successful send
             try { await deleteDraft(draftId); } catch { /* ignore */ }
             selectedThreadId.set(msg.threadId);
@@ -71,17 +140,39 @@
         <form class="compose-form" onsubmit={(e) => { e.preventDefault(); send(); }}>
             <div class="field-row">
                 <span class="field-label">To</span>
-                <input
-                    class="field-input"
-                    type="text"
-                    bind:value={toPersonId}
-                    oninput={scheduleSave}
-                    placeholder="Person ID or @handle"
-                    autocapitalize="none"
-                    spellcheck={false}
-                    disabled={sending}
-                    required
-                />
+                <div class="to-wrapper">
+                    <input
+                        class="field-input"
+                        type="text"
+                        value={toInputValue}
+                        oninput={onToInput}
+                        onkeydown={onToKeydown}
+                        onblur={onToBlur}
+                        onfocus={() => { if (suggestions.length) showDropdown = true; }}
+                        placeholder="Name or @handle"
+                        autocapitalize="none"
+                        autocomplete="off"
+                        spellcheck={false}
+                        disabled={sending}
+                        required
+                    />
+                    {#if showDropdown}
+                        <ul class="suggestions" role="listbox">
+                            {#each suggestions as person, i}
+                                <li
+                                    class="suggestion-item"
+                                    class:active={i === activeIndex}
+                                    role="option"
+                                    aria-selected={i === activeIndex}
+                                    onmousedown={() => selectPerson(person)}
+                                >
+                                    <span class="suggestion-name">{person.firstName} {person.lastName}</span>
+                                    <span class="suggestion-handle">@{person.handle}</span>
+                                </li>
+                            {/each}
+                        </ul>
+                    {/if}
+                </div>
             </div>
 
             <div class="field-divider"></div>
@@ -120,7 +211,7 @@
                 <button
                     class="send-btn"
                     type="submit"
-                    disabled={sending || !toPersonId.trim() || !body.trim()}
+                    disabled={sending || !toHandle.trim() || !body.trim()}
                 >
                     {sending ? "Sending…" : "Send"}
                 </button>
@@ -206,8 +297,52 @@
         color: #0f172a;
         background: transparent;
         padding: 0;
+        width: 100%;
     }
     .field-input::placeholder { color: #cbd5e1; }
+
+    .to-wrapper {
+        flex: 1;
+        position: relative;
+    }
+
+    .suggestions {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: -4.5rem; /* align with left edge of field-row */
+        right: -1.25rem;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        list-style: none;
+        margin: 0;
+        padding: 0.25rem 0;
+        z-index: 100;
+        max-height: 260px;
+        overflow-y: auto;
+    }
+
+    .suggestion-item {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+    }
+    .suggestion-item:hover,
+    .suggestion-item.active { background: #f0fdf4; }
+
+    .suggestion-name {
+        color: #0f172a;
+        font-weight: 500;
+    }
+
+    .suggestion-handle {
+        color: #64748b;
+        font-size: 0.8rem;
+    }
 
     .field-divider {
         height: 1px;

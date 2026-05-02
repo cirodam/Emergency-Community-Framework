@@ -65,7 +65,7 @@ async function seedPopulation(svc: PersonService): Promise<number> {
         usedHandles.add(handle);
 
         const isChild = birthDate > new Date(Date.now() - 18 * 365.25 * 86400_000);
-        const person = new Person(firstName, lastName, birthDate, handle, false, null, null, [], isChild);
+        const person = new Person(firstName, lastName, birthDate, handle, false, null, null, []);
         await svc.add(person);
     }
 
@@ -81,7 +81,7 @@ export function getSetupStatus(req: Request, res: Response): void {
 }
 
 // POST /api/setup
-// Body: { communityName, firstName, lastName, birthDate, handle, password }
+// Body: { communityName, communityHandle, firstName, lastName, birthDate, handle, password }
 // Atomic first-boot setup: creates the founder person and sets their password.
 // Returns 409 if setup has already been completed.
 export async function setup(req: Request, res: Response): Promise<void> {
@@ -90,10 +90,13 @@ export async function setup(req: Request, res: Response): Promise<void> {
         return;
     }
 
-    const { communityName, firstName, lastName, birthDate, handle, password, phone, seedPopulation: doSeed } = req.body ?? {};
+    const { communityName, communityHandle, firstName, lastName, birthDate, handle, password, phone, seedPopulation: doSeed } = req.body ?? {};
 
     if (typeof communityName !== "string" || !communityName.trim()) {
         res.status(400).json({ error: "communityName is required" }); return;
+    }
+    if (typeof communityHandle !== "string" || !communityHandle.trim()) {
+        res.status(400).json({ error: "communityHandle is required" }); return;
     }
     if (typeof firstName !== "string" || !firstName.trim()) {
         res.status(400).json({ error: "firstName is required" }); return;
@@ -129,8 +132,9 @@ export async function setup(req: Request, res: Response): Promise<void> {
     // Grant the founder explicit stewardship
     svc().grantSteward(person.id);
 
-    // Set the community name in the constitution and persist
+    // Set the community name and handle in the constitution and persist
     Constitution.getInstance().setCommunityName(communityName.trim());
+    Constitution.getInstance().setCommunityHandle(communityHandle.trim());
     Constitution.getInstance().save();
 
     // Optionally seed a sample population for testing

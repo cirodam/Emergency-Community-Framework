@@ -21,19 +21,30 @@ async function apiFetch(input: string, init: RequestInit = {}): Promise<Response
 }
 
 export interface AccountDto {
-    accountId: string;
-    ownerId: string;
     label: string;
+    handle: string;
+    primary: boolean;
     currency: string;
     amount: number;
     overdraftLimit: number;
     createdAt: string;
 }
 
+export interface PersonDto {
+    id: string;
+    firstName: string;
+    lastName: string;
+    handle: string;
+    disabled: boolean;
+    retired: boolean;
+}
+
 export interface TransactionDto {
     id: string;
-    fromAccountId: string;
-    toAccountId: string;
+    /** Handle-based address of the sender. */
+    from: string;
+    /** Handle-based address of the recipient. */
+    to: string;
     currency: string;
     amount: number;
     memo: string;
@@ -41,12 +52,27 @@ export interface TransactionDto {
     reversalOf?: string;
 }
 
-// ── Accounts ──────────────────────────────────────────────────────────────────
+// ── Transactions (legacy — node/admin use only) ──────────────────────────────
 
 export async function getMyAccounts(): Promise<AccountDto[]> {
     const res = await apiFetch("/api/me/accounts");
     if (!res.ok) throw new Error("Failed to load accounts");
     return res.json() as Promise<AccountDto[]>;
+}
+
+export async function getMyAccountByHandle(handle: string): Promise<AccountDto> {
+    const res = await apiFetch(`/api/me/accounts/by-handle/${encodeURIComponent(handle)}`);
+    if (!res.ok) throw new Error("Account not found");
+    return res.json() as Promise<AccountDto>;
+}
+
+export async function getMyAccountTransactions(handle: string, month?: string): Promise<TransactionDto[]> {
+    const url = month
+        ? `/api/me/accounts/by-handle/${encodeURIComponent(handle)}/transactions?month=${encodeURIComponent(month)}`
+        : `/api/me/accounts/by-handle/${encodeURIComponent(handle)}/transactions`;
+    const res = await apiFetch(url);
+    if (!res.ok) throw new Error("Failed to load transactions");
+    return res.json() as Promise<TransactionDto[]>;
 }
 
 export async function createMyAccount(label: string, currency = "kin"): Promise<AccountDto> {
@@ -61,8 +87,8 @@ export async function createMyAccount(label: string, currency = "kin"): Promise<
     return res.json() as Promise<AccountDto>;
 }
 
-export async function deleteMyAccount(accountId: string): Promise<void> {
-    const res = await apiFetch(`/api/me/accounts/${encodeURIComponent(accountId)}`, {
+export async function deleteMyAccount(handle: string): Promise<void> {
+    const res = await apiFetch(`/api/me/accounts/by-handle/${encodeURIComponent(handle)}`, {
         method: "DELETE",
     });
     if (!res.ok) {
@@ -71,8 +97,8 @@ export async function deleteMyAccount(accountId: string): Promise<void> {
     }
 }
 
-export async function renameMyAccount(accountId: string, label: string): Promise<AccountDto> {
-    const res = await apiFetch(`/api/me/accounts/${encodeURIComponent(accountId)}`, {
+export async function renameMyAccount(handle: string, label: string): Promise<AccountDto> {
+    const res = await apiFetch(`/api/me/accounts/by-handle/${encodeURIComponent(handle)}`, {
         method: "PATCH",
         body: JSON.stringify({ label }),
     });
@@ -80,18 +106,6 @@ export async function renameMyAccount(accountId: string, label: string): Promise
         const body = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Failed to rename account");
     }
-    return res.json() as Promise<AccountDto>;
-}
-
-export async function getAccountsByOwner(ownerId: string): Promise<AccountDto[]> {
-    const res = await apiFetch(`/api/accounts/${encodeURIComponent(ownerId)}`);
-    if (!res.ok) throw new Error("Failed to load accounts");
-    return res.json() as Promise<AccountDto[]>;
-}
-
-export async function getAccountById(accountId: string): Promise<AccountDto> {
-    const res = await apiFetch(`/api/account/${encodeURIComponent(accountId)}`);
-    if (!res.ok) throw new Error("Account not found");
     return res.json() as Promise<AccountDto>;
 }
 
@@ -123,6 +137,34 @@ export async function sendTransfer(
         throw new Error(body.error ?? "Transfer failed");
     }
     return res.json() as Promise<TransactionDto>;
+}
+
+export async function sendTransferByAddress(
+    toAddress: string,
+    amount: number,
+    memo?: string,
+): Promise<{ ok: boolean; amount: number; toAddress: string }> {
+    const res = await apiFetch("/api/transfers/send", {
+        method: "POST",
+        body: JSON.stringify({ toAddress, amount, memo }),
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Transfer failed");
+    }
+    return res.json() as Promise<{ ok: boolean; amount: number; toAddress: string }>;
+}
+
+// ── Persons (proxy from community) ────────────────────────────────────────────
+
+let _personsCache: PersonDto[] | null = null;
+
+export async function getPersons(): Promise<PersonDto[]> {
+    if (_personsCache) return _personsCache;
+    const res = await apiFetch("/api/persons");
+    if (!res.ok) throw new Error("Failed to load persons");
+    _personsCache = (await res.json()) as PersonDto[];
+    return _personsCache;
 }
 
 // ── Admin (teller / bank-admin) ───────────────────────────────────────────────

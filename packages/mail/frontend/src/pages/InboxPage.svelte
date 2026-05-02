@@ -31,8 +31,8 @@
     }
 
     function senderLabel(msg: MessageDto): string {
-        if (msg.fromPersonId === s.personId) return "me";
-        return `@${msg.fromPersonId.slice(0, 10)}`;
+        if (msg.fromHandle === s.handle) return "me";
+        return `@${msg.fromHandle}`;
     }
 
     async function open(msg: MessageDto) {
@@ -100,7 +100,7 @@
                     </div>
                     <div class="row-right">
                         <span class="row-date">{formatDate(msg.sentAt)}</span>
-                        {#if msg.fromPersonId !== s.personId}
+                        {#if msg.fromHandle !== s.handle}
                             <button class="flag-btn" onclick={(e) => flag(msg, e)} aria-label="Report">⚑</button>
                         {/if}
                         <button class="delete-btn" onclick={(e) => remove(msg, e)} aria-label="Delete">✕</button>

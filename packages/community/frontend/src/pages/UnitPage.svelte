@@ -54,7 +54,7 @@
 
     // Nominate for a vacant role
     let nominatingRoleId: string | null = $state(null);
-    let nomineeId = $state("");
+    let nomineeHandle = $state("");
     let nominationStatement = $state("");
     let nominating = $state(false);
     let nominationError = $state("");
@@ -63,7 +63,7 @@
     // Assign member to role
     let persons: PersonDto[] = $state([]);
     let assigningRoleId: string | null = $state(null);
-    let assignPersonId = $state("");
+    let assignPersonHandle = $state("");
     let assignSaving = $state(false);
 
     // Schedule editing
@@ -114,14 +114,14 @@
 
     function startAssign(role: RoleDto) {
         assigningRoleId = role.id;
-        assignPersonId  = role.memberId ?? "";
+        assignPersonHandle = role.memberHandle ?? "";
     }
 
     async function saveAssign(roleId: string) {
-        if (!assignPersonId && !roles.find(r => r.id === roleId)?.memberId) return;
+        if (!assignPersonHandle && !roles.find(r => r.id === roleId)?.memberHandle) return;
         assignSaving = true;
         try {
-            const updated = await updateRole(roleId, { memberId: assignPersonId || null });
+            const updated = await updateRole(roleId, { memberHandle: assignPersonHandle || null });
             roles = roles.map(r => r.id === updated.id ? updated : r);
         } catch {
             // silently revert
@@ -228,18 +228,18 @@
 
     function startNominate(roleId: string) {
         nominatingRoleId = roleId;
-        nomineeId = "";
+        nomineeHandle = "";
         nominationStatement = "";
         nominationError = "";
         nominationSuccess = false;
     }
 
     async function submitNomination(roleId: string) {
-        if (!nomineeId) { nominationError = "Please select a nominee."; return; }
+        if (!nomineeHandle) { nominationError = "Please select a nominee."; return; }
         nominating = true;
         nominationError = "";
         try {
-            await createNomination({ roleId, nomineeId, statement: nominationStatement });
+            await createNomination({ roleId, nomineeHandle, statement: nominationStatement });
             nominationSuccess = true;
             setTimeout(() => {
                 nominatingRoleId = null;
@@ -316,17 +316,16 @@
                             <div class="role-card-top">
                                 <div class="role-title-row">
                                     <span class="role-title">{role.title}</span>
-                                    {#if !role.memberId}
+                                    {#if !role.memberHandle}
                                         <span class="vacant-badge">vacant</span>
                                     {/if}
                                     {#if !role.funded}
                                         <span class="unfunded-badge">unfunded</span>
                                     {/if}
                                 </div>
-                                {#if role.memberId}
-                                    {@const holder = persons.find(p => p.id === role.memberId)}
+                                {#if role.memberHandle}
                                     <div class="role-holder-row">
-                                        <span class="role-holder">{holder ? `${holder.firstName} ${holder.lastName}` : role.memberId}</span>
+                                        <span class="role-holder">@{role.memberHandle}</span>
                                         <button class="reassign-btn" onclick={() => startAssign(role)} title="Reassign">✎</button>
                                     </div>
                                 {/if}
@@ -344,10 +343,10 @@
 
                             {#if assigningRoleId === role.id}
                                 <div class="assign-row">
-                                    <select class="assign-select" bind:value={assignPersonId}>
+                                    <select class="assign-select" bind:value={assignPersonHandle}>
                                         <option value="">— unassign —</option>
-                                        {#each persons as p (p.id)}
-                                            <option value={p.id}>{p.firstName} {p.lastName}</option>
+                                        {#each persons as p (p.handle)}
+                                            <option value={p.handle}>{p.firstName} {p.lastName}</option>
                                         {/each}
                                     </select>
                                     <button class="assign-save-btn" onclick={() => saveAssign(role.id)} disabled={assignSaving}>
@@ -355,7 +354,7 @@
                                     </button>
                                     <button class="assign-cancel-btn" onclick={() => assigningRoleId = null}>Cancel</button>
                                 </div>
-                            {:else if !role.memberId}
+                            {:else if !role.memberHandle}
                                 <div class="vacant-actions">
                                     {#if nominatingRoleId !== role.id}
                                         <button class="nominate-btn" onclick={() => startNominate(role.id)}>Nominate</button>
@@ -369,10 +368,10 @@
                                 {:else}
                                     <div class="nomination-form">
                                         <p class="nomination-label">Nominate someone for this role:</p>
-                                        <select class="assign-select" bind:value={nomineeId}>
+                                        <select class="assign-select" bind:value={nomineeHandle}>
                                             <option value="">— select a member —</option>
-                                            {#each persons as p (p.id)}
-                                                <option value={p.id}>{p.firstName} {p.lastName}</option>
+                                            {#each persons as p (p.handle)}
+                                                <option value={p.handle}>{p.firstName} {p.lastName}</option>
                                             {/each}
                                         </select>
                                         <textarea
@@ -385,7 +384,7 @@
                                             <p class="nomination-error">{nominationError}</p>
                                         {/if}
                                         <div class="assign-row" style="margin-top:0;">
-                                            <button class="assign-save-btn" style="background:#15803d;" onclick={() => submitNomination(role.id)} disabled={nominating || !nomineeId}>
+                                            <button class="assign-save-btn" style="background:#15803d;" onclick={() => submitNomination(role.id)} disabled={nominating || !nomineeHandle}>
                                                 {nominating ? "…" : "Submit"}
                                             </button>
                                             <button class="assign-cancel-btn" onclick={() => nominatingRoleId = null}>Cancel</button>
@@ -394,7 +393,7 @@
                                 {/if}
                             {/if}
 
-                            {#if role.memberId && role.termEndDate}
+                            {#if role.memberHandle && role.termEndDate}
                                 {@const days = daysUntil(role.termEndDate)}
                                 {#if days !== null && days <= 60}
                                     <div class="expiry-row">

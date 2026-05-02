@@ -30,7 +30,7 @@
     $effect(() => { load(); });
 
     // ── Derived ────────────────────────────────────────────────────────────────
-    const myId    = $derived($session?.personId ?? "");
+    const myHandle = $derived($session?.handle ?? "");
     const pending  = $derived(applications.filter(a => a.status === "pending"));
     const resolved = $derived(applications.filter(a => a.status !== "pending"));
 
@@ -71,11 +71,11 @@
     }
 
     function hasVouched(app: ApplicationDto): boolean {
-        return app.voucherIds.includes(myId);
+        return app.voucherHandles.includes(myHandle);
     }
 
     function isOwnApplication(app: ApplicationDto): boolean {
-        return app.submittedBy === myId;
+        return app.submittedByHandle === myHandle;
     }
 
     function formatDate(iso: string): string {
@@ -109,11 +109,11 @@
                             <div class="app-name">{app.firstName} {app.lastName}</div>
                             <div class="app-meta">Applied {formatDate(app.submittedAt)}</div>
                         </div>
-                        <div class="vouch-progress" title="{app.voucherIds.length} of {app.vouchesRequired} vouches">
+                        <div class="vouch-progress" title="{app.voucherHandles.length} of {app.vouchesRequired} vouches">
                             {#each { length: app.vouchesRequired } as _, i}
-                                <span class="vouch-pip" class:filled={i < app.voucherIds.length}></span>
+                                <span class="vouch-pip" class:filled={i < app.voucherHandles.length}></span>
                             {/each}
-                            <span class="vouch-label">{app.voucherIds.length}/{app.vouchesRequired}</span>
+                            <span class="vouch-label">{app.voucherHandles.length}/{app.vouchesRequired}</span>
                         </div>
                         <span class="chevron">{expandedId === app.id ? "▲" : "▼"}</span>
                     </button>

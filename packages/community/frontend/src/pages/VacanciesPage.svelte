@@ -10,7 +10,7 @@
 
     // Nomination form state
     let nominatingRole: VacancyDto | null = $state(null);
-    let nomineeId = $state("");
+    let nomineeHandle = $state("");
     let statement = $state("");
     let submitting = $state(false);
     let submitError = $state("");
@@ -41,7 +41,7 @@
 
     function startNominate(v: VacancyDto) {
         nominatingRole = v;
-        nomineeId = $session?.personId ?? "";
+        nomineeHandle = $session?.handle ?? "";
         statement = "";
         submitError = "";
         submitSuccess = false;
@@ -54,11 +54,11 @@
     }
 
     async function submitNomination() {
-        if (!nominatingRole || !nomineeId) { submitError = "Please select a nominee."; return; }
+        if (!nominatingRole || !nomineeHandle) { submitError = "Please select a nominee."; return; }
         submitting = true;
         submitError = "";
         try {
-            await createNomination({ roleId: nominatingRole.roleId, nomineeId, statement });
+            await createNomination({ roleId: nominatingRole.roleId, nomineeHandle, statement });
             submitSuccess = true;
             // Remove from local list so the vacancy disappears after a moment
             setTimeout(() => {
@@ -120,10 +120,10 @@
                                 {:else}
                                     <div class="nominate-form">
                                         <p class="form-label">Who should fill this role?</p>
-                                        <select class="form-select" bind:value={nomineeId}>
+                                        <select class="form-select" bind:value={nomineeHandle}>
                                             <option value="">— select a member —</option>
-                                            {#each persons as p (p.id)}
-                                                <option value={p.id}>{p.firstName} {p.lastName}</option>
+                                            {#each persons as p (p.handle)}
+                                                <option value={p.handle}>{p.firstName} {p.lastName}</option>
                                             {/each}
                                         </select>
                                         <textarea
@@ -136,7 +136,7 @@
                                             <p class="form-error">{submitError}</p>
                                         {/if}
                                         <div class="form-actions">
-                                            <button class="submit-btn" onclick={submitNomination} disabled={submitting || !nomineeId}>
+                                            <button class="submit-btn" onclick={submitNomination} disabled={submitting || !nomineeHandle}>
                                                 {submitting ? "Submitting…" : "Submit nomination"}
                                             </button>
                                             <button class="cancel-btn" onclick={cancelNominate}>Cancel</button>

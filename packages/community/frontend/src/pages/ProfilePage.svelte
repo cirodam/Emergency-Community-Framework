@@ -30,7 +30,7 @@
         if (pin !== pinConfirm)      { pinError = "PINs do not match.";      return; }
         pinSaving = true;
         try {
-            await setPin(s.personId, pin);
+            await setPin(s.handle, pin);
             pinMsg = "PIN saved.";
             pin = ""; pinConfirm = "";
         } catch (e) {
@@ -46,7 +46,7 @@
         if (!trimmed) { phoneError = "Enter a phone number."; return; }
         phoneSaving = true;
         try {
-            const updated = await updatePerson(s.personId, { phone: trimmed });
+            const updated = await updatePerson(s.handle, { phone: trimmed });
             person = updated;
             phoneMsg = "Phone number saved.";
             phoneEdit = "";
@@ -61,7 +61,7 @@
         loading = true;
         error = "";
         try {
-            person = await getPerson(s.personId);
+            person = await getPerson(s.handle);
         } catch (e) {
             const msg = e instanceof Error ? e.message : "";
             if (msg.includes("not found") || msg.includes("404")) {

@@ -2,6 +2,9 @@
 export * from "./types/IEconomicActor.js";
 export * from "./types/Address.js";
 
+// addressing
+export * from "./addressing.js";
+
 // network
 export * from "./network/NodeIdentity.js";
 export * from "./network/NodeSigner.js";

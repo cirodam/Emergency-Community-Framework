@@ -64,7 +64,7 @@
                 <div class="stat-value cb-color">{fmt(econ.centralBank.kinInCirculation)}<span class="stat-unit"> kin</span></div>
                 <p class="stat-note">
                     Represents the total kin currently held across all member accounts.
-                    The supply rises with new issuances (birthdays, joins, birth grants) and
+                    The supply rises with new issuances (birthdays, joins) and
                     falls when demurrage retires unanchored kin back to the central bank.
                 </p>
             {:else}
@@ -193,22 +193,6 @@
                     </div>
                     <strong class="policy-value">{pct(param("birthdayCirculationFraction", 0.2))} to member</strong>
                 </div>
-
-                <div class="policy-row">
-                    <div class="policy-label">
-                        <span class="policy-name">New-member seed balance</span>
-                        <span class="policy-auth">referendum</span>
-                    </div>
-                    <strong class="policy-value">{fmt(param("endowmentSeedBalance", 1000))} kin</strong>
-                </div>
-
-                <div class="policy-row">
-                    <div class="policy-label">
-                        <span class="policy-name">Birth grant</span>
-                        <span class="policy-auth">referendum</span>
-                    </div>
-                    <strong class="policy-value">{fmt(param("birthGrant", 500))} kin</strong>
-                </div>
             </section>
         {/if}
 
@@ -221,10 +205,10 @@
                 <div>
                     <strong>Kin issuance</strong>
                     <p>
-                        Kin enters circulation in three ways: a birthday issuance credited
+                        Kin enters circulation in two ways: a birthday issuance credited
                         annually to each member (split between the member's account and the
-                        social insurance pool), a join endowment for new members based on
-                        their age, and a birth grant when a new person is born into the community.
+                        social insurance pool), and a join endowment for new members based on
+                        their age.
                     </p>
                 </div>
             </div>

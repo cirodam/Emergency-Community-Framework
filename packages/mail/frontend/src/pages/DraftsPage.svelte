@@ -55,7 +55,7 @@
             {#each drafts as draft (draft.id)}
                 <li class="message-row" onclick={() => open(draft)}>
                     <div class="msg-meta">
-                        <span class="msg-to">To: {draft.toPersonIds.join(", ") || "(no recipient)"}</span>
+                        <span class="msg-to">To: {draft.toHandles.map(h => `@${h}`).join(", ") || "(no recipient)"}</span>
                         <span class="msg-date">{formatDate(draft.updatedAt)}</span>
                     </div>
                     <div class="msg-subject">{draft.subject || "(no subject)"}</div>

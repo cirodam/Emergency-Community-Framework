@@ -28,7 +28,8 @@ router.get(   "/payment-tokens/person/:personId", requireSteward, paymentTokens.
 router.post(  "/payment-tokens/receive",                          paymentTokens.receivePayment);
 
 // Cross-community transfers
-router.post("/transfers/out", requireAuth, transfers.sendTransfer);
+router.post("/transfers/out",  requireAuth, transfers.sendTransfer);
+router.post("/transfers/send", requireAuth, transfers.sendTransferByHandle);
 
 // Cross-community mail relay (internal — called by local mail service)
 router.post("/mail/route-external", mailRelay.routeExternalMail);

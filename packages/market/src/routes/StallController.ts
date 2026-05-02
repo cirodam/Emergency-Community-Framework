@@ -1,8 +1,15 @@
 import { Request, Response } from "express";
 import { StallService } from "../StallService.js";
-import { STALL_CATEGORIES, StallCategory } from "../Stall.js";
+import { STALL_CATEGORIES, StallCategory, type Stall } from "../Stall.js";
+import type { PersonCredential } from "@ecf/core";
 
 const svc = () => StallService.getInstance();
+
+/** Strip internal holderId from stall responses. */
+function toDto(s: Stall) {
+    const { holderId: _h, ...rest } = s;
+    return rest;
+}
 
 // GET /api/stalls?marketplaceId=...
 export function listStalls(req: Request, res: Response): void {
@@ -10,14 +17,14 @@ export function listStalls(req: Request, res: Response): void {
     const results = marketplaceId
         ? svc().getByMarketplace(marketplaceId as string)
         : svc().getAll();
-    res.json(results);
+    res.json(results.map(toDto));
 }
 
 // GET /api/stalls/:id
 export function getStall(req: Request, res: Response): void {
     const s = svc().get(req.params.id as string);
     if (!s) { res.status(404).json({ error: "Stall not found" }); return; }
-    res.json(s);
+    res.json(toDto(s));
 }
 
 // POST /api/stalls
@@ -41,19 +48,19 @@ export function createStall(req: Request & { personId?: string }, res: Response)
     }
 
     // holderHandle is read from the credential — not trusted from body
-    const holderHandle = (req as Request & { personId?: string; credential?: { personId: string } }).credential?.personId ?? holderId;
+    const holderHandle = (req as Request & { personId?: string; credential?: PersonCredential }).credential?.handle ?? "";
 
     const s = svc().add(
         marketplaceId.trim(),
         marketplaceName.trim(),
         holderId,
-        typeof (req.body?.holderHandle) === "string" ? req.body.holderHandle : "",
+        typeof (req.body?.holderHandle) === "string" ? req.body.holderHandle : holderHandle,
         name.trim(),
         typeof description === "string" ? description.trim() : "",
         category as StallCategory,
         typeof stallNumber === "string" ? stallNumber.trim() : "",
     );
-    res.status(201).json(s);
+    res.status(201).json(toDto(s));
 }
 
 // PATCH /api/stalls/:id
@@ -74,7 +81,7 @@ export function updateStall(req: Request & { personId?: string }, res: Response)
     }
 
     try {
-        res.json(svc().update(req.params.id as string, patch));
+        res.json(toDto(svc().update(req.params.id as string, patch)));
     } catch (err) {
         res.status(404).json({ error: (err as Error).message });
     }
@@ -90,7 +97,7 @@ export function deleteStall(req: Request & { personId?: string }, res: Response)
 // PATCH /api/admin/stalls/:id/suspend — coordinator/admin: suspend any stall
 export function adminSuspendStall(req: Request, res: Response): void {
     try {
-        res.json(svc().adminSetStatus(req.params.id as string, "inactive"));
+        res.json(toDto(svc().adminSetStatus(req.params.id as string, "inactive")));
     } catch (err) {
         res.status(404).json({ error: (err as Error).message });
     }
@@ -99,7 +106,7 @@ export function adminSuspendStall(req: Request, res: Response): void {
 // PATCH /api/admin/stalls/:id/unsuspend — coordinator/admin: reactivate any stall
 export function adminUnsuspendStall(req: Request, res: Response): void {
     try {
-        res.json(svc().adminSetStatus(req.params.id as string, "active"));
+        res.json(toDto(svc().adminSetStatus(req.params.id as string, "active")));
     } catch (err) {
         res.status(404).json({ error: (err as Error).message });
     }

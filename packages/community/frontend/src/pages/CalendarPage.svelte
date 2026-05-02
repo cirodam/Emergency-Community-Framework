@@ -141,12 +141,12 @@
         if (!$session) return;
         rsvpBusy = ev.id;
         try {
-            const myRsvp = ev.rsvps.find(r => r.personId === $session!.personId);
+            const myRsvp = ev.rsvps.find(r => r.handle === $session!.handle);
             let updated: CalendarEventDto;
             if (myRsvp?.status === status) {
-                updated = await removeCalendarRsvp(ev.id, $session.personId);
+                updated = await removeCalendarRsvp(ev.id, $session.handle);
             } else {
-                updated = await rsvpCalendarEvent(ev.id, $session.personId, status);
+                updated = await rsvpCalendarEvent(ev.id, status);
             }
             events = events.map(e => e.id === updated.id && e.occurrenceDate === ev.occurrenceDate ? { ...updated, occurrenceDate: ev.occurrenceDate } : e);
         } catch { /* silent */ }
@@ -155,7 +155,7 @@
 
     function myRsvpStatus(ev: CalendarEventDto): "yes" | "no" | "maybe" | null {
         if (!$session) return null;
-        return ev.rsvps.find(r => r.personId === $session!.personId)?.status ?? null;
+        return ev.rsvps.find(r => r.handle === $session!.handle)?.status ?? null;
     }
 
     function rsvpCounts(ev: CalendarEventDto) {
@@ -223,7 +223,7 @@
             const created = await createCalendarEvent({
                 title:            form.title.trim(),
                 startAt,
-                organizerId:      $session.personId,
+                organizerHandle:  $session.handle,
                 organizerType:    "person",
                 endAt,
                 allDay:           form.allDay,
@@ -370,7 +370,7 @@
                                         disabled={rsvpBusy === ev.id}
                                         onclick={() => handleRsvp(ev, "no")}
                                     >✗ No</button>
-                                    {#if ev.createdBy === $session.personId}
+                                    {#if ev.createdByHandle === $session.handle}
                                         <button class="cancel-btn" onclick={() => handleCancel(ev)}>Cancel event</button>
                                     {/if}
                                 </div>

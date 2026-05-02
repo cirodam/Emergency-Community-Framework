@@ -60,7 +60,7 @@
                         <span class="thread-date">{formatDate(thread.lastMessageAt)}</span>
                     </div>
                     <div class="thread-participants">
-                        {thread.participantIds.slice(0, 3).join(", ")}{thread.participantIds.length > 3 ? "…" : ""}
+                        {thread.participantHandles.slice(0, 3).map(h => `@${h}`).join(", ")}{thread.participantHandles.length > 3 ? "…" : ""}
                     </div>
                     <div class="thread-actions">
                         <button class="icon-btn" title="Move to inbox" onclick={(e) => unarchive(thread, e)}>↩ Unarchive</button>

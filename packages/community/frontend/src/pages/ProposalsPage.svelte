@@ -99,8 +99,6 @@
         if (m.stage === "resolved") return "badge-resolved";
         return "badge-default";
     }
-
-    const personId = $derived($session?.personId ?? null);
 </script>
 
 <div class="page">

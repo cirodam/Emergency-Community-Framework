@@ -10,7 +10,14 @@ const svc = () => MotionService.getInstance();
 const ppl = () => PersonService.getInstance();
 
 function toDto(m: Motion) {
-    return m.toData();
+    const data = m.toData();
+    // Strip internal UUIDs from the public DTO — handles are the member-facing identifiers.
+    const { proposerId: _pid, ...rest } = data as typeof data & { proposerId?: unknown };
+    return {
+        ...rest,
+        votes:    data.votes.map(({ personId: _vpid, ...v }) => v),
+        comments: data.comments.map(({ authorId: _acid, ...c }) => c),
+    };
 }
 
 // GET /api/motions?body=referendum&stage=deliberating

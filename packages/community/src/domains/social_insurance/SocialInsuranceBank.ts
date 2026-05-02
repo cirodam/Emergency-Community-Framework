@@ -82,6 +82,8 @@ export class SocialInsuranceBank extends FunctionalDomain {
             "Social Insurance Bank",
             "kin",
             0,
+            "insurance",
+            true,
         );
         this._poolAccountId = account.accountId;
 

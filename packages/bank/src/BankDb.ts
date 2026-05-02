@@ -44,10 +44,13 @@ export class BankDb {
                 currency        TEXT NOT NULL CHECK(currency IN ('kin','kithe')),
                 amount          INTEGER NOT NULL DEFAULT 0,
                 overdraft_limit INTEGER NOT NULL DEFAULT 0,
-                created_at      TEXT NOT NULL
+                created_at      TEXT NOT NULL,
+                handle          TEXT NOT NULL DEFAULT '',
+                is_primary      INTEGER NOT NULL DEFAULT 0
             );
 
-            CREATE INDEX IF NOT EXISTS idx_accounts_owner ON accounts(owner_id);
+            CREATE INDEX IF NOT EXISTS idx_accounts_owner         ON accounts(owner_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_handle ON accounts(owner_id, handle) WHERE handle != '';
 
             CREATE TABLE IF NOT EXISTS account_owners (
                 owner_id      TEXT PRIMARY KEY,

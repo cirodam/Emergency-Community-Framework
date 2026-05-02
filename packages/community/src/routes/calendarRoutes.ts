@@ -12,7 +12,7 @@ router.get(   "/calendar/:id",                calendar.getEvent);
 router.patch( "/calendar/:id",                requireAuth, calendar.updateEvent);
 router.delete("/calendar/:id",                requireAuth, calendar.cancelEvent);
 router.post(  "/calendar/:id/rsvp",           requireAuth, calendar.rsvpToEvent);
-router.delete("/calendar/:id/rsvp/:personId", requireAuth, calendar.removeRsvp);
+router.delete("/calendar/:id/rsvp/:handle",   requireAuth, calendar.removeRsvp);
 
 // Locations
 router.get(   "/locations",     locations.listLocations);

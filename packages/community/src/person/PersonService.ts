@@ -6,6 +6,7 @@ import { PersonLoader } from "./PersonLoader.js";
 import { Constitution } from "../governance/Constitution.js";
 import type { DomainService } from "../DomainService.js";
 import { AppSuspensionService } from "./AppSuspensionService.js";
+import { HandleRegistry } from "../HandleRegistry.js";
 
 export interface PersonPatch {
     firstName?: string;
@@ -76,6 +77,7 @@ export class PersonService {
         this.loader = loader;
         for (const person of loader.loadAll()) {
             this.persons.set(person.id, person);
+            HandleRegistry.getInstance().register(person.handle, "person", person.id);
         }
     }
 
@@ -102,6 +104,7 @@ export class PersonService {
      */
     async add(person: Person): Promise<void> {
         this.persons.set(person.id, person);
+        HandleRegistry.getInstance().register(person.handle, "person", person.id);
         this.issueCredential(person);
         for (const h of this.joinHandlers) await h(person);
         this.save(person);
@@ -132,6 +135,7 @@ export class PersonService {
      */
     async discharge(person: Person): Promise<void> {
         for (const h of this.dischargeHandlers) await h(person);
+        HandleRegistry.getInstance().release(person.handle);
         this.loader?.delete(person.id);
         this.persons.delete(person.id);
     }

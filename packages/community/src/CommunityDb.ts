@@ -51,7 +51,6 @@ export class CommunityDb {
                 disabled          INTEGER NOT NULL DEFAULT 0,
                 retired           INTEGER NOT NULL DEFAULT 0,
                 steward           INTEGER NOT NULL DEFAULT 0,
-                born_in_community INTEGER NOT NULL DEFAULT 0,
                 guardian_id       TEXT,
                 phone             TEXT,
                 pin_hash          TEXT,

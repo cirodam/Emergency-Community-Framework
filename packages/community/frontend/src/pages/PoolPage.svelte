@@ -16,7 +16,7 @@
     let outcomeNote   = $state("");
 
     let nominating     = $state(false);
-    let nomineeId      = $state("");
+    let nomineeHandle  = $state("");
     let nomineeStmt    = $state("");
     let nominateError  = $state("");
     let nominateSaving = $state(false);
@@ -57,13 +57,13 @@
     }
 
     async function doNominate() {
-        if (!nomineeId || !pool) return;
+        if (!nomineeHandle || !pool) return;
         nominateSaving = true;
         nominateError = "";
         try {
-            await createPoolNomination({ poolId: pool.id, nomineeId, statement: nomineeStmt.trim() });
+            await createPoolNomination({ poolId: pool.id, nomineeHandle, statement: nomineeStmt.trim() });
             nominating = false;
-            nomineeId = "";
+            nomineeHandle = "";
             nomineeStmt = "";
         } catch (e) {
             nominateError = e instanceof Error ? e.message : "Failed";
@@ -117,15 +117,6 @@
             motions = motions.map(m => m.id === id ? updated : m);
             outcomingId = null; outcomeNote = "";
         } catch (e) { docketError = e instanceof Error ? e.message : "Failed"; }
-    }
-
-    function personName(id: string): string {
-        const p = persons.find(p => p.id === id);
-        return p ? `${p.firstName} ${p.lastName}` : id;
-    }
-
-    function personHandle(id: string): string | null {
-        return persons.find(p => p.id === id)?.handle ?? null;
     }
 
     // Mandate editing
@@ -199,16 +190,13 @@
             {/if}
         </div>
 
-        {#if pool.personIds.length === 0}
+        {#if pool.personHandles.length === 0}
             <p class="empty-msg">No members in this pool yet.</p>
         {:else}
             <div class="member-list">
-                {#each pool.personIds as pid (pid)}
+                {#each pool.personHandles as handle (handle)}
                     <div class="member-card">
-                        <span class="member-name">{personName(pid)}</span>
-                        {#if personHandle(pid)}
-                            <span class="member-handle">@{personHandle(pid)}</span>
-                        {/if}
+                        <span class="member-handle">@{handle}</span>
                     </div>
                 {/each}
             </div>
@@ -218,16 +206,16 @@
     {#if !loading && !error && isSteward && pool}
         {#if nominating}
             <div class="nominate-form">
-                <select class="nominate-select" bind:value={nomineeId}>
+                <select class="nominate-select" bind:value={nomineeHandle}>
                     <option value="">— select person —</option>
-                    {#each persons.filter(p => !pool!.personIds.includes(p.id)) as p (p.id)}
-                        <option value={p.id}>{p.firstName} {p.lastName}</option>
+                    {#each persons.filter(p => !pool!.personHandles.includes(p.handle)) as p (p.handle)}
+                        <option value={p.handle}>{p.firstName} {p.lastName}</option>
                     {/each}
                 </select>
                 <input class="nominate-input" placeholder="Statement (optional)" bind:value={nomineeStmt} />
                 {#if nominateError}<p class="nominate-error">{nominateError}</p>{/if}
                 <div class="nominate-actions">
-                    <button class="btn-sm btn-primary-sm" onclick={doNominate} disabled={!nomineeId || nominateSaving}>
+                    <button class="btn-sm btn-primary-sm" onclick={doNominate} disabled={!nomineeHandle || nominateSaving}>
                         {nominateSaving ? "Submitting…" : "Nominate"}
                     </button>
                     <button class="btn-sm" onclick={() => { nominating = false; nominateError = ""; }}>Cancel</button>

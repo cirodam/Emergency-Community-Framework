@@ -170,7 +170,7 @@
                                 <p class="unit-desc">{unit.description}</p>
                             {/if}
                             <div class="unit-footer">
-                                <span class="unit-stat">{unit.personIds.length} member{unit.personIds.length !== 1 ? "s" : ""}</span>
+                                <span class="unit-stat">{unit.personHandles.length} member{unit.personHandles.length !== 1 ? "s" : ""}</span>
                                 <span class="unit-stat">{unit.roleIds.length} role{unit.roleIds.length !== 1 ? "s" : ""}</span>
                                 <span class="unit-date">Since {fmt(unit.createdAt)}</span>
                             </div>
@@ -204,7 +204,7 @@
                     {#if pool.description}
                         <p class="pool-desc">{pool.description}</p>
                     {/if}
-                    <p class="pool-members">{pool.personIds.length} member{pool.personIds.length !== 1 ? "s" : ""}</p>
+                    <p class="pool-members">{pool.personHandles.length} member{pool.personHandles.length !== 1 ? "s" : ""}</p>
                 </div>
             {:else}
                 <p class="empty-msg">No leadership pool assigned.</p>
@@ -224,7 +224,7 @@
                                 <div class="template-row" class:already={p.id === domain?.poolId}>
                                     <div class="template-info">
                                         <span class="template-label">{p.name}</span>
-                                        <span class="template-desc">{p.personIds.length} member{p.personIds.length !== 1 ? "s" : ""}{p.description ? " · " + p.description : ""}</span>
+                                        <span class="template-desc">{p.personHandles.length} member{p.personHandles.length !== 1 ? "s" : ""}{p.description ? " · " + p.description : ""}</span>
                                     </div>
                                     <button
                                         class="template-add-btn"

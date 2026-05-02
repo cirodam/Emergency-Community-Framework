@@ -8,7 +8,6 @@
     let lastName      = $state("");
     let birthDate     = $state("");
     let phone         = $state("");
-    let bornIn        = $state(false);
 
     let error   = $state("");
     let loading = $state(false);
@@ -32,7 +31,6 @@
                 firstName: firstName.trim(),
                 lastName:  lastName.trim(),
                 birthDate,
-                bornInCommunity: bornIn,
                 phone: phone.trim() || null,
             });
         } catch (e) {
@@ -121,11 +119,6 @@
                     />
                 </label>
 
-                <label class="checkbox-field">
-                    <input type="checkbox" bind:checked={bornIn} disabled={loading} />
-                    <span>Born into community <span class="hint">(receives birth grant instead of join endowment)</span></span>
-                </label>
-            </div>
 
             <button type="submit" class="btn-primary btn-full" disabled={loading}>
                 {loading ? "Adding…" : "Add person"}

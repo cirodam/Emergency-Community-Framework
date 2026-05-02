@@ -43,7 +43,7 @@
     }
 
     function senderLabel(msg: MessageDto): string {
-        return msg.fromPersonId === s.personId ? "me" : `@${msg.fromPersonId.slice(0, 14)}`;
+        return msg.fromHandle === s.handle ? "me" : `@${msg.fromHandle}`;
     }
 </script>
 

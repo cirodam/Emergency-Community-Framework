@@ -44,17 +44,17 @@
 
     function otherParticipant(): string {
         if (!detail) return "";
-        return detail.thread.participantIds.find(id => id !== s.personId) ?? "";
+        return detail.thread.participantHandles.find(h => h !== s.handle) ?? "";
     }
 
     function senderLabel(msg: MessageDto): string {
-        if (msg.fromPersonId === s.personId) return `${s.firstName} ${s.lastName} <@${s.handle}>`;
-        return `@${msg.fromPersonId}`;
+        if (msg.fromHandle === s.handle) return `${s.firstName} ${s.lastName} <@${s.handle}>`;
+        return `@${msg.fromHandle}`;
     }
 
     function recipientLabel(msg: MessageDto): string {
-        const ids = msg.toPersonIds ?? [];
-        return ids.map(id => id === s.personId ? `@${s.handle}` : `@${id.slice(0, 12)}`).join(", ") || "(none)";
+        const handles = msg.toHandles ?? [];
+        return handles.map(h => h === s.handle ? `@${s.handle}` : `@${h}`).join(", ") || "(none)";
     }
 
     function formatFull(iso: string): string {
@@ -124,7 +124,7 @@
     {:else if detail}
         <div class="conversation">
             {#each detail.messages as msg, i (msg.id)}
-                {@const mine = msg.fromPersonId === s.personId}
+                {@const mine = msg.fromHandle === s.handle}
                 {@const isCollapsed = collapsed.has(msg.id)}
 
                 <div class="email-card" class:mine>
@@ -132,10 +132,10 @@
                     <button class="email-header" onclick={() => toggle(msg.id)}>
                         <div class="header-left">
                             <div class="sender-avatar" class:mine>
-                                {mine ? `${s.firstName[0]}${s.lastName[0]}` : msg.fromPersonId.slice(0, 2).toUpperCase()}
+                                {mine ? `${s.firstName[0]}${s.lastName[0]}` : msg.fromHandle.slice(0, 2).toUpperCase()}
                             </div>
                             <div class="header-meta">
-                                <span class="sender-name">{mine ? `${s.firstName} ${s.lastName}` : `@${msg.fromPersonId.slice(0, 16)}`}</span>
+                                <span class="sender-name">{mine ? `${s.firstName} ${s.lastName}` : `@${msg.fromHandle}`}</span>
                                 {#if isCollapsed}
                                     <span class="preview-collapsed">{msg.body.replace(/\n/g, " ").slice(0, 60)}{msg.body.length > 60 ? "…" : ""}</span>
                                 {:else}

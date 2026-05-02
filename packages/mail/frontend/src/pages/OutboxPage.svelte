@@ -31,10 +31,10 @@
     }
 
     function recipientLabel(msg: MessageDto): string {
-        if (!msg.toPersonIds.length) return "(unknown)";
-        const first = msg.toPersonIds[0];
-        const label = first === s.personId ? "me" : `@${first.slice(0, 10)}`;
-        if (msg.toPersonIds.length > 1) return `${label} +${msg.toPersonIds.length - 1}`;
+        if (!msg.toHandles.length) return "(unknown)";
+        const first = msg.toHandles[0];
+        const label = first === s.handle ? "me" : `@${first}`;
+        if (msg.toHandles.length > 1) return `${label} +${msg.toHandles.length - 1}`;
         return label;
     }
 

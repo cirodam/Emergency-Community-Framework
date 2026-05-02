@@ -11,7 +11,7 @@ export interface SessionData {
     displayName: string;
     /** base64url-encoded PersonCredential — sent as Bearer token on every API call. */
     token: string;
-    primaryAccountId: string;
+    primaryAccountHandle: string;
     appPermissions: Record<string, string[]>;
 }
 
@@ -81,5 +81,5 @@ function createPageStore() {
 
 export const currentPage = createPageStore();
 
-/** The account currently being viewed in the detail page (not persisted). */
-export const selectedAccountId = writable<string>("");
+/** The account handle currently being viewed in the detail page (not persisted). */
+export const selectedAccountHandle = writable<string>("");

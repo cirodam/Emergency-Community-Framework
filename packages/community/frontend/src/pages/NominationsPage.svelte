@@ -1,11 +1,10 @@
 <script lang="ts">
-    import { listNominations, confirmNomination, declineNomination, listExpiringRoles, listPersons, listRoles, listDomains, listUnits } from "../lib/api.js";
-    import type { NominationDto, ExpiringRoleDto, PersonDto, RoleDto, DomainDto, UnitDto } from "../lib/api.js";
+    import { listNominations, confirmNomination, declineNomination, listExpiringRoles, listRoles, listDomains, listUnits } from "../lib/api.js";
+    import type { NominationDto, ExpiringRoleDto, RoleDto, DomainDto, UnitDto } from "../lib/api.js";
     import { currentPage, selectedUnitId, selectedDomainId } from "../lib/session.js";
 
     let nominations: NominationDto[]   = $state([]);
     let expiring: ExpiringRoleDto[]     = $state([]);
-    let persons: PersonDto[]            = $state([]);
     let roles: RoleDto[]                = $state([]);
     let domains: DomainDto[]            = $state([]);
     let units: UnitDto[]                = $state([]);
@@ -17,10 +16,9 @@
         loading = true;
         error = "";
         try {
-            [nominations, expiring, persons, roles, domains, units] = await Promise.all([
+            [nominations, expiring, roles, domains, units] = await Promise.all([
                 listNominations(),
                 listExpiringRoles(60),
-                listPersons(),
                 listRoles(),
                 listDomains(),
                 listUnits(),
@@ -37,11 +35,6 @@
     let pending  = $derived(nominations.filter(n => n.status === "pending"));
     let accepted  = $derived(nominations.filter(n => n.status === "accepted"));
     let resolved  = $derived(nominations.filter(n => n.status === "confirmed" || n.status === "declined"));
-
-    function personName(id: string): string {
-        const p = persons.find(p => p.id === id);
-        return p ? `${p.firstName} ${p.lastName}` : id;
-    }
 
     function roleTitle(id: string): string {
         return roles.find(r => r.id === id)?.title ?? id;
@@ -121,8 +114,8 @@
                         <div class="card">
                             <div class="card-top">
                                 <div class="card-info">
-                                    <span class="card-name">{personName(n.nomineeId)}</span>
-                                    <span class="card-sub">nominated by {personName(n.createdBy)}</span>
+                                    <span class="card-name">@{n.nomineeHandle ?? "unknown"}</span>
+                                    <span class="card-sub">nominated by @{n.createdByHandle ?? "unknown"}</span>
                                 </div>
                                 <div class="card-actions">
                                     <button class="confirm-btn" onclick={() => doConfirm(n.id)}>Accept</button>
@@ -158,8 +151,8 @@
                         <div class="card docket-card">
                             <div class="card-top">
                                 <div class="card-info">
-                                    <span class="card-name">{personName(n.nomineeId)}</span>
-                                    <span class="card-sub">nominated by {personName(n.createdBy)}</span>
+                                    <span class="card-name">@{n.nomineeHandle ?? "unknown"}</span>
+                                    <span class="card-sub">nominated by @{n.createdByHandle ?? "unknown"}</span>
                                 </div>
                                 <span class="status-badge accepted">Assembly vote</span>
                             </div>
@@ -189,7 +182,7 @@
                             <div class="card-top">
                                 <div class="card-info">
                                     <span class="card-name">{r.roleTitle}</span>
-                                    <span class="card-sub">{personName(r.memberId)} · {r.unitName} · {r.domainName}</span>
+                                    <span class="card-sub">@{r.memberHandle ?? "unknown"} · {r.unitName} · {r.domainName}</span>
                                 </div>
                                 <div class="expiry-info">
                                     <span class="expiry-days" class:urgent={daysUntil(r.termEndDate) <= 14}>
@@ -214,8 +207,8 @@
                         <div class="card resolved-card">
                             <div class="card-top">
                                 <div class="card-info">
-                                    <span class="card-name">{personName(n.nomineeId)}</span>
-                                    <span class="card-sub">nominated by {personName(n.createdBy)}</span>
+                                    <span class="card-name">@{n.nomineeHandle ?? "unknown"}</span>
+                                    <span class="card-sub">nominated by @{n.createdByHandle ?? "unknown"}</span>
                                 </div>
                                 <span class="status-badge" class:confirmed={n.status === "confirmed"} class:declined={n.status === "declined"}>
                                     {n.status}

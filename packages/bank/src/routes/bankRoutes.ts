@@ -2,7 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { verifyNodeSignature } from "@ecf/core";
 import { getCommunityIdentity } from "../communityIdentity.js";
 import { requireAuth, requireNotSuspended, requireTeller, requireBankAdmin, requireBankAccess } from "./middleware.js";
-import { createAccount, getAllAccounts, getAccounts, getAccountById, getTransactions, createTransfer, applyDemurrage, getMyAccounts, createMyAccount, deleteMyAccount, renameMyAccount, closeOwnerAccounts, adminGetAccounts, adminReverseTransaction } from "./BankController.js";
+import { createAccount, getAllAccounts, getAccounts, getAccountById, getTransactions, createTransfer, applyDemurrage, getMyAccounts, createMyAccount, deleteMyAccount, renameMyAccount, closeOwnerAccounts, adminGetAccounts, adminReverseTransaction, listPersons, sendTransferByHandle, getMyAccountByHandle, getMyAccountTransactions, deleteMyAccountByHandle, renameMyAccountByHandle } from "./BankController.js";
 
 const router = Router();
 
@@ -28,13 +28,20 @@ router.get(   "/account/:accountId",               requireAuthOrNodeSignature, g
 router.post("/demurrage",                        requireAuthOrNodeSignature, applyDemurrage);
 
 // Member routes — require a valid community-issued credential + not suspended
-router.get(   "/me/accounts",                      ...requireBankAccess, getMyAccounts);
-router.post(  "/me/accounts",                      ...requireBankAccess, createMyAccount);
-router.delete("/me/accounts/:accountId",           ...requireBankAccess, deleteMyAccount);
-router.patch( "/me/accounts/:accountId",           ...requireBankAccess, renameMyAccount);
-router.get(   "/accounts/:ownerId",                requireAuthOrNodeSignature, getAccounts);
-router.get(   "/accounts/:accountId/transactions", requireAuthOrNodeSignature, getTransactions);
-router.post(  "/transfers",                        requireAuthOrNodeSignature, createTransfer);
+router.get(   "/me/accounts",                             ...requireBankAccess, getMyAccounts);
+router.post(  "/me/accounts",                             ...requireBankAccess, createMyAccount);
+router.delete("/me/accounts/:accountId",                  ...requireBankAccess, deleteMyAccount);
+router.patch( "/me/accounts/:accountId",                  ...requireBankAccess, renameMyAccount);
+// Handle-based member routes (preferred — no UUID exposure)
+router.get(   "/me/accounts/by-handle/:handle",           ...requireBankAccess, getMyAccountByHandle);
+router.get(   "/me/accounts/by-handle/:handle/transactions", ...requireBankAccess, getMyAccountTransactions);
+router.delete("/me/accounts/by-handle/:handle",           ...requireBankAccess, deleteMyAccountByHandle);
+router.patch( "/me/accounts/by-handle/:handle",           ...requireBankAccess, renameMyAccountByHandle);
+router.get(   "/accounts/:ownerId",                       requireAuthOrNodeSignature, getAccounts);
+router.get(   "/accounts/:accountId/transactions",        requireAuthOrNodeSignature, getTransactions);
+router.post(  "/transfers",                               requireAuthOrNodeSignature, createTransfer);
+router.post(  "/transfers/send",                          ...requireBankAccess, sendTransferByHandle);
+router.get(   "/persons",                                 ...requireBankAccess, listPersons);
 
 // Teller routes — require bank: teller permission
 router.get(  "/admin/accounts",                    ...requireTeller, adminGetAccounts);

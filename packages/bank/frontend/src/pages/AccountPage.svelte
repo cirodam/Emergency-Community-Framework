@@ -1,13 +1,13 @@
 <script lang="ts">
-    import { session, currentPage, selectedAccountId } from "../lib/session.js";
-    import { getAccountById, getTransactions, getMyAccounts, sendTransfer } from "../lib/api.js";
+    import { session, currentPage, selectedAccountHandle } from "../lib/session.js";
+    import { getMyAccountByHandle, getMyAccountTransactions, getMyAccounts, sendTransferByAddress } from "../lib/api.js";
     import type { AccountDto, TransactionDto } from "../lib/api.js";
     import AmountDisplay from "../components/AmountDisplay.svelte";
     import TransactionRow from "../components/TransactionRow.svelte";
     import ErrorBanner from "../components/ErrorBanner.svelte";
 
     const s = $derived($session!);
-    const accountId = $derived($selectedAccountId || s.primaryAccountId);
+    const accountHandle = $derived($selectedAccountHandle || s.primaryAccountHandle);
 
     let account: AccountDto | null = $state(null);
     let loadError = $state("");
@@ -33,18 +33,18 @@
     let selectedMonth = $state(months[1]?.value ?? "");
 
     async function loadAccount() {
-        if (!accountId) return;
+        if (!accountHandle) return;
         loadingAccount = true; loadError = "";
-        try { account = await getAccountById(accountId); }
+        try { account = await getMyAccountByHandle(accountHandle); }
         catch (e) { loadError = e instanceof Error ? e.message : "Failed to load account"; }
         finally   { loadingAccount = false; }
     }
 
     async function loadTxs() {
-        if (!accountId) return;
+        if (!accountHandle) return;
         txLoading = true; txError = "";
         try {
-            const raw = await getTransactions(accountId, selectedMonth || undefined);
+            const raw = await getMyAccountTransactions(accountHandle, selectedMonth || undefined);
             txs = raw.slice().sort((a, b) => b.timestamp.localeCompare(a.timestamp));
         } catch (e) {
             txError = e instanceof Error ? e.message : "Failed to load transactions";
@@ -53,17 +53,17 @@
         }
     }
 
-    $effect(() => { accountId; loadAccount(); });
-    $effect(() => { accountId; selectedMonth; loadTxs(); });
+    $effect(() => { accountHandle; loadAccount(); });
+    $effect(() => { accountHandle; selectedMonth; loadTxs(); });
 
     // ── Move funds (between own accounts) ─────────────────────────────────
-    let showMove      = $state(false);
-    let ownAccounts   = $state<AccountDto[]>([]);
-    let moveToId      = $state("");
-    let moveAmount    = $state("");
-    let moveError     = $state("");
-    let moving        = $state(false);
-    let moveSuccess   = $state(false);
+    let showMove        = $state(false);
+    let ownAccounts     = $state<AccountDto[]>([]);
+    let moveToHandle    = $state("");
+    let moveAmount      = $state("");
+    let moveError       = $state("");
+    let moving          = $state(false);
+    let moveSuccess     = $state(false);
 
     async function toggleMove() {
         showMove = !showMove;
@@ -71,20 +71,21 @@
             moveError = ""; moveSuccess = false; moveAmount = "";
             if (ownAccounts.length === 0) {
                 const all = await getMyAccounts();
-                ownAccounts = all.filter(a => a.accountId !== accountId);
+                ownAccounts = all.filter(a => a.handle !== accountHandle);
             }
-            if (ownAccounts.length > 0 && !moveToId) moveToId = ownAccounts[0].accountId;
+            if (ownAccounts.length > 0 && !moveToHandle) moveToHandle = ownAccounts[0].handle;
         }
     }
 
     async function doMove() {
         const amt = parseFloat(moveAmount);
-        if (!moveToId) { moveError = "Select a destination account"; return; }
+        if (!moveToHandle) { moveError = "Select a destination account"; return; }
         if (isNaN(amt) || amt <= 0) { moveError = "Enter a valid amount"; return; }
         moving = true; moveError = "";
         try {
-            await sendTransfer(accountId, moveToId, amt, "transfer between accounts");
-            account = await getAccountById(accountId);
+            // Move between own accounts: address is just the target account handle
+            await sendTransferByAddress(moveToHandle, amt, "transfer between accounts");
+            account = await getMyAccountByHandle(accountHandle);
             await loadTxs();
             moveSuccess = true;
             moveAmount = "";
@@ -112,7 +113,7 @@
         <div class="balance-card">
             <div class="balance-card-label">{account.label}</div>
             <AmountDisplay amount={account.amount} currency={account.currency} size="lg" />
-            <div class="balance-card-id">{account.accountId.slice(0, 8)}… · {account.currency}</div>
+            <div class="balance-card-id">@{account.handle} · {account.currency}</div>
         </div>
     {/if}
 
@@ -144,9 +145,9 @@
                 <div class="move-fields">
                     <div class="move-field">
                         <label class="field-label" for="move-to">To account</label>
-                        <select id="move-to" class="move-select" bind:value={moveToId} disabled={moving}>
-                            {#each ownAccounts as a (a.accountId)}
-                                <option value={a.accountId}>{a.label} ({a.amount.toLocaleString()} {a.currency})</option>
+                        <select id="move-to" class="move-select" bind:value={moveToHandle} disabled={moving}>
+                            {#each ownAccounts as a (a.handle)}
+                                <option value={a.handle}>{a.label} ({a.amount.toLocaleString()} {a.currency})</option>
                             {/each}
                         </select>
                     </div>
@@ -194,7 +195,7 @@
         {:else}
             <div class="tx-list">
                 {#each txs as tx (tx.id)}
-                    <TransactionRow {tx} perspectiveAccountId={accountId} />
+                    <TransactionRow {tx} perspectiveAccountHandle={accountHandle} />
                 {/each}
             </div>
         {/if}

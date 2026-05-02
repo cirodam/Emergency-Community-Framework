@@ -10,24 +10,25 @@ type AuthedRequest = Request & { personId?: string };
 const svc = () => NominationService.getInstance();
 
 function toDto(n: Nomination) {
+    const ppl = PersonService.getInstance();
     const poolName = n.poolId
         ? (DomainService.getInstance().getPool(n.poolId)?.name ?? null)
         : null;
     return {
-        id:         n.id,
-        createdAt:  n.createdAt.toISOString(),
-        createdBy:  n.createdBy,
-        type:       n.type,
-        roleId:     n.roleId,
-        unitId:     n.unitId,
-        domainId:   n.domainId,
-        poolId:     n.poolId,
+        id:             n.id,
+        createdAt:      n.createdAt.toISOString(),
+        createdByHandle: ppl.get(n.createdBy)?.handle ?? null,
+        type:           n.type,
+        roleId:         n.roleId,
+        unitId:         n.unitId,
+        domainId:       n.domainId,
+        poolId:         n.poolId,
         poolName,
-        nomineeId:  n.nomineeId,
-        statement:  n.statement,
-        status:     n.status,
-        resolvedAt: n.resolvedAt?.toISOString() ?? null,
-        resolvedBy: n.resolvedBy,
+        nomineeHandle:  ppl.get(n.nomineeId)?.handle ?? null,
+        statement:      n.statement,
+        status:         n.status,
+        resolvedAt:     n.resolvedAt?.toISOString() ?? null,
+        resolvedBy:     n.resolvedBy,
     };
 }
 
@@ -48,32 +49,33 @@ export function listExpiring(req: Request, res: Response): void {
 }
 
 // POST /api/nominations/pool
-// Body: { poolId, nomineeId, statement }
+// Body: { poolId, nomineeHandle, statement }
 export function createPoolNomination(req: AuthedRequest, res: Response): void {
     const personId = req.personId;
     if (!personId) { res.status(401).json({ error: "Authentication required" }); return; }
 
-    const { poolId, nomineeId, statement } = req.body ?? {};
+    const { poolId, nomineeHandle, statement } = req.body ?? {};
 
     if (typeof poolId !== "string" || !poolId.trim()) {
         res.status(400).json({ error: "poolId is required" }); return;
     }
-    if (typeof nomineeId !== "string" || !nomineeId.trim()) {
-        res.status(400).json({ error: "nomineeId is required" }); return;
+    if (typeof nomineeHandle !== "string" || !nomineeHandle.trim()) {
+        res.status(400).json({ error: "nomineeHandle is required" }); return;
     }
 
     const domainSvc = DomainService.getInstance();
     if (!domainSvc.getPool(poolId)) {
         res.status(404).json({ error: "Pool not found" }); return;
     }
-    if (!PersonService.getInstance().get(nomineeId)) {
+    const nominee = PersonService.getInstance().getByHandle(nomineeHandle);
+    if (!nominee) {
         res.status(404).json({ error: "Nominee not found" }); return;
     }
 
     const n = Nomination.forPool(
         personId,
         poolId,
-        nomineeId,
+        nominee.id,
         typeof statement === "string" ? statement.trim() : "",
     );
     svc().create(n);
@@ -81,18 +83,18 @@ export function createPoolNomination(req: AuthedRequest, res: Response): void {
 }
 
 // POST /api/nominations
-// Body: { roleId, nomineeId, statement }
+// Body: { roleId, nomineeHandle, statement }
 export function createNomination(req: AuthedRequest, res: Response): void {
     const personId = req.personId;
     if (!personId) { res.status(401).json({ error: "Authentication required" }); return; }
 
-    const { roleId, nomineeId, statement } = req.body ?? {};
+    const { roleId, nomineeHandle, statement } = req.body ?? {};
 
     if (typeof roleId !== "string" || !roleId.trim()) {
         res.status(400).json({ error: "roleId is required" }); return;
     }
-    if (typeof nomineeId !== "string" || !nomineeId.trim()) {
-        res.status(400).json({ error: "nomineeId is required" }); return;
+    if (typeof nomineeHandle !== "string" || !nomineeHandle.trim()) {
+        res.status(400).json({ error: "nomineeHandle is required" }); return;
     }
 
     // Verify the role exists
@@ -101,7 +103,7 @@ export function createNomination(req: AuthedRequest, res: Response): void {
     if (!role) { res.status(404).json({ error: "Role not found" }); return; }
 
     // Verify the nominee is a real community member
-    const nominee = PersonService.getInstance().get(nomineeId);
+    const nominee = PersonService.getInstance().getByHandle(nomineeHandle);
     if (!nominee) { res.status(404).json({ error: "Nominee not found" }); return; }
 
     // Find the unit and domain for this role
@@ -118,7 +120,7 @@ export function createNomination(req: AuthedRequest, res: Response): void {
         roleId,
         unit.id,
         domain.id,
-        nomineeId,
+        nominee.id,
         typeof statement === "string" ? statement.trim() : "",
     );
     svc().create(n);

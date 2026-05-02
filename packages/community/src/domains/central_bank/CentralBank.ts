@@ -74,6 +74,8 @@ export class CentralBank extends FunctionalDomain {
             "Central Bank",
             "kin",
             null, // null → overdraftLimit -Infinity on the bank side
+            "issuance",
+            true,
         );
         this._issuanceAccountId = account.accountId;
 

@@ -51,11 +51,20 @@ export class Bank {
 
     // ── Account management ────────────────────────────────────────────────────
 
-    openAccount(owner: IEconomicActor, label: string, currency: Currency, overdraftLimit: number = 0): BankAccount {
-        const account = new BankAccount(owner, label, currency, overdraftLimit);
+    openAccount(
+        owner: IEconomicActor,
+        label: string,
+        currency: Currency,
+        overdraftLimit: number = 0,
+        handle: string = "",
+        primary: boolean = false,
+    ): BankAccount {
+        // If this is the owner's first account, make it primary automatically
+        const ownerAccounts = this.ownerIndex.get(owner.getId()) ?? [];
+        const isFirst = ownerAccounts.length === 0;
+        const account = new BankAccount(owner, label, currency, overdraftLimit, handle, primary || isFirst);
         this.accounts.set(account.accountId, account);
 
-        const ownerAccounts = this.ownerIndex.get(owner.getId()) ?? [];
         ownerAccounts.push(account.accountId);
         this.ownerIndex.set(owner.getId(), ownerAccounts);
         this.accountLoader?.save(account);
@@ -73,7 +82,12 @@ export class Bank {
     }
 
     getPrimaryAccount(ownerId: string): BankAccount | undefined {
-        return this.getAccounts(ownerId).find(a => a.label === "primary");
+        const accounts = this.getAccounts(ownerId);
+        return accounts.find(a => a.primary) ?? accounts[0];
+    }
+
+    getAccountByHandle(ownerId: string, handle: string): BankAccount | undefined {
+        return this.getAccounts(ownerId).find(a => a.handle === handle);
     }
 
     getAllAccounts(): BankAccount[] {

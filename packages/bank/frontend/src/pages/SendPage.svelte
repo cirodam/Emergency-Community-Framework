@@ -1,38 +1,93 @@
 <script lang="ts">
     import AmountDisplay from "../components/AmountDisplay.svelte";
     import ErrorBanner from "../components/ErrorBanner.svelte";
-    import { session, currentPage, selectedAccountId } from "../lib/session.js";
-    import { sendTransfer, getAccountById } from "../lib/api.js";
-    import type { AccountDto } from "../lib/api.js";
+    import { session, currentPage, selectedAccountHandle } from "../lib/session.js";
+    import { sendTransferByAddress, getMyAccountByHandle, getPersons } from "../lib/api.js";
+    import type { AccountDto, PersonDto } from "../lib/api.js";
 
     const s = $derived($session!);
-    const fromId = $derived($selectedAccountId || s.primaryAccountId);
+    const fromHandle = $derived($selectedAccountHandle || s.primaryAccountHandle);
 
     let fromAccount: AccountDto | null = $state(null);
-    let toAccountId = $state("");
-    let amount      = $state("");
-    let memo        = $state("");
-    let error       = $state("");
-    let success     = $state(false);
-    let loading     = $state(false);
+    let toInputValue  = $state("");
+    let toAddress     = $state(""); // the resolved address to submit
+    let amount        = $state("");
+    let memo          = $state("");
+    let error         = $state("");
+    let success       = $state(false);
+    let loading       = $state(false);
+
+    // Autocomplete state
+    let allPersons: PersonDto[] = $state([]);
+    let suggestions: PersonDto[] = $state([]);
+    let showDropdown = $state(false);
+    let activeIndex  = $state(-1);
 
     $effect(() => {
-        if (fromId) {
-            getAccountById(fromId).then(a => { fromAccount = a; }).catch(() => {});
+        if (fromHandle) {
+            getMyAccountByHandle(fromHandle).then(a => { fromAccount = a; }).catch(() => {});
         }
+        getPersons().then(p => { allPersons = p; }).catch(() => {});
     });
+
+    function onToInput() {
+        const q = toInputValue.toLowerCase();
+        if (q.length === 0) {
+            suggestions = [];
+            showDropdown = false;
+            toAddress = "";
+            return;
+        }
+        suggestions = allPersons.filter(p =>
+            !p.disabled && !p.retired &&
+            (p.handle.includes(q) ||
+             `${p.firstName} ${p.lastName}`.toLowerCase().includes(q))
+        ).slice(0, 6);
+        showDropdown = suggestions.length > 0;
+        activeIndex = -1;
+        // If the input is a raw handle/address, allow submitting it directly
+        toAddress = toInputValue.trim();
+    }
+
+    function selectPerson(person: PersonDto) {
+        toInputValue = `${person.firstName} ${person.lastName}`;
+        toAddress = person.handle;
+        showDropdown = false;
+        suggestions = [];
+    }
+
+    function onToKeydown(e: KeyboardEvent) {
+        if (!showDropdown) return;
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            activeIndex = Math.min(activeIndex + 1, suggestions.length - 1);
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            activeIndex = Math.max(activeIndex - 1, -1);
+        } else if (e.key === "Enter" && activeIndex >= 0) {
+            e.preventDefault();
+            selectPerson(suggestions[activeIndex]);
+        } else if (e.key === "Escape") {
+            showDropdown = false;
+        }
+    }
+
+    function onToBlur() {
+        setTimeout(() => { showDropdown = false; }, 150);
+    }
 
     async function submit() {
         error = "";
         const amt = parseFloat(amount);
-        if (!toAccountId.trim()) { error = "Enter a recipient account ID"; return; }
+        if (!toAddress.trim()) { error = "Enter a recipient handle (e.g. alice or savings@alice)"; return; }
         if (isNaN(amt) || amt <= 0) { error = "Enter a valid amount"; return; }
 
         loading = true;
         try {
-            await sendTransfer(fromId, toAccountId.trim(), amt, memo.trim());
+            await sendTransferByAddress(toAddress.trim(), amt, memo.trim() || undefined);
             success = true;
-            toAccountId = "";
+            toInputValue = "";
+            toAddress = "";
             amount = "";
             memo = "";
         } catch (e) {
@@ -72,15 +127,38 @@
 
         <form onsubmit={(e) => { e.preventDefault(); submit(); }}>
             <label class="field">
-                <span>Recipient account ID</span>
-                <input
-                    type="text"
-                    bind:value={toAccountId}
-                    placeholder="Paste account ID"
-                    autocomplete="off"
-                    spellcheck={false}
-                    disabled={loading}
-                />
+                <span>Recipient</span>
+                <div class="to-wrapper">
+                    <input
+                        type="text"
+                        bind:value={toInputValue}
+                        oninput={onToInput}
+                        onkeydown={onToKeydown}
+                        onblur={onToBlur}
+                        placeholder="Name or handle (e.g. alice)"
+                        autocomplete="off"
+                        spellcheck={false}
+                        disabled={loading}
+                    />
+                    {#if showDropdown}
+                        <ul class="suggestions" role="listbox">
+                            {#each suggestions as person, i}
+                                <li
+                                    class="suggestion-item {i === activeIndex ? 'active' : ''}"
+                                    role="option"
+                                    aria-selected={i === activeIndex}
+                                    onmousedown={() => selectPerson(person)}
+                                >
+                                    <span class="suggestion-name">{person.firstName} {person.lastName}</span>
+                                    <span class="suggestion-handle">@{person.handle}</span>
+                                </li>
+                            {/each}
+                        </ul>
+                    {/if}
+                </div>
+                {#if toAddress && toAddress !== toInputValue}
+                    <span class="resolved-hint">→ @{toAddress}</span>
+                {/if}
             </label>
 
             <label class="field">
@@ -142,6 +220,47 @@
     }
 
     .field input:focus { border-color: #2563eb; }
+
+    .to-wrapper { position: relative; }
+
+    .to-wrapper input { width: 100%; box-sizing: border-box; }
+
+    .suggestions {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+        list-style: none;
+        padding: 0.25rem 0;
+        margin: 0;
+        z-index: 100;
+    }
+
+    .suggestion-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.6rem 1rem;
+        cursor: pointer;
+        transition: background 0.1s;
+    }
+
+    .suggestion-item:hover,
+    .suggestion-item.active { background: #eff6ff; }
+
+    .suggestion-name { font-weight: 500; color: #1e293b; font-size: 0.95rem; }
+
+    .suggestion-handle { color: #94a3b8; font-size: 0.82rem; }
+
+    .resolved-hint {
+        font-size: 0.78rem;
+        color: #64748b;
+        padding-left: 0.25rem;
+    }
 
     .btn-primary {
         width: 100%;
@@ -242,3 +361,4 @@
 
     .from-bal { color: #3b82f6; margin-left: auto; font-variant-numeric: tabular-nums; }
 </style>
+

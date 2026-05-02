@@ -3,12 +3,12 @@
 
     interface Props {
         tx: TransactionDto;
-        /** The account whose perspective to use for +/- sign */
-        perspectiveAccountId: string;
+        /** The account handle whose perspective to use for +/- sign */
+        perspectiveAccountHandle: string;
     }
-    let { tx, perspectiveAccountId }: Props = $props();
+    let { tx, perspectiveAccountHandle }: Props = $props();
 
-    const isCredit  = $derived(tx.toAccountId === perspectiveAccountId);
+    const isCredit  = $derived(tx.to === perspectiveAccountHandle);
     const sign      = $derived(isCredit ? "+" : "−");
     const date      = $derived(new Date(tx.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" }));
     const time      = $derived(new Date(tx.timestamp).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }));

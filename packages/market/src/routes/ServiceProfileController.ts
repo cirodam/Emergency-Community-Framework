@@ -1,7 +1,13 @@
 import { Request, Response } from "express";
 import { ServiceProfileService } from "../ServiceProfileService.js";
-import { SERVICE_CATEGORIES, ServiceCategory, ServiceRateUnit, ServiceAvailability } from "../ServiceProfile.js";
+import { SERVICE_CATEGORIES, ServiceCategory, ServiceRateUnit, ServiceAvailability, type ServiceProfile } from "../ServiceProfile.js";
 import { type PersonCredential } from "@ecf/core";
+
+/** Strip internal providerId from service profile responses. */
+function toDto(p: ServiceProfile) {
+    const { providerId: _p, ...rest } = p;
+    return rest;
+}
 
 const VALID_RATE_UNITS: ServiceRateUnit[]     = ["per-hour", "per-job", "negotiable"];
 const VALID_AVAILABILITY: ServiceAvailability[] = ["available", "busy", "by-appointment"];
@@ -30,7 +36,7 @@ export function listServices(req: Request, res: Response): void {
     const offset = (Math.min(page, pages) - 1) * limit;
 
     res.json({
-        items: all.slice(offset, offset + limit),
+        items: all.slice(offset, offset + limit).map(toDto),
         total,
         page:  Math.min(page, pages),
         pages,
@@ -41,7 +47,7 @@ export function listServices(req: Request, res: Response): void {
 export function getService(req: Request, res: Response): void {
     const p = svc().get(req.params.id as string);
     if (!p) { res.status(404).json({ error: "Service profile not found" }); return; }
-    res.json(p);
+    res.json(toDto(p));
 }
 
 // POST /api/services
@@ -77,7 +83,7 @@ export function createService(req: Request & { personId?: string; credential?: P
         resolvedRateUnit,
         resolvedAvailability,
     );
-    res.status(201).json(p);
+    res.status(201).json(toDto(p));
 }
 
 // PATCH /api/services/:id
@@ -116,7 +122,7 @@ export function updateService(req: Request & { personId?: string }, res: Respons
 
     try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        res.json(svc().update(req.params.id as string, callerId, patch as any));
+        res.json(toDto(svc().update(req.params.id as string, callerId, patch as any)));
     } catch (err) {
         const msg = (err as Error).message;
         const status = msg.includes("not found") ? 404 : msg.includes("Not your") ? 403 : 422;

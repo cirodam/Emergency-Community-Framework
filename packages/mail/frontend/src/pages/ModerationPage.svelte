@@ -59,7 +59,7 @@
                     <div class="reason"><strong>Reason:</strong> {r.reason}</div>
                     {#if r.message}
                         <div class="message-preview">
-                            <div class="msg-from">From: <code>{r.message.fromPersonId}</code></div>
+                            <div class="msg-from">From: <code>{r.message.fromHandle}</code></div>
                             <div class="msg-subject">Subject: {r.message.subject || "(no subject)"}</div>
                             <div class="msg-body">{r.message.body}</div>
                         </div>

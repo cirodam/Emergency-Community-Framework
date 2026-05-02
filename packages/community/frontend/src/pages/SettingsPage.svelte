@@ -12,7 +12,7 @@
 
     async function load() {
         loadError = "";
-        try { person = await getPerson(s.personId); }
+        try { person = await getPerson(s.handle); }
         catch (e) {
             const msg = e instanceof Error ? e.message : "";
             if (msg.includes("not found") || msg.includes("404")) { session.logout(); return; }
@@ -36,7 +36,7 @@
         if (!trimmed) { phoneError = "Enter a phone number."; return; }
         phoneSaving = true;
         try {
-            const updated = await updatePerson(s.personId, { phone: trimmed });
+            const updated = await updatePerson(s.handle, { phone: trimmed });
             person = updated;
             phoneMsg = "Phone number saved.";
             phoneEdit = "";
@@ -60,7 +60,7 @@
         if (pin !== pinConfirm)      { pinError = "PINs do not match.";      return; }
         pinSaving = true;
         try {
-            await setPin(s.personId, pin);
+            await setPin(s.handle, pin);
             pinMsg = "PIN saved.";
             pin = ""; pinConfirm = "";
         } catch (e) {
@@ -81,7 +81,7 @@
         if (newPassword.length < 8) { passError = "Password must be at least 8 characters"; return; }
         passLoading = true;
         try {
-            await setPassword(s.personId, newPassword);
+            await setPassword(s.handle, newPassword);
             session.refresh({ hasPassword: true });
             passOk = true;
             newPassword = "";

@@ -43,7 +43,7 @@
                 <strong>Market:</strong> {stall.marketplaceName}
             </p>
             <p class="meta-line">
-                <strong>Holder:</strong> {stall.holderHandle || stall.holderId}
+                <strong>Holder:</strong> {stall.holderHandle}
             </p>
             {#if stall.description}
                 <p class="stall-desc">{stall.description}</p>

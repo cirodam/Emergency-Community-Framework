@@ -9,7 +9,7 @@ export const COMMUNITY_TREASURY_DOMAIN_ID = "ecf-domain-community-treasury-00000
  *
  * Funded by two sources:
  *  1. A share of every new adult member's join endowment (the circulating
- *     fraction minus the seed balance).
+ *     fraction after the insurance pool allocation).
  *  2. Monthly community dues collected from all member accounts
  *     (communityDuesRate). This is distinct from Central Bank demurrage:
  *     demurrage retires kin from circulation; dues move kin from
@@ -93,6 +93,8 @@ export class CommunityTreasury extends FunctionalDomain {
             "Community Treasury",
             "kin",
             0,
+            "treasury",
+            true,
         );
         this._accountId = account.accountId;
 

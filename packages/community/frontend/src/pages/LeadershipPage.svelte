@@ -69,7 +69,7 @@
                 <div class="card-body">
                     <span class="card-title">{pool.name}</span>
                     <span class="card-sub">
-                        {pool.personIds.length} member{pool.personIds.length !== 1 ? "s" : ""}
+                        {pool.personHandles.length} member{pool.personHandles.length !== 1 ? "s" : ""}
                         {#if pool.description} · {pool.description}{/if}
                     </span>
                 </div>

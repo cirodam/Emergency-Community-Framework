@@ -10,6 +10,8 @@ interface AccountRow {
     amount:          number; // integer cents
     overdraft_limit: number; // integer cents; -999999999999 sentinel for -Infinity
     created_at:      string;
+    handle:          string;
+    is_primary:      number; // 0 or 1
 }
 
 const INF_SENTINEL = -999_999_999_999;
@@ -29,12 +31,14 @@ export class AccountLoader {
 
     save(account: BankAccount): void {
         this.db.prepare(`
-            INSERT INTO accounts (account_id, owner_id, label, currency, amount, overdraft_limit, created_at)
-            VALUES (@account_id, @owner_id, @label, @currency, @amount, @overdraft_limit, @created_at)
+            INSERT INTO accounts (account_id, owner_id, label, currency, amount, overdraft_limit, created_at, handle, is_primary)
+            VALUES (@account_id, @owner_id, @label, @currency, @amount, @overdraft_limit, @created_at, @handle, @is_primary)
             ON CONFLICT(account_id) DO UPDATE SET
                 label           = excluded.label,
                 amount          = excluded.amount,
-                overdraft_limit = excluded.overdraft_limit
+                overdraft_limit = excluded.overdraft_limit,
+                handle          = excluded.handle,
+                is_primary      = excluded.is_primary
         `).run({
             account_id:      account.accountId,
             owner_id:        account.ownerId,
@@ -43,6 +47,8 @@ export class AccountLoader {
             amount:          toCents(account.amount),
             overdraft_limit: toCents(account.overdraftLimit),
             created_at:      account.createdAt.toISOString(),
+            handle:          account.handle,
+            is_primary:      account.primary ? 1 : 0,
         });
     }
 
@@ -65,6 +71,8 @@ export class AccountLoader {
             amount:         fromCents(r.amount),
             overdraftLimit: fromCents(r.overdraft_limit),
             createdAt:      new Date(r.created_at),
+            handle:         r.handle ?? "",
+            primary:        r.is_primary === 1,
         });
     }
 }

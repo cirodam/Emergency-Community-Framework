@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PersonService } from "../person/PersonService.js";
 import { DomainService } from "../DomainService.js";
 import { Person } from "../person/Person.js";
+import { HandleRegistry } from "../HandleRegistry.js";
 
 const svc = () => PersonService.getInstance();
 
@@ -10,17 +11,17 @@ export function listPersons(req: Request, res: Response): void {
     res.json(svc().getAll().map(toListDto));
 }
 
-// GET /api/persons/:id
+// GET /api/persons/:handle
 export function getPerson(req: Request, res: Response): void {
-    const person = svc().get(req.params.id as string);
+    const person = svc().getByHandle(req.params.handle as string);
     if (!person) { res.status(404).json({ error: "Person not found" }); return; }
     res.json(toDto(person));
 }
 
 // POST /api/persons
-// Body: { firstName, lastName, birthDate, bornInCommunity?, phone?, languages? }
+// Body: { firstName, lastName, birthDate, phone?, languages? }
 export async function addPerson(req: Request, res: Response): Promise<void> {
-    const { firstName, lastName, birthDate, bornInCommunity, phone, languages } = req.body ?? {};
+    const { firstName, lastName, birthDate, phone, languages } = req.body ?? {};
     if (typeof firstName !== "string" || !firstName.trim()) {
         res.status(400).json({ error: "firstName is required" }); return;
     }
@@ -39,7 +40,7 @@ export async function addPerson(req: Request, res: Response): Promise<void> {
     const base = `${firstName.trim()}_${lastName.trim()}`.toLowerCase().replace(/[^a-z0-9_]/g, "");
     let handle = base;
     let suffix = 2;
-    while (svc().getByHandle(handle)) {
+    while (HandleRegistry.getInstance().isTaken(handle)) {
         if (suffix > 999) {
             res.status(409).json({ error: "Could not generate a unique handle" });
             return;
@@ -56,7 +57,6 @@ export async function addPerson(req: Request, res: Response): Promise<void> {
         null,
         null,
         [],
-        bornInCommunity === true,
     );
     if (phone)     person.phone     = phone;
     if (languages) person.languages = languages;
@@ -64,11 +64,13 @@ export async function addPerson(req: Request, res: Response): Promise<void> {
     res.status(201).json(toDto(person));
 }
 
-// PATCH /api/persons/:id
+// PATCH /api/persons/:handle
 export function updatePerson(req: Request, res: Response): void {
     try {
-        const person = svc().update(req.params.id as string, req.body ?? {});
-        res.json(toDto(person));
+        const person = svc().getByHandle(req.params.handle as string);
+        if (!person) { res.status(404).json({ error: "Person not found" }); return; }
+        const updated = svc().update(person.id, req.body ?? {});
+        res.json(toDto(updated));
     } catch (err) {
         const msg = (err as Error).message ?? "";
         const status = msg.toLowerCase().includes("not found") ? 404 : 400;
@@ -76,37 +78,41 @@ export function updatePerson(req: Request, res: Response): void {
     }
 }
 
-// DELETE /api/persons/:id
+// DELETE /api/persons/:handle
 export async function dischargePerson(req: Request, res: Response): Promise<void> {
-    const person = svc().get(req.params.id as string);
+    const person = svc().getByHandle(req.params.handle as string);
     if (!person) { res.status(404).json({ error: "Person not found" }); return; }
     await svc().discharge(person);
     res.status(204).send();
 }
 
-// POST /api/persons/:id/credential
+// POST /api/persons/:handle/credential
 export function issueCredential(req: Request, res: Response): void {
-    const person = svc().get(req.params.id as string);
+    const person = svc().getByHandle(req.params.handle as string);
     if (!person) { res.status(404).json({ error: "Person not found" }); return; }
     const credential = svc().issueCredential(person);
     res.json(credential);
 }
 
-// POST /api/persons/:id/steward
+// POST /api/persons/:handle/steward
 export function grantSteward(req: Request, res: Response): void {
     try {
-        const person = svc().grantSteward(req.params.id as string);
-        res.json(toDto(person));
+        const person = svc().getByHandle(req.params.handle as string);
+        if (!person) { res.status(404).json({ error: "Person not found" }); return; }
+        const updated = svc().grantSteward(person.id);
+        res.json(toDto(updated));
     } catch (err) {
         res.status(404).json({ error: (err as Error).message });
     }
 }
 
-// DELETE /api/persons/:id/steward
+// DELETE /api/persons/:handle/steward
 export function revokeSteward(req: Request, res: Response): void {
     try {
-        const person = svc().revokeSteward(req.params.id as string);
-        res.json(toDto(person));
+        const person = svc().getByHandle(req.params.handle as string);
+        if (!person) { res.status(404).json({ error: "Person not found" }); return; }
+        const updated = svc().revokeSteward(person.id);
+        res.json(toDto(updated));
     } catch (err) {
         res.status(404).json({ error: (err as Error).message });
     }
@@ -115,7 +121,6 @@ export function revokeSteward(req: Request, res: Response): void {
 /** Full DTO — includes phone and appPermissions; only used for the individual GET. */
 function toDto(p: Person) {
     return {
-        id:              p.id,
         firstName:       p.firstName,
         lastName:        p.lastName,
         handle:          p.handle,
@@ -124,7 +129,6 @@ function toDto(p: Person) {
         retired:         p.retired,
         steward:         p.steward,
         isSteward:       svc().isSteward(p),
-        bornInCommunity: p.bornInCommunity,
         languages:       p.languages,
         joinDate:        p.joinDate,
         credential:      p.credential,
@@ -135,7 +139,6 @@ function toDto(p: Person) {
 /** Stripped DTO for list responses — omits phone. */
 function toListDto(p: Person) {
     return {
-        id:              p.id,
         firstName:       p.firstName,
         lastName:        p.lastName,
         handle:          p.handle,
@@ -143,7 +146,6 @@ function toListDto(p: Person) {
         retired:         p.retired,
         steward:         p.steward,
         isSteward:       svc().isSteward(p),
-        bornInCommunity: p.bornInCommunity,
         languages:       p.languages,
         joinDate:        p.joinDate,
     };

@@ -13,23 +13,23 @@ function toDto(app: MemberApplication | undefined | null) {
     if (!app) return null;
     const vouchers = app.voucherIds.map(id => {
         const p = people().get(id);
-        return { id, name: p ? `${p.firstName} ${p.lastName}` : id };
+        return { handle: p?.handle ?? null, name: p ? `${p.firstName} ${p.lastName}` : id };
     });
     const submitter = people().get(app.submittedBy);
     return {
-        id:              app.id,
-        firstName:       app.firstName,
-        lastName:        app.lastName,
-        birthDate:       app.birthDate,
-        message:         app.message,
-        status:          app.status,
-        voucherIds:      app.voucherIds,
+        id:                app.id,
+        firstName:         app.firstName,
+        lastName:          app.lastName,
+        birthDate:         app.birthDate,
+        message:           app.message,
+        status:            app.status,
+        voucherHandles:    app.voucherIds.map(id => people().get(id)?.handle ?? null).filter(Boolean) as string[],
         vouchers,
-        vouchesRequired: svc().vouchesRequired(),
-        submittedBy:     app.submittedBy,
-        submittedByName: submitter ? `${submitter.firstName} ${submitter.lastName}` : (app.submittedBy === "self" ? "Self-submitted" : app.submittedBy),
-        submittedAt:     app.submittedAt,
-        admittedAt:      app.admittedAt,
+        vouchesRequired:   svc().vouchesRequired(),
+        submittedByHandle: submitter?.handle ?? (app.submittedBy === "self" ? "self" : null),
+        submittedByName:   submitter ? `${submitter.firstName} ${submitter.lastName}` : (app.submittedBy === "self" ? "Self-submitted" : app.submittedBy),
+        submittedAt:       app.submittedAt,
+        admittedAt:        app.admittedAt,
     };
 }
 

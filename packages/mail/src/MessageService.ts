@@ -56,13 +56,36 @@ export class MessageService {
                 id:           msg.id,
                 threadId:     msg.threadId,
                 fromPersonId: msg.fromPersonId,
+                fromHandle:   (msg as Message & { fromHandle?: string }).fromHandle ?? msg.fromPersonId,
                 toPersonIds:  msg.toPersonIds?.length ? msg.toPersonIds : [legacy.toPersonId],
+                toHandles:    (msg as Message & { toHandles?: string[] }).toHandles ?? [],
                 subject:      msg.subject,
                 body:         msg.body,
                 sentAt:       msg.sentAt,
             };
             this.messages.set(msg.id, upgraded);
             loader.saveMessage(upgraded);
+        }
+
+        // ── Migration: fill missing fromHandle / toHandles on existing messages ──
+        for (const msg of this.messages.values()) {
+            if (!msg.fromHandle) {
+                const patched: Message = {
+                    ...msg,
+                    fromHandle: msg.fromPersonId,
+                    toHandles:  msg.toHandles?.length ? msg.toHandles : msg.toPersonIds,
+                };
+                this.messages.set(msg.id, patched);
+                loader.saveMessage(patched);
+            }
+        }
+        // ── Migration: fill missing participantHandles on existing threads ────
+        for (const thread of this.threads.values()) {
+            if (!thread.participantHandles?.length) {
+                const patched: Thread = { ...thread, participantHandles: thread.participantIds };
+                this.threads.set(thread.id, patched);
+                loader.saveThread(patched);
+            }
         }
     }
 
@@ -71,6 +94,9 @@ export class MessageService {
     /**
      * Send a message from `fromPersonId` to one or more recipients.
      *
+     * `fromHandle` is the sender's handle (from their auth credential).
+     * `toPersonIds` / `toHandles` are parallel arrays — same length and order.
+     *
      * If `existingThreadId` is provided the message is appended to that thread
      * (sender must be a participant). Otherwise a new thread is created.
      *
@@ -78,7 +104,9 @@ export class MessageService {
      */
     send(
         fromPersonId: string,
+        fromHandle: string,
         toPersonIds: string[],
+        toHandles: string[],
         subject: string,
         body: string,
         existingThreadId?: string,
@@ -86,6 +114,17 @@ export class MessageService {
         if (!toPersonIds.length) throw new Error("At least one recipient is required");
         const uniqueRecipients = [...new Set(toPersonIds.filter(id => id !== fromPersonId))];
         if (!uniqueRecipients.length) throw new Error("Cannot send a message only to yourself");
+
+        // Deduplicate handles in parallel with IDs
+        const seenIds = new Set<string>();
+        const uniqueHandles: string[] = [];
+        for (let i = 0; i < toPersonIds.length; i++) {
+            const id = toPersonIds[i];
+            if (id !== fromPersonId && !seenIds.has(id)) {
+                seenIds.add(id);
+                uniqueHandles.push(toHandles[i] ?? id);
+            }
+        }
 
         const now = new Date().toISOString();
 
@@ -97,13 +136,21 @@ export class MessageService {
             if (!existing.participantIds.includes(fromPersonId))
                 throw new Error("Forbidden: not a thread participant");
             const allParticipants = [...new Set([...existing.participantIds, fromPersonId, ...uniqueRecipients])];
-            thread = { ...existing, participantIds: allParticipants, lastMessageAt: now };
+            // Merge handles: keep existing, add new ones for new participants
+            const existingHandleMap = new Map(existing.participantIds.map((id, i) => [id, existing.participantHandles?.[i] ?? id]));
+            existingHandleMap.set(fromPersonId, fromHandle);
+            uniqueRecipients.forEach((id, i) => existingHandleMap.set(id, uniqueHandles[i] ?? id));
+            const allHandles = allParticipants.map(id => existingHandleMap.get(id) ?? id);
+            thread = { ...existing, participantIds: allParticipants, participantHandles: allHandles, lastMessageAt: now };
         } else {
+            const allParticipantIds = [...new Set([fromPersonId, ...uniqueRecipients])];
+            const handleMap = new Map([[fromPersonId, fromHandle], ...uniqueRecipients.map((id, i) => [id, uniqueHandles[i] ?? id] as [string, string])]);
             thread = {
-                id:             randomUUID(),
-                subject:        subject.trim() || "(no subject)",
-                participantIds: [...new Set([fromPersonId, ...uniqueRecipients])],
-                lastMessageAt:  now,
+                id:                 randomUUID(),
+                subject:            subject.trim() || "(no subject)",
+                participantIds:     allParticipantIds,
+                participantHandles: allParticipantIds.map(id => handleMap.get(id) ?? id),
+                lastMessageAt:      now,
             };
         }
 
@@ -111,7 +158,9 @@ export class MessageService {
             id:           randomUUID(),
             threadId:     thread.id,
             fromPersonId,
+            fromHandle,
             toPersonIds:  uniqueRecipients,
+            toHandles:    uniqueHandles,
             subject:      thread.subject,
             body,
             sentAt:       now,
@@ -157,10 +206,11 @@ export class MessageService {
         subject:     string;
         fromHandle:  string;  // "handle@community-handle"
         toPersonIds: string[];
+        toHandles:   string[]; // parallel array of local-person handles
         body:        string;
         sentAt:      string;
     }): Message | null {
-        const { messageId, threadId, subject, fromHandle, toPersonIds, body, sentAt } = params;
+        const { messageId, threadId, subject, fromHandle, toPersonIds, toHandles, body, sentAt } = params;
 
         // Idempotency — skip if already stored
         if (this.messages.has(messageId)) return null;
@@ -170,23 +220,31 @@ export class MessageService {
         // Resolve or create thread
         let thread = this.threads.get(threadId);
         if (!thread) {
+            const allParticipantIds = [...new Set([syntheticFromId, ...toPersonIds])];
+            const handleMap = new Map([[syntheticFromId, fromHandle], ...toPersonIds.map((id, i) => [id, toHandles[i] ?? id] as [string, string])]);
             thread = {
-                id:             threadId,
-                subject:        subject.trim() || "(no subject)",
-                participantIds: [...new Set([syntheticFromId, ...toPersonIds])],
-                lastMessageAt:  sentAt,
+                id:                 threadId,
+                subject:            subject.trim() || "(no subject)",
+                participantIds:     allParticipantIds,
+                participantHandles: allParticipantIds.map(id => handleMap.get(id) ?? id),
+                lastMessageAt:      sentAt,
             };
         } else {
             // Add any new local recipients to existing thread
             const allParticipants = [...new Set([...thread.participantIds, ...toPersonIds])];
-            thread = { ...thread, participantIds: allParticipants, lastMessageAt: sentAt };
+            const existingHandleMap = new Map((thread.participantIds).map((id, i) => [id, thread!.participantHandles?.[i] ?? id]));
+            existingHandleMap.set(syntheticFromId, fromHandle);
+            toPersonIds.forEach((id, i) => existingHandleMap.set(id, toHandles[i] ?? id));
+            thread = { ...thread, participantIds: allParticipants, participantHandles: allParticipants.map(id => existingHandleMap.get(id) ?? id), lastMessageAt: sentAt };
         }
 
         const msg: Message = {
             id:           messageId,
             threadId:     thread.id,
             fromPersonId: syntheticFromId,
+            fromHandle,
             toPersonIds,
+            toHandles:    toHandles.length ? toHandles : toPersonIds,
             subject:      thread.subject,
             body,
             sentAt,
@@ -395,11 +453,11 @@ export class MessageService {
         return toDelete.length;
     }
 
-    saveDraft(personId: string, id: string | undefined, toPersonIds: string[], subject: string, body: string): Draft {
+    saveDraft(personId: string, id: string | undefined, toHandles: string[], subject: string, body: string): Draft {
         const draft: Draft = {
             id:          id ?? randomUUID(),
             personId,
-            toPersonIds,
+            toHandles,
             subject,
             body,
             updatedAt:   new Date().toISOString(),

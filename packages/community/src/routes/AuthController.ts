@@ -61,30 +61,34 @@ export async function login(req: Request, res: Response): Promise<void> {
     res.json({ ...toPersonDto(person), token });
 }
 
-// POST /api/persons/:id/password
+// POST /api/persons/:handle/password
 // Body: { password }
 export async function setPassword(req: Request, res: Response): Promise<void> {
     const { password } = req.body ?? {};
     if (typeof password !== "string" || password.length < 8) {
         res.status(400).json({ error: "password must be at least 8 characters" }); return;
     }
+    const person = svc().getByHandle(req.params.handle as string);
+    if (!person) { res.status(404).json({ error: "Person not found" }); return; }
     try {
-        await svc().setPassword(req.params.id as string, password);
+        await svc().setPassword(person.id, password);
         res.status(204).send();
     } catch (err) {
         res.status(404).json({ error: (err as Error).message });
     }
 }
 
-// POST /api/persons/:id/pin
+// POST /api/persons/:handle/pin
 // Body: { pin }  — 4–8 digits
 export async function setPin(req: Request, res: Response): Promise<void> {
     const { pin } = req.body ?? {};
     if (typeof pin !== "string" || !/^\d{4,8}$/.test(pin)) {
         res.status(400).json({ error: "pin must be 4–8 digits" }); return;
     }
+    const person = svc().getByHandle(req.params.handle as string);
+    if (!person) { res.status(404).json({ error: "Person not found" }); return; }
     try {
-        await svc().setPin(req.params.id as string, pin);
+        await svc().setPin(person.id, pin);
         res.status(204).send();
     } catch (err) {
         res.status(404).json({ error: (err as Error).message });

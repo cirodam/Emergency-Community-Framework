@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAuth, requireModerator, requireMailAccess } from "./middleware.js";
 import {
+    listPersons,
     listThreadsFiltered,
     getThread,
     getInbox,
@@ -27,6 +28,7 @@ import {
 const router = Router();
 
 // All mail routes require authentication + not suspended
+router.get(   "/persons",                ...requireMailAccess, listPersons);
 router.get(   "/threads",                ...requireMailAccess, listThreadsFiltered);
 router.get(   "/threads/:id",            ...requireMailAccess, getThread);
 router.patch( "/threads/:id/archive",    ...requireMailAccess, archiveThread);

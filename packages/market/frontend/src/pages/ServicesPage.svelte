@@ -180,7 +180,7 @@
         msgSending = true; msgError = "";
         try {
             await sendMailMessage(
-                p.providerId,
+                p.providerHandle,
                 `Re: ${p.name}`,
                 `Hi ${p.providerHandle},\n\nI'm interested in your service "${p.name}".\n\n${msgBody.trim()}`,
             );
@@ -353,7 +353,7 @@
                             {/if}
                         </div>
                         <div class="svc-name">{p.name}</div>
-                        <p class="svc-meta">{p.providerHandle || p.providerId} · expires in {daysLeft(p.expiresAt)}d</p>
+                        <p class="svc-meta">{p.providerHandle} · expires in {daysLeft(p.expiresAt)}d</p>
                         {#if p.description}<p class="svc-desc">{p.description}</p>{/if}
                         {#if msgId === p.id}
                             {#if msgSent}
@@ -377,10 +377,10 @@
                             {/if}
                         {:else}
                             <div class="card-actions">
-                                {#if myId === p.providerId}
+                                {#if $session?.handle === p.providerHandle}
                                     <button class="action-btn" onclick={() => startEdit(p)}>Edit</button>
                                     <button class="action-btn danger" onclick={() => handleDelete(p.id)}>Delete</button>
-                                {:else if myId}
+                                {:else if $session?.handle}
                                     <button class="btn-primary" onclick={() => openMessage(p)}>Message provider</button>
                                 {/if}
                             </div>

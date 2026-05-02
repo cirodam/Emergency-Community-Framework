@@ -10,7 +10,7 @@
     let error   = $state("");
 
     // Add-member form
-    let addPersonId = $state("");
+    let addHandle = $state("");
     let addError    = $state("");
     let adding      = $state(false);
 
@@ -21,8 +21,8 @@
     let editError   = $state("");
     let saving      = $state(false);
 
-    const myId = $derived($session?.personId ?? "");
-    const isAdmin = $derived(assoc?.adminIds.includes(myId) ?? false);
+    const myHandle = $derived($session?.handle ?? "");
+    const isAdmin = $derived(assoc?.adminHandles.includes(myHandle) ?? false);
 
     async function load(id: string) {
         loading = true;
@@ -31,7 +31,7 @@
             const [a, persons] = await Promise.all([getAssociation(id), listPersons()]);
             assoc      = a;
             allPersons = persons;
-            members    = persons.filter(p => a.memberIds.includes(p.id));
+            members    = persons.filter(p => a.memberHandles.includes(p.handle));
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to load";
         } finally {
@@ -44,24 +44,19 @@
         if (id) load(id);
     });
 
-    function personName(id: string): string {
-        const p = allPersons.find(p => p.id === id);
-        return p ? `${p.firstName} ${p.lastName}` : id;
-    }
-
     // Non-member persons available to add
     const nonMembers = $derived(
-        assoc ? allPersons.filter(p => !assoc!.memberIds.includes(p.id)) : []
+        assoc ? allPersons.filter(p => !assoc!.memberHandles.includes(p.handle)) : []
     );
 
     async function doAddMember() {
-        if (!assoc || !addPersonId) return;
+        if (!assoc || !addHandle) return;
         adding   = true;
         addError = "";
         try {
-            assoc   = await addAssociationMember(assoc.id, addPersonId);
-            members = allPersons.filter(p => assoc!.memberIds.includes(p.id));
-            addPersonId = "";
+            assoc   = await addAssociationMember(assoc.id, addHandle);
+            members = allPersons.filter(p => assoc!.memberHandles.includes(p.handle));
+            addHandle = "";
         } catch (e) {
             addError = e instanceof Error ? e.message : "Failed to add member";
         } finally {
@@ -69,29 +64,29 @@
         }
     }
 
-    async function doRemoveMember(personId: string) {
+    async function doRemoveMember(handle: string) {
         if (!assoc) return;
         try {
-            assoc   = await removeAssociationMember(assoc.id, personId);
-            members = allPersons.filter(p => assoc!.memberIds.includes(p.id));
+            assoc   = await removeAssociationMember(assoc.id, handle);
+            members = allPersons.filter(p => assoc!.memberHandles.includes(p.handle));
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to remove member";
         }
     }
 
-    async function doPromoteAdmin(personId: string) {
+    async function doPromoteAdmin(handle: string) {
         if (!assoc) return;
         try {
-            assoc = await addAssociationAdmin(assoc.id, personId);
+            assoc = await addAssociationAdmin(assoc.id, handle);
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to promote";
         }
     }
 
-    async function doDemoteAdmin(personId: string) {
+    async function doDemoteAdmin(handle: string) {
         if (!assoc) return;
         try {
-            assoc = await removeAssociationAdmin(assoc.id, personId);
+            assoc = await removeAssociationAdmin(assoc.id, handle);
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to demote";
         }
@@ -171,13 +166,13 @@
 
             {#if isAdmin}
                 <div class="add-row">
-                    <select bind:value={addPersonId} class="add-select">
+                    <select bind:value={addHandle} class="add-select">
                         <option value="">Add a member…</option>
-                        {#each nonMembers as p (p.id)}
-                            <option value={p.id}>{p.firstName} {p.lastName} (@{p.handle})</option>
+                        {#each nonMembers as p (p.handle)}
+                            <option value={p.handle}>{p.firstName} {p.lastName} (@{p.handle})</option>
                         {/each}
                     </select>
-                    <button class="add-btn" onclick={doAddMember} disabled={!addPersonId || adding}>
+                    <button class="add-btn" onclick={doAddMember} disabled={!addHandle || adding}>
                         {adding ? "…" : "Add"}
                     </button>
                 </div>
@@ -188,8 +183,8 @@
                 <p class="empty">No members yet.</p>
             {:else}
                 <ul class="member-list">
-                    {#each members as m (m.id)}
-                        {@const memberIsAdmin = assoc.adminIds.includes(m.id)}
+                    {#each members as m (m.handle)}
+                        {@const memberIsAdmin = assoc.adminHandles.includes(m.handle)}
                         <li class="member-row">
                             <div class="member-left">
                                 <div class="mini-avatar">{m.firstName[0]}{m.lastName[0]}</div>
@@ -204,14 +199,14 @@
                             {#if isAdmin}
                                 <div class="member-actions">
                                     {#if memberIsAdmin}
-                                        {#if assoc.adminIds.length > 1}
-                                            <button class="action-link" onclick={() => doDemoteAdmin(m.id)}>Remove admin</button>
+                                        {#if assoc.adminHandles.length > 1}
+                                            <button class="action-link" onclick={() => doDemoteAdmin(m.handle)}>Remove admin</button>
                                         {/if}
                                     {:else}
-                                        <button class="action-link" onclick={() => doPromoteAdmin(m.id)}>Make admin</button>
+                                        <button class="action-link" onclick={() => doPromoteAdmin(m.handle)}>Make admin</button>
                                     {/if}
-                                    {#if m.id !== myId}
-                                        <button class="action-link danger" onclick={() => doRemoveMember(m.id)}>Remove</button>
+                                    {#if m.handle !== myHandle}
+                                        <button class="action-link danger" onclick={() => doRemoveMember(m.handle)}>Remove</button>
                                     {/if}
                                 </div>
                             {/if}

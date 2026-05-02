@@ -195,11 +195,11 @@ export function createRole(req: Request, res: Response): void {
 }
 
 // PATCH /api/roles/:id
-// Body: { memberId?, kinPerMonth?, funded?, termStartDate?, termEndDate?, title?, description?, weeklySchedule? }
+// Body: { memberHandle?, kinPerMonth?, funded?, termStartDate?, termEndDate?, title?, description?, weeklySchedule? }
 export function updateRole(req: Request, res: Response): void {
     const role = svc().getRole(req.params.id as string);
     if (!role) { res.status(404).json({ error: "Role not found" }); return; }
-    const { memberId, kinPerMonth, funded, termStartDate, termEndDate, title, description, weeklySchedule } = req.body ?? {};
+    const { memberHandle, kinPerMonth, funded, termStartDate, termEndDate, title, description, weeklySchedule } = req.body ?? {};
     if (title !== undefined) {
         if (typeof title !== "string" || !title.trim()) {
             res.status(400).json({ error: "title must be a non-empty string" }); return;
@@ -212,7 +212,15 @@ export function updateRole(req: Request, res: Response): void {
         }
         role.description = description;
     }
-    if (memberId     !== undefined) role.memberId     = memberId;
+    if (memberHandle !== undefined) {
+        if (memberHandle === null) {
+            role.memberId = null;
+        } else {
+            const person = PersonService.getInstance().getByHandle(memberHandle);
+            if (!person) { res.status(404).json({ error: "Person not found" }); return; }
+            role.memberId = person.id;
+        }
+    }
     if (kinPerMonth  !== undefined) {
         if (typeof kinPerMonth !== "number" || kinPerMonth < 0) {
             res.status(400).json({ error: "kinPerMonth must be a non-negative number" }); return;
@@ -352,27 +360,30 @@ export function updatePool(req: Request, res: Response): void {
 }
 
 // POST /api/pools/:id/members
-// Body: { personId }
+// Body: { handle }
 export function addPoolMember(req: Request, res: Response): void {
     const pool = svc().getPool(req.params.id as string);
     if (!pool) { res.status(404).json({ error: "Pool not found" }); return; }
-    const { personId } = req.body ?? {};
-    if (typeof personId !== "string" || !personId) {
-        res.status(400).json({ error: "personId is required" }); return;
+    const { handle } = req.body ?? {};
+    if (typeof handle !== "string" || !handle) {
+        res.status(400).json({ error: "handle is required" }); return;
     }
-    if (!PersonService.getInstance().get(personId)) {
+    const person = PersonService.getInstance().getByHandle(handle);
+    if (!person) {
         res.status(404).json({ error: "Person not found" }); return;
     }
-    pool.addPerson(personId);
+    pool.addPerson(person.id);
     svc().savePool(pool);
     res.json(toPoolDto(pool));
 }
 
-// DELETE /api/pools/:id/members/:personId
+// DELETE /api/pools/:id/members/:handle
 export function removePoolMember(req: Request, res: Response): void {
     const pool = svc().getPool(req.params.id as string);
     if (!pool) { res.status(404).json({ error: "Pool not found" }); return; }
-    pool.removePerson(req.params.personId as string);
+    const person = PersonService.getInstance().getByHandle(req.params.handle as string);
+    if (!person) { res.status(404).json({ error: "Person not found" }); return; }
+    pool.removePerson(person.id);
     svc().savePool(pool);
     res.json(toPoolDto(pool));
 }
@@ -398,25 +409,27 @@ function toDomainDto(d: FunctionalDomain) {
 }
 
 function toUnitDto(u: FunctionalUnit) {
+    const ppl = PersonService.getInstance();
     return {
-        id:          u.id,
-        name:        u.name,
-        description: u.description,
-        type:        u.getType(),
-        personIds:   u.personIds,
-        roleIds:     u.roleIds,
-        locationId:  u.locationId,
-        createdAt:   u.createdAt,
+        id:           u.id,
+        name:         u.name,
+        description:  u.description,
+        type:         u.getType(),
+        personHandles: u.personIds.map(id => ppl.get(id)?.handle ?? id),
+        roleIds:      u.roleIds,
+        locationId:   u.locationId,
+        createdAt:    u.createdAt,
     };
 }
 
 function toRoleDto(r: CommunityRole) {
+    const ppl = PersonService.getInstance();
     return {
         id:             r.id,
         roleTypeId:     r.roleTypeId,
         title:          r.title,
         description:    r.description,
-        memberId:       r.memberId,
+        memberHandle:   r.memberId ? (ppl.get(r.memberId)?.handle ?? null) : null,
         kinPerMonth:    r.kinPerMonth,
         funded:         r.funded,
         termStartDate:  r.termStartDate,
@@ -437,13 +450,14 @@ function toRoleTypeDto(rt: RoleType) {
 }
 
 function toPoolDto(p: LeaderPool) {
+    const ppl = PersonService.getInstance();
     return {
-        id:          p.id,
-        name:        p.name,
-        description: p.description,
-        mandate:     p.mandate,
-        personIds:   p.personIds,
-        createdAt:   p.createdAt,
+        id:            p.id,
+        name:          p.name,
+        description:   p.description,
+        mandate:       p.mandate,
+        personHandles: p.personIds.map(id => ppl.get(id)?.handle ?? id),
+        createdAt:     p.createdAt,
     };
 }
 

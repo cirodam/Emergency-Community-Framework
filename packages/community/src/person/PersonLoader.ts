@@ -11,7 +11,6 @@ interface PersonRow {
     disabled:          number;
     retired:           number;
     steward:           number;
-    born_in_community: number;
     guardian_id:       string | null;
     phone:             string | null;
     pin_hash:          string | null;
@@ -31,12 +30,12 @@ export class PersonLoader {
         this.db.prepare(`
             INSERT INTO persons
                 (id, first_name, last_name, birth_date, join_date, handle,
-                 disabled, retired, steward, born_in_community,
+                 disabled, retired, steward,
                  guardian_id, phone, pin_hash, password_hash,
                  private_key_der, public_key_hex, languages, credential)
             VALUES
                 (@id, @first_name, @last_name, @birth_date, @join_date, @handle,
-                 @disabled, @retired, @steward, @born_in_community,
+                 @disabled, @retired, @steward,
                  @guardian_id, @phone, @pin_hash, @password_hash,
                  @private_key_der, @public_key_hex, @languages, @credential)
             ON CONFLICT(id) DO UPDATE SET
@@ -48,7 +47,6 @@ export class PersonLoader {
                 disabled          = excluded.disabled,
                 retired           = excluded.retired,
                 steward           = excluded.steward,
-                born_in_community = excluded.born_in_community,
                 guardian_id       = excluded.guardian_id,
                 phone             = excluded.phone,
                 pin_hash          = excluded.pin_hash,
@@ -67,7 +65,6 @@ export class PersonLoader {
             disabled:          person.disabled ? 1 : 0,
             retired:           person.retired ? 1 : 0,
             steward:           person.steward ? 1 : 0,
-            born_in_community: person.bornInCommunity ? 1 : 0,
             guardian_id:       person.guardianId ?? null,
             phone:             person.phone ?? null,
             pin_hash:          pinHash ?? null,
@@ -100,7 +97,6 @@ export class PersonLoader {
             disabled:        r.disabled === 1,
             retired:         r.retired === 1,
             steward:         r.steward === 1,
-            bornInCommunity: r.born_in_community === 1,
             guardianId:      r.guardian_id ?? null,
             phone:           r.phone ?? null,
             pinHash:         r.pin_hash ?? null,

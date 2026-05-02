@@ -56,7 +56,7 @@
                             </div>
                             <p class="stall-name">{s.name}</p>
                             {#if s.description}<p class="stall-desc">{s.description}</p>{/if}
-                            <p class="stall-holder">{s.holderHandle || s.holderId}</p>
+                            <p class="stall-holder">{s.holderHandle}</p>
                         </button>
                     {/each}
                 </div>

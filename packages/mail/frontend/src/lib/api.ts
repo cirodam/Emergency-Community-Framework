@@ -17,8 +17,8 @@ async function apiFetch(input: string, init: RequestInit = {}): Promise<Response
 export interface MessageDto {
     id:                  string;
     threadId:            string;
-    fromPersonId:        string;
-    toPersonIds:         string[];
+    fromHandle:          string;   // handle at send time (or "external:handle@community")
+    toHandles:           string[]; // recipient handles at send time
     subject:             string;
     body:                string;
     sentAt:              string;
@@ -28,10 +28,10 @@ export interface MessageDto {
 }
 
 export interface ThreadDto {
-    id:             string;
-    subject:        string;
-    participantIds: string[];
-    lastMessageAt:  string;
+    id:                 string;
+    subject:            string;
+    participantHandles: string[]; // handles for display
+    lastMessageAt:      string;
 }
 
 export interface ThreadDetail {
@@ -67,14 +67,14 @@ export async function getUnreadCount(): Promise<number> {
 }
 
 export async function sendMessage(
-    toPersonId: string,
+    toHandle: string,
     subject: string,
     body: string,
     threadId?: string,
 ): Promise<MessageDto> {
     const res = await apiFetch("/api/messages", {
         method: "POST",
-        body:   JSON.stringify({ toPersonId, subject, body, threadId }),
+        body:   JSON.stringify({ toHandles: [toHandle], subject, body, threadId }),
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({})) as { error?: string };
@@ -134,12 +134,12 @@ export async function adminDeleteMessage(id: string): Promise<void> {
 // ── Drafts ────────────────────────────────────────────────────────────────────
 
 export interface DraftDto {
-    id:          string;
-    personId:    string;
-    toPersonIds: string[];
-    subject:     string;
-    body:        string;
-    updatedAt:   string;
+    id:         string;
+    personId:   string;
+    toHandles:  string[];
+    subject:    string;
+    body:       string;
+    updatedAt:  string;
 }
 
 export async function listDrafts(): Promise<DraftDto[]> {
@@ -148,10 +148,10 @@ export async function listDrafts(): Promise<DraftDto[]> {
     return res.json() as Promise<DraftDto[]>;
 }
 
-export async function saveDraft(id: string, toPersonIds: string[], subject: string, body: string): Promise<DraftDto> {
+export async function saveDraft(id: string, toHandles: string[], subject: string, body: string): Promise<DraftDto> {
     const res = await apiFetch(`/api/drafts/${encodeURIComponent(id)}`, {
         method: "PUT",
-        body:   JSON.stringify({ toPersonIds, subject, body }),
+        body:   JSON.stringify({ toHandles, subject, body }),
     });
     if (!res.ok) throw new Error("Failed to save draft");
     return res.json() as Promise<DraftDto>;
@@ -209,4 +209,25 @@ export async function emptyTrash(): Promise<number> {
     if (!res.ok) throw new Error("Failed to empty trash");
     const json = await res.json() as { deleted: number };
     return json.deleted;
+}
+
+// ── Person directory (for recipient autocomplete) ─────────────────────────────
+
+export interface PersonDto {
+    id:        string;
+    firstName: string;
+    lastName:  string;
+    handle:    string;
+    disabled:  boolean;
+    retired:   boolean;
+}
+
+let _personsCache: PersonDto[] | null = null;
+
+export async function getPersons(): Promise<PersonDto[]> {
+    if (_personsCache) return _personsCache;
+    const res = await apiFetch("/api/persons");
+    if (!res.ok) throw new Error("Failed to load persons");
+    _personsCache = await res.json() as PersonDto[];
+    return _personsCache;
 }

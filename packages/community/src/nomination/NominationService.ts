@@ -2,6 +2,7 @@ import logger from "../logger.js";
 import { Nomination } from "./Nomination.js";
 import { NominationLoader } from "./NominationLoader.js";
 import { DomainService } from "../DomainService.js";
+import { PersonService } from "../person/PersonService.js";
 
 export class NominationService {
     private static instance: NominationService;
@@ -86,14 +87,14 @@ export class NominationService {
                     if (!role) continue;
                     if (role.memberId && role.termEndDate && role.termEndDate <= cutoff) {
                         results.push({
-                            roleId:      role.id,
-                            roleTitle:   role.title,
-                            memberId:    role.memberId,
-                            termEndDate: role.termEndDate.toISOString(),
-                            unitId:      unit.id,
-                            unitName:    unit.name,
-                            domainId:    domain.id,
-                            domainName:  domain.name,
+                            roleId:        role.id,
+                            roleTitle:     role.title,
+                            memberHandle:  PersonService.getInstance().get(role.memberId)?.handle ?? null,
+                            termEndDate:   role.termEndDate.toISOString(),
+                            unitId:        unit.id,
+                            unitName:      unit.name,
+                            domainId:      domain.id,
+                            domainName:    domain.name,
                         });
                     }
                 }
@@ -152,12 +153,12 @@ export interface VacancyInfo {
 }
 
 export interface ExpiringRoleInfo {
-    roleId:      string;
-    roleTitle:   string;
-    memberId:    string;
-    termEndDate: string;
-    unitId:      string;
-    unitName:    string;
-    domainId:    string;
-    domainName:  string;
+    roleId:       string;
+    roleTitle:    string;
+    memberHandle: string | null;
+    termEndDate:  string;
+    unitId:       string;
+    unitName:     string;
+    domainId:     string;
+    domainName:   string;
 }

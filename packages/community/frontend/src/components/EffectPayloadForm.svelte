@@ -64,7 +64,6 @@
     let apLastName       = $state("");
     let apBirthDate      = $state("");
     let apPhone          = $state("");
-    let apBornInCommunity = $state(false);
 
     let bylawTitle       = $state("");
     let bylawPreamble    = $state("");
@@ -154,7 +153,6 @@
                     lastName:        ln,
                     birthDate:       apBirthDate,
                     ...(apPhone.trim() ? { phone: apPhone.trim() } : {}),
-                    ...(apBornInCommunity ? { bornInCommunity: true } : {}),
                 };
             }
         } else if (kind === "suspend-member" || kind === "reinstate-member") {
@@ -335,10 +333,6 @@
         <input class="input" type="date" bind:value={apBirthDate} />
     </label>
     <input class="input" type="tel" placeholder="Phone (optional, E.164 e.g. +15551234567)" bind:value={apPhone} />
-    <label class="checkbox-row">
-        <input type="checkbox" bind:checked={apBornInCommunity} />
-        Born in community (receives birth grant instead of back-endowment)
-    </label>
 {:else if kind === "suspend-member" || kind === "reinstate-member"}
     {#if !persons.length}
         <p class="hint">Loading members…</p>

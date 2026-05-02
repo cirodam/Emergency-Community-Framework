@@ -1,5 +1,6 @@
 import { Organization } from "./Organization.js";
 import { OrgLoader } from "./OrgLoader.js";
+import { HandleRegistry } from "../HandleRegistry.js";
 
 const HANDLE_RE = /^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$|^[a-z0-9]{1,2}$/;
 
@@ -20,6 +21,7 @@ export class OrgService {
         this.loader = loader;
         for (const org of loader.loadAll()) {
             this.orgs.set(org.id, org);
+            HandleRegistry.getInstance().register(org.handle, "organization", org.id);
         }
     }
 
@@ -56,11 +58,15 @@ export class OrgService {
         if (this.getByHandle(normalized)) {
             throw new Error(`Handle '${normalized}' is already taken`);
         }
+        if (HandleRegistry.getInstance().isTaken(normalized)) {
+            throw new Error(`Handle '${normalized}' is already taken by another entity`);
+        }
         if (!name.trim()) {
             throw new Error("name is required");
         }
         const org = new Organization(normalized, name, foundedBy, description ?? null);
         this.orgs.set(org.id, org);
+        HandleRegistry.getInstance().register(org.handle, "organization", org.id);
         this.loader!.save(org);
         return org;
     }
