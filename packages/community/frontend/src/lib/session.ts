@@ -18,7 +18,7 @@ const TOKEN_KEY   = "ecf_community_token";
 
 function loadFromStorage(): SessionData | null {
     try {
-        const raw = sessionStorage.getItem(SESSION_KEY);
+        const raw = localStorage.getItem(SESSION_KEY);
         return raw ? (JSON.parse(raw) as SessionData) : null;
     } catch {
         return null;
@@ -27,7 +27,7 @@ function loadFromStorage(): SessionData | null {
 
 /** Returns the current credential token, or null if not logged in. */
 export function getToken(): string | null {
-    return sessionStorage.getItem(TOKEN_KEY);
+    return localStorage.getItem(TOKEN_KEY);
 }
 
 function createSessionStore() {
@@ -47,14 +47,14 @@ function createSessionStore() {
                 isSteward:   person.isSteward,
                 token:       person.token,
             };
-            sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
-            sessionStorage.setItem(TOKEN_KEY, person.token);
+            localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+            localStorage.setItem(TOKEN_KEY, person.token);
             set(data);
         },
 
         logout(): void {
-            sessionStorage.removeItem(SESSION_KEY);
-            sessionStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(SESSION_KEY);
+            localStorage.removeItem(TOKEN_KEY);
             set(null);
         },
 
@@ -62,7 +62,7 @@ function createSessionStore() {
             const current = loadFromStorage();
             if (!current) return;
             const updated = { ...current, ...updates };
-            sessionStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+            localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
             set(updated);
         },
     };
@@ -70,10 +70,13 @@ function createSessionStore() {
 
 export const session = createSessionStore();
 
-export type Page = "directory" | "constitution" | "settings" | "domains" | "domain" | "unit" | "leadership" | "assembly" | "pool" | "motion" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations" | "proposals" | "proposal" | "nodes" | "central-bank" | "social-insurance" | "vacancies" | "nominations" | "connections" | "growth" | "schedule" | "documents" | "bylaw" | "timeline" | "calendar" | "registry" | "role-type";
+/** Set to true when any API call returns 401, so the login page can explain why. */
+export const sessionExpired = writable(false);
+
+export type Page = "dashboard" | "directory" | "constitution" | "settings" | "domains" | "domain" | "unit" | "leadership" | "assembly" | "pool" | "motion" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations" | "proposals" | "proposal" | "nodes" | "central-bank" | "social-insurance" | "vacancies" | "nominations" | "connections" | "schedule" | "documents" | "bylaw" | "timeline" | "calendar" | "registry" | "role-type" | "unit-type-detail";
 
 function createPageStore() {
-    const { subscribe, set } = writable<Page>("schedule");
+    const { subscribe, set } = writable<Page>("dashboard");
     return { subscribe, go: (page: Page) => set(page) };
 }
 
@@ -102,3 +105,7 @@ export const selectedBylawId = writable<string | null>(null);
 
 /** ID of the role type currently being viewed in the role type detail page. */
 export const selectedRoleTypeId = writable<string | null>(null);
+
+import type { UnitTypeDto } from "./api.js";
+/** Unit type currently being viewed in the unit type detail page. */
+export const selectedUnitType = writable<UnitTypeDto | null>(null);

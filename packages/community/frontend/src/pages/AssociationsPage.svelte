@@ -1,7 +1,8 @@
 <script lang="ts">
-    import { listAssociations, createAssociation } from "../lib/api.js";
+    import { listAssociations, createMotion, submitMotionForDeliberation } from "../lib/api.js";
     import type { AssociationDto } from "../lib/api.js";
-    import { currentPage, selectedAssociationId } from "../lib/session.js";
+    import { currentPage, selectedAssociationId, selectedMotionId } from "../lib/session.js";
+    import EffectPayloadForm from "../components/EffectPayloadForm.svelte";
 
     let associations: AssociationDto[] = $state([]);
     let loading = $state(true);
@@ -11,11 +12,14 @@
     let search = $state("");
     let page   = $state(1);
 
-    // Create form
-    let showCreate = $state(false);
-    let creating   = $state(false);
-    let createError = $state("");
-    let form = $state({ name: "", handle: "", description: "" });
+    // Propose-creation motion form
+    let showPropose    = $state(false);
+    let proposeTitle   = $state("");
+    let proposeDesc    = $state("");
+    let minApprovals   = $state("4");
+    let proposing      = $state(false);
+    let proposeError   = $state("");
+    let proposePayload = $state<Record<string, unknown>>({});
 
     async function load() {
         loading = true;
@@ -47,27 +51,36 @@
         page = Math.max(1, Math.min(p, pages));
     }
 
-    function autoHandle() {
-        if (!form.handle) {
-            form.handle = form.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    async function submitProposal() {
+        proposeError = "";
+        if (!proposeTitle.trim() || !proposeDesc.trim()) {
+            proposeError = "Title and rationale are required."; return;
         }
-    }
-
-    async function submit() {
-        createError = "";
-        if (!form.name.trim() || !form.handle.trim()) {
-            createError = "Name and handle are required."; return;
+        if (!proposePayload.name || !proposePayload.handle) {
+            proposeError = "Association name and handle are required."; return;
         }
-        creating = true;
+        const count = parseInt(minApprovals, 10);
+        if (!count || count < 1) {
+            proposeError = "Enter a required approval count."; return;
+        }
+        proposing = true;
         try {
-            const a = await createAssociation({ name: form.name.trim(), handle: form.handle.trim(), description: form.description.trim() });
-            associations = [...associations, a].sort((a, b) => a.name.localeCompare(b.name));
-            showCreate = false;
-            form = { name: "", handle: "", description: "" };
+            const m = await createMotion({
+                body:        "referendum",
+                title:       proposeTitle.trim(),
+                description: proposeDesc.trim(),
+                kind:        "create-association",
+                payload:     proposePayload,
+            });
+            await submitMotionForDeliberation(m.id, "petition", count);
+            showPropose = false;
+            proposeTitle = ""; proposeDesc = ""; proposePayload = {}; minApprovals = "4";
+            selectedMotionId.set(m.id);
+            currentPage.go("motion");
         } catch (e) {
-            createError = e instanceof Error ? e.message : "Failed to create";
+            proposeError = e instanceof Error ? e.message : "Failed to propose";
         } finally {
-            creating = false;
+            proposing = false;
         }
     }
 
@@ -83,8 +96,8 @@
             <h2 class="page-title">Associations</h2>
             <p class="page-subtitle">Businesses, churches, cooperatives, and clubs within this community.</p>
         </div>
-        <button class="new-btn" onclick={() => { showCreate = !showCreate; createError = ""; }}>
-            {showCreate ? "✕" : "+ New"}
+        <button class="new-btn" onclick={() => { showPropose = !showPropose; proposeError = ""; }}>
+            {showPropose ? "✕" : "＋ Propose"}
         </button>
     </div>
 
@@ -98,31 +111,38 @@
         />
     </div>
 
-    {#if showCreate}
-        <form class="create-form" onsubmit={(e) => { e.preventDefault(); submit(); }}>
-            <h3 class="form-title">Register an association</h3>
+    {#if showPropose}
+        <form class="create-form" onsubmit={(e) => { e.preventDefault(); submitProposal(); }}>
+            <h3 class="form-title">Propose a new association</h3>
+            <p class="form-hint">This will create a motion for the Community Assembly to approve.</p>
 
             <div class="field">
-                <label for="name">Name</label>
-                <input id="name" type="text" bind:value={form.name} onblur={autoHandle} placeholder="First Baptist Church" />
+                <label for="p-title">Motion title</label>
+                <input id="p-title" type="text" bind:value={proposeTitle} placeholder="e.g. Create First Baptist Church association" />
             </div>
 
             <div class="field">
-                <label for="handle">Handle <span class="field-hint">unique, letters/numbers/underscores</span></label>
-                <input id="handle" type="text" bind:value={form.handle} placeholder="first_baptist" autocapitalize="none" />
+                <label for="p-desc">Rationale</label>
+                <textarea id="p-desc" bind:value={proposeDesc} rows="2" placeholder="Why should this association be created?"></textarea>
             </div>
 
             <div class="field">
-                <label for="desc">Description <span class="field-hint">optional</span></label>
-                <textarea id="desc" bind:value={form.description} rows="2" placeholder="What does this association do?"></textarea>
+                <label for="p-approvals">Approvals required to pass</label>
+                <input id="p-approvals" type="number" min="1" bind:value={minApprovals} placeholder="e.g. 4" />
+                <span class="field-sub">Motion passes as a petition once this many members approve it.</span>
             </div>
 
-            {#if createError}
-                <p class="form-error">{createError}</p>
+            <div class="field">
+                <p class="section-label">Association details</p>
+                <EffectPayloadForm kind="create-association" bind:payload={proposePayload} />
+            </div>
+
+            {#if proposeError}
+                <p class="form-error">{proposeError}</p>
             {/if}
 
-            <button class="submit-btn" type="submit" disabled={creating}>
-                {creating ? "Registering…" : "Register"}
+            <button class="submit-btn" type="submit" disabled={proposing}>
+                {proposing ? "Submitting…" : "Submit motion"}
             </button>
         </form>
     {/if}
@@ -134,7 +154,7 @@
     {:else if error}
         <div class="error-msg">{error}</div>
     {:else if associations.length === 0}
-        <div class="empty-msg">No associations yet. Register the first one above.</div>
+        <div class="empty-msg">No associations yet. Propose one above to start the process.</div>
     {:else if filtered.length === 0}
         <div class="empty-msg">No associations match your search.</div>
     {:else}
@@ -208,7 +228,10 @@
         padding: 1.25rem;
         margin-bottom: 1.25rem;
     }
-    .form-title { font-size: 0.95rem; font-weight: 700; color: #0f172a; margin: 0 0 1rem; }
+    .form-title { font-size: 0.95rem; font-weight: 700; color: #0f172a; margin: 0 0 0.35rem; }
+    .form-hint  { font-size: 0.78rem; color: #64748b; margin: 0 0 1rem; }
+    .section-label { display: block; font-size: 0.8rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem; }
+    .field-sub  { display: block; font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem; }
 
     .field { margin-bottom: 0.85rem; }
     .field label {
@@ -218,7 +241,6 @@
         color: #475569;
         margin-bottom: 0.3rem;
     }
-    .field-hint { font-weight: 400; color: #94a3b8; }
 
     .field input,
     .field textarea {

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { listUnitTypes, listRoleTypes } from "../lib/api.js";
     import type { UnitTypeDto, RoleTypeDto } from "../lib/api.js";
-    import { currentPage, selectedRoleTypeId } from "../lib/session.js";
+    import { currentPage, selectedRoleTypeId, selectedUnitType } from "../lib/session.js";
 
     let unitTypes: UnitTypeDto[] = $state([] as UnitTypeDto[]);
     let roleTypes: RoleTypeDto[] = $state([] as RoleTypeDto[]);
@@ -31,6 +31,11 @@
     function openRoleType(id: string) {
         selectedRoleTypeId.set(id);
         currentPage.go("role-type");
+    }
+
+    function openUnitType(ut: UnitTypeDto) {
+        selectedUnitType.set(ut);
+        currentPage.go("unit-type-detail");
     }
 </script>
 
@@ -65,7 +70,7 @@
             {:else}
                 <div class="card-grid">
                     {#each unitTypes as ut (ut.type)}
-                        <div class="type-card">
+                        <button class="type-card type-card-btn" onclick={() => openUnitType(ut)}>
                             <div class="card-header">
                                 <span class="type-label">{ut.label}</span>
                                 {#if ut.custom}
@@ -78,7 +83,7 @@
                             {#if ut.description}
                                 <p class="type-desc">{ut.description}</p>
                             {/if}
-                        </div>
+                        </button>
                     {/each}
                 </div>
                 <p class="count">{unitTypes.length} unit type{unitTypes.length !== 1 ? "s" : ""}</p>

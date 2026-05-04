@@ -1,10 +1,13 @@
 <script lang="ts">
     import ErrorBanner from "../components/ErrorBanner.svelte";
-    import { session, currentPage } from "../lib/session.js";
-    import { login, changeOwnPassword } from "../lib/api.js";
+    import { session, currentPage, sessionExpired } from "../lib/session.js";
+    import { login, changeOwnPassword, getConstitution } from "../lib/api.js";
     import type { PersonDto } from "../lib/api.js";
 
-    const { onApply }: { onApply?: () => void } = $props();
+    const { onApply, onLogin }: { onApply?: () => void; onLogin?: () => void } = $props();
+
+    let communityName = $state("");
+    $effect(() => { getConstitution().then(c => { communityName = c.communityName; }).catch(() => {}); });
 
     let handle   = $state("");
     let password = $state("");
@@ -27,6 +30,7 @@
         error = "";
         if (!handle.trim())   { error = "Enter your handle"; return; }
         if (!password)        { error = "Enter your password"; return; }
+        sessionExpired.set(false);
 
         loading = true;
         try {
@@ -55,7 +59,7 @@
                 window.location.href = `${returnUrl}#session=${payload}`;
             } else {
                 session.login(person);
-                currentPage.go("profile");
+                onLogin?.();
             }
         } catch (e) {
             error = e instanceof Error ? e.message : "Login failed";
@@ -84,6 +88,7 @@
                 window.location.href = `${returnUrl}#session=${payload}`;
             } else {
                 currentPage.go("profile");
+                onLogin?.();
             }
         } catch (e) {
             changeError = e instanceof Error ? e.message : "Failed to change password";
@@ -96,7 +101,7 @@
 <div class="login-page">
     <header class="login-header">
         <div class="logo">⊚</div>
-        <h1>Community Portal</h1>
+        <h1>{communityName || "Community Portal"}</h1>
         <p>{mustChange ? "Set your password" : "Sign in with your handle"}</p>
     </header>
 
@@ -127,7 +132,10 @@
                     {changeLoading ? "Saving…" : "Set password"}
                 </button>
             </form>
-        {:else}
+    {:else}
+            {#if $sessionExpired}
+                <div class="session-notice">Your session expired. Please sign in again.</div>
+            {/if}
             <ErrorBanner message={error} />
 
             <form onsubmit={(e) => { e.preventDefault(); submit(); }}>
@@ -279,6 +287,16 @@
         font-size: 0.9rem;
         color: #713f12;
         margin: 0;
+    }
+
+    .session-notice {
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+        color: #9a3412;
+        margin-bottom: 0.5rem;
     }
 
     .link-btn {

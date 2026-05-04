@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getPool, listPersons, listMotions, createMotion, listMotionEffects, markMotionDiscussed, recordMotionOutcome, createPoolNomination, updatePool } from "../lib/api.js";
+    import { getPool, listPersons, listMotions, createMotion, submitMotionForDeliberation, listMotionEffects, markMotionDiscussed, recordMotionOutcome, updatePool } from "../lib/api.js";
     import type { PoolDto, PersonDto, MotionDto, MotionOutcome, MotionEffectKind } from "../lib/api.js";
     import { currentPage, selectedPoolId, session, selectedMotionId } from "../lib/session.js";
     import EffectPayloadForm from "../components/EffectPayloadForm.svelte";
@@ -16,10 +16,11 @@
     let outcomeNote   = $state("");
 
     let nominating     = $state(false);
-    let nomineeHandle  = $state("");
-    let nomineeStmt    = $state("");
-    let nominateError  = $state("");
-    let nominateSaving = $state(false);
+    let petitionPersonId  = $state("");
+    let petitionApprovals = $state("3");
+    let petitionDesc      = $state("");
+    let petitionError     = $state("");
+    let petitionSaving    = $state(false);
 
     // Add-to-docket form
     let showAddMotion  = $state(false);
@@ -56,20 +57,26 @@
         } finally { addingMotion = false; }
     }
 
-    async function doNominate() {
-        if (!nomineeHandle || !pool) return;
-        nominateSaving = true;
-        nominateError = "";
+    async function doPetition() {
+        if (!petitionPersonId || !pool) return;
+        const count = parseInt(petitionApprovals, 10);
+        if (!count || count < 1) { petitionError = "Enter a valid approval count."; return; }
+        petitionSaving = true; petitionError = "";
         try {
-            await createPoolNomination({ poolId: pool.id, nomineeHandle, statement: nomineeStmt.trim() });
-            nominating = false;
-            nomineeHandle = "";
-            nomineeStmt = "";
+            const person = persons.find(p => p.id === petitionPersonId);
+            const m = await createMotion({
+                body:        "referendum",
+                title:       `Add ${person?.firstName} ${person?.lastName} to ${pool.name}`,
+                description: petitionDesc.trim() || `Petition to add @${person?.handle} to the ${pool.name} pool.`,
+                kind:        "add-pool-member",
+                payload:     { poolId: pool.id, personId: petitionPersonId },
+            });
+            await submitMotionForDeliberation(m.id, "petition", count);
+            selectedMotionId.set(m.id);
+            currentPage.go("motion");
         } catch (e) {
-            nominateError = e instanceof Error ? e.message : "Failed";
-        } finally {
-            nominateSaving = false;
-        }
+            petitionError = e instanceof Error ? e.message : "Failed";
+        } finally { petitionSaving = false; }
     }
 
     const isSteward = $derived(($session as any)?.isSteward ?? false);
@@ -206,23 +213,24 @@
     {#if !loading && !error && isSteward && pool}
         {#if nominating}
             <div class="nominate-form">
-                <select class="nominate-select" bind:value={nomineeHandle}>
+                <select class="nominate-select" bind:value={petitionPersonId}>
                     <option value="">— select person —</option>
-                    {#each persons.filter(p => !pool!.personHandles.includes(p.handle)) as p (p.handle)}
-                        <option value={p.handle}>{p.firstName} {p.lastName}</option>
+                    {#each persons.filter(p => !pool!.personHandles.includes(p.handle)) as p (p.id)}
+                        <option value={p.id}>{p.firstName} {p.lastName} (@{p.handle})</option>
                     {/each}
                 </select>
-                <input class="nominate-input" placeholder="Statement (optional)" bind:value={nomineeStmt} />
-                {#if nominateError}<p class="nominate-error">{nominateError}</p>{/if}
+                <input class="nominate-input" type="number" min="1" placeholder="Approvals needed (e.g. 3)" bind:value={petitionApprovals} />
+                <input class="nominate-input" placeholder="Rationale (optional)" bind:value={petitionDesc} />
+                {#if petitionError}<p class="nominate-error">{petitionError}</p>{/if}
                 <div class="nominate-actions">
-                    <button class="btn-sm btn-primary-sm" onclick={doNominate} disabled={!nomineeHandle || nominateSaving}>
-                        {nominateSaving ? "Submitting…" : "Nominate"}
+                    <button class="btn-sm btn-primary-sm" onclick={doPetition} disabled={!petitionPersonId || petitionSaving}>
+                        {petitionSaving ? "Submitting…" : "Submit petition"}
                     </button>
-                    <button class="btn-sm" onclick={() => { nominating = false; nominateError = ""; }}>Cancel</button>
+                    <button class="btn-sm" onclick={() => { nominating = false; petitionError = ""; }}>Cancel</button>
                 </div>
             </div>
         {:else}
-            <button class="nominate-btn" onclick={() => nominating = true}>＋ Nominate to pool</button>
+            <button class="nominate-btn" onclick={() => nominating = true}>＋ Petition to add member</button>
         {/if}
     {/if}
 

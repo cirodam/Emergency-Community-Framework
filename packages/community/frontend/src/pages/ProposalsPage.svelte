@@ -20,7 +20,8 @@
     let createError  = $state("");
     let newTitle     = $state("");
     let newDesc      = $state("");
-    let newThreshold = $state<VoteThresholdKey>("thresholdSimpleMajority");
+    let newThreshold    = $state<VoteThresholdKey>("thresholdSimpleMajority");
+    let newMinApprovals = $state("");
     let effectKinds  = $state<MotionEffectKind[]>([]);
     let selectedKind = $state("");
     let effectPayload = $state<Record<string, unknown>>({});
@@ -35,6 +36,7 @@
         thresholdSimpleMajority: "Simple majority (51%)",
         thresholdSupermajority:  "Supermajority (67%)",
         thresholdNearConsensus:  "Near consensus (90%)",
+        petition:                "Petition (fixed approval count)",
     };
 
     async function load() {
@@ -65,8 +67,12 @@
                 kind:        selectedKind || null,
                 payload:     selectedKind ? effectPayload : undefined,
             });
-            await submitMotionForDeliberation(m.id, newThreshold);
-            showCreate = false; newTitle = ""; newDesc = "";
+            const minApprovals = newThreshold === "petition" ? parseInt(newMinApprovals, 10) : undefined;
+            if (newThreshold === "petition" && (!minApprovals || minApprovals < 1)) {
+                createError = "Enter a required approval count."; creating = false; return;
+            }
+            await submitMotionForDeliberation(m.id, newThreshold, minApprovals);
+            showCreate = false; newTitle = ""; newDesc = ""; newMinApprovals = "";
             selectedKind = ""; effectPayload = {};
             await load();
         } catch (e) {
@@ -126,6 +132,12 @@
                     {/each}
                 </select>
             </div>
+            {#if newThreshold === "petition"}
+                <div class="threshold-row">
+                    <label class="threshold-label" for="min-approvals">Approvals required</label>
+                    <input id="min-approvals" class="input" type="number" min="1" placeholder="e.g. 4" bind:value={newMinApprovals} />
+                </div>
+            {/if}
             {#if effectKinds.length}
                 <div class="threshold-row">
                     <label class="threshold-label" for="effect-select">Automated effect (optional)</label>

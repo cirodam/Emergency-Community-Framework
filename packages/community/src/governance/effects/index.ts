@@ -21,6 +21,8 @@ import { CommunityRole } from "../../common/CommunityRole.js";
 import { UnitTemplateRegistry } from "../../common/domain/UnitTemplateRegistry.js";
 import { LocationService } from "../../location/LocationService.js";
 import { Location } from "../../location/Location.js";
+import { AssociationService } from "../../association/AssociationService.js";
+import { Association } from "../../association/Association.js";
 
 // ── amend-constitution ────────────────────────────────────────────────────────
 // Payload: { parameter: string, newValue: number | boolean }
@@ -158,7 +160,7 @@ effectRegistry.register("set-retirement-payout", {
 
 effectRegistry.register("add-person", {
     label:    "Add person",
-    bodyHint: "assembly",
+    bodyHint: "referendum",
     validate(raw) {
         if (typeof raw !== "object" || raw === null) return "Payload must be an object";
         const p = raw as Record<string, unknown>;
@@ -814,6 +816,101 @@ effectRegistry.register("found-marketplace", {
                 "marketplace-founded",
                 `Marketplace "${name}" founded at "${locationName}".`,
                 { actorId: motion.proposerId },
+            );
+        } catch { /* non-fatal */ }
+    },
+});
+
+// ── create-association ────────────────────────────────────────────────────────
+// Payload: { name: string, handle: string, description?: string, founderPersonId?: string }
+// Registers a new association (business, church, cooperative, club, etc.) and
+// optionally makes the given person its first admin.
+
+effectRegistry.register("create-association", {
+    label:    "Create an association",
+    bodyHint: "referendum",
+    validate(raw) {
+        if (typeof raw !== "object" || raw === null) return "Payload must be an object";
+        const p = raw as Record<string, unknown>;
+        if (typeof p.name !== "string" || !p.name.trim())
+            return "payload.name must be a non-empty string";
+        if (typeof p.handle !== "string" || !p.handle.trim())
+            return "payload.handle must be a non-empty string";
+        if (p.founderPersonId !== undefined && typeof p.founderPersonId !== "string")
+            return "payload.founderPersonId must be a string";
+        return null;
+    },
+    handler({ motion, payload }) {
+        const name        = (payload.name   as string).trim();
+        const handle      = (payload.handle as string).trim();
+        const description = typeof payload.description === "string" ? payload.description.trim() : "";
+
+        const svc = AssociationService.getInstance();
+        if (svc.isHandleTaken(handle)) {
+            throw new Error(`Handle "@${handle}" is already in use.`);
+        }
+
+        const association = new Association(name, handle, description);
+        svc.create(association);
+
+        const founderPersonId = typeof payload.founderPersonId === "string" && payload.founderPersonId
+            ? payload.founderPersonId
+            : motion.proposerId;
+        if (founderPersonId) {
+            svc.addAdmin(association.id, founderPersonId);
+        }
+
+        motion.outcomeNote = `Association "${name}" (@${association.handle}) registered (id: ${association.id}).`;
+
+        try {
+            CommunityLogService.getInstance().write(
+                "association-created",
+                `Association "${name}" (@${association.handle}) created via motion.`,
+                { actorId: motion.proposerId, refId: association.id },
+            );
+        } catch { /* non-fatal */ }
+    },
+});
+
+// ── add-pool-member ───────────────────────────────────────────────────────────
+// Adds an existing person directly to a leader pool via a petition vote.
+// Bypasses the nomination/consent flow — assumes consent was established
+// outside of the governance system (e.g. in-person or offline).
+// Payload: { poolId: string, personId: string }
+
+effectRegistry.register("add-pool-member", {
+    label:    "Add person to leader pool",
+    bodyHint: "referendum",
+    validate(raw) {
+        if (typeof raw !== "object" || raw === null) return "Payload must be an object";
+        const p = raw as Record<string, unknown>;
+        if (typeof p.poolId !== "string" || !p.poolId)
+            return "payload.poolId must be a non-empty string";
+        if (typeof p.personId !== "string" || !p.personId)
+            return "payload.personId must be a non-empty string";
+        return null;
+    },
+    handler({ motion, payload }) {
+        const poolId   = payload.poolId   as string;
+        const personId = payload.personId as string;
+
+        const domainSvc = DomainService.getInstance();
+        const pool      = domainSvc.getPool(poolId);
+        if (!pool) throw new Error(`Leader pool "${poolId}" not found`);
+
+        const person = PersonService.getInstance().get(personId);
+        if (!person) throw new Error(`Person "${personId}" not found`);
+
+        pool.addPerson(personId);
+        domainSvc.savePool(pool);
+
+        motion.outcomeNote = `${person.firstName} ${person.lastName} added to pool "${pool.name}".`;
+
+        try {
+            CommunityLogService.getInstance().write(
+                "pool-member-added",
+                `${person.firstName} ${person.lastName} added to pool "${pool.name}" via petition.`,
+                { actorId: motion.proposerId, refId: pool.id },
             );
         } catch { /* non-fatal */ }
     },

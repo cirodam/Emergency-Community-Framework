@@ -33,13 +33,13 @@
 
     function sessionHash(): string {
         if (!$session) return "";
-        const payload = btoa(JSON.stringify({
+        const payload = btoa(encodeURIComponent(JSON.stringify({
             token:     $session.token,
             id:        $session.personId,
             firstName: $session.firstName,
             lastName:  $session.lastName,
             handle:    $session.handle,
-        }));
+        })));
         return `#session=${payload}`;
     }
 

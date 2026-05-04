@@ -10,13 +10,6 @@
     import AdminPage    from "./pages/AdminPage.svelte";
     import BottomNav    from "./components/BottomNav.svelte";
 
-    // If the URL contains a fresh #session= fragment, any existing sessionStorage
-    // data is stale. Clear it immediately so the $effect below does not treat the
-    // old session as valid and set ready=true before onMount can process the fragment.
-    if (window.location.hash.startsWith("#session=")) {
-        session.logout();
-    }
-
     let ready = $state(false);
 
     onMount(async () => {
@@ -59,6 +52,7 @@
                     primaryAccountHandle: primary?.handle ?? "",
                     appPermissions,
                 };
+                session.logout(); // clear any stale session before installing the new one
                 session.login(data);
                 // Strip the hash so it's not accidentally reused or visible
                 history.replaceState(null, "", window.location.pathname + window.location.search);

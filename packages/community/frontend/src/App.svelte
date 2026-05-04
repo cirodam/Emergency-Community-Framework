@@ -19,7 +19,7 @@ import AssemblyPage      from "./pages/AssemblyPage.svelte";
 import PoolPage          from "./pages/PoolPage.svelte";
 import MotionPage        from "./pages/MotionPage.svelte";
     import ApplicationsPage   from "./pages/ApplicationsPage.svelte";
-    import HowItWorksPage      from "./pages/HowItWorksPage.svelte";
+    import CharterPage         from "./pages/HowItWorksPage.svelte";
     import BudgetPage          from "./pages/BudgetPage.svelte";
     import AssociationsPage    from "./pages/AssociationsPage.svelte";
     import AssociationPage     from "./pages/AssociationPage.svelte";
@@ -29,23 +29,41 @@ import MotionPage        from "./pages/MotionPage.svelte";
     import ApplyPage           from "./pages/ApplyPage.svelte";
     import NodesPage           from "./pages/NodesPage.svelte";
     import VacanciesPage       from "./pages/VacanciesPage.svelte";
-    import NominationsPage     from "./pages/NominationsPage.svelte";
     import ConnectionsPage     from "./pages/ConnectionsPage.svelte";
-    import GrowthPage          from "./pages/GrowthPage.svelte";
     import SchedulePage        from "./pages/SchedulePage.svelte";
     import TimelinePage        from "./pages/TimelinePage.svelte";
+    import DashboardPage       from "./pages/DashboardPage.svelte";
     import CalendarPage        from "./pages/CalendarPage.svelte";
     import BottomNav           from "./components/BottomNav.svelte";
     import RegistryPage        from "./pages/RegistryPage.svelte";
     import RoleTypePage        from "./pages/RoleTypePage.svelte";
+    import UnitTypePage        from "./pages/UnitTypePage.svelte";
 
     type AppState = "loading" | "setup" | "login" | "apply" | "app";
     let appState: AppState = $state("loading");
 
     onMount(async () => {
+        // If a satellite app redirected here with ?return=<url> and the user is
+        // already logged in (persisted in localStorage), hand the session back
+        // immediately without showing the login page.
+        const returnUrl = new URLSearchParams(window.location.search).get("return");
+        if (returnUrl && $session && (returnUrl.startsWith("http://") || returnUrl.startsWith("https://"))) {
+            const payload = btoa(encodeURIComponent(JSON.stringify({
+                token:     $session.token,
+                id:        $session.personId,
+                firstName: $session.firstName,
+                lastName:  $session.lastName,
+                handle:    $session.handle,
+            })));
+            window.location.href = `${returnUrl}#session=${payload}`;
+            return;
+        }
+
         try {
             const { needsSetup } = await getSetupStatus();
             if (needsSetup) {
+                // Wipe any stale session from a previous community
+                session.logout();
                 appState = "setup";
             } else if ($session) {
                 appState = "app";
@@ -57,8 +75,6 @@ import MotionPage        from "./pages/MotionPage.svelte";
             appState = $session ? "app" : "login";
         }
     });
-
-    const loggedIn = $derived(!!$session);
 </script>
 
 {#if appState === "loading"}
@@ -72,12 +88,14 @@ import MotionPage        from "./pages/MotionPage.svelte";
 {:else if appState === "apply"}
     <ApplyPage onBack={() => { appState = "login"; }} />
 
-{:else if !loggedIn}
-    <LoginPage onApply={() => { appState = "apply"; }} />
+{:else if appState === "login"}
+    <LoginPage onApply={() => { appState = "apply"; }} onLogin={() => { appState = "app"; }} />
 
-{:else}
+{:else if appState === "app"}
     <main>
-        {#if $currentPage === "directory"}
+        {#if $currentPage === "dashboard"}
+            <DashboardPage />
+        {:else if $currentPage === "directory"}
             <DirectoryPage />
         {:else if $currentPage === "constitution"}
             <ConstitutionPage />
@@ -104,7 +122,7 @@ import MotionPage        from "./pages/MotionPage.svelte";
         {:else if $currentPage === "applications"}
             <ApplicationsPage />
         {:else if $currentPage === "how-it-works"}
-            <HowItWorksPage />
+            <CharterPage />
         {:else if $currentPage === "budget"}
             <BudgetPage />
         {:else if $currentPage === "associations"}
@@ -125,12 +143,8 @@ import MotionPage        from "./pages/MotionPage.svelte";
             <SocialInsurancePage />
         {:else if $currentPage === "vacancies"}
             <VacanciesPage />
-        {:else if $currentPage === "nominations"}
-            <NominationsPage />
         {:else if $currentPage === "connections"}
             <ConnectionsPage />
-        {:else if $currentPage === "growth"}
-            <GrowthPage />
         {:else if $currentPage === "schedule"}
             <SchedulePage />
         {:else if $currentPage === "calendar"}
@@ -141,6 +155,8 @@ import MotionPage        from "./pages/MotionPage.svelte";
             <RegistryPage />
         {:else if $currentPage === "role-type"}
             <RoleTypePage />
+        {:else if $currentPage === "unit-type-detail"}
+            <UnitTypePage />
         {/if}
     </main>
     <BottomNav />

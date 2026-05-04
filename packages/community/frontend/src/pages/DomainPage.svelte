@@ -133,7 +133,7 @@
 
 <div class="domain-page">
     <div class="page-header">
-        <button class="back-btn" onclick={back} aria-label="Back to domains">‹ Domains</button>
+        <button class="back-btn" onclick={back} aria-label="Back to institutions">‹ Institutions</button>
     </div>
 
     {#if loading}
@@ -157,7 +157,7 @@
             </div>
 
             {#if units.length === 0}
-                <p class="empty-msg">No units in this domain yet.</p>
+                <p class="empty-msg">No units in this institution yet.</p>
             {:else}
                 <div class="unit-list">
                     {#each units as unit (unit.id)}

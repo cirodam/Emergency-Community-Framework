@@ -12,11 +12,6 @@
 
     let ready = $state(false);
 
-    // Clear any stale sessionStorage before processing a fresh login redirect.
-    if (window.location.hash.startsWith("#session=")) {
-        session.logout();
-    }
-
     onMount(async () => {
         const hash = window.location.hash;
         if (hash.startsWith("#session=")) {
@@ -38,6 +33,7 @@
                     token:     payload.token,
                     appPermissions,
                 };
+                session.logout(); // clear any stale session before installing the new one
                 session.login(data);
                 history.replaceState(null, "", window.location.pathname + window.location.search);
             } catch {

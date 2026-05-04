@@ -7,14 +7,7 @@
     type NavItem = LeafItem | GroupItem;
 
     const items: NavItem[] = [
-        {
-            kind: "group", id: "calendar", label: "Calendar", icon: "⊞",
-            activePages: ["schedule", "calendar"],
-            children: [
-                { kind: "leaf", id: "schedule", label: "Work Schedule", icon: "⊞" },
-                { kind: "leaf", id: "calendar", label: "Events",        icon: "◷" },
-            ],
-        },
+        { kind: "leaf", id: "dashboard", label: "Dashboard", icon: "⊞" },
         {
             kind: "group", id: "people", label: "People", icon: "◉",
             activePages: ["directory", "associations", "association", "add-person", "applications"],
@@ -30,16 +23,16 @@
             children: [
                 { kind: "leaf", id: "leadership",   label: "Leadership",   icon: "★" },
                 { kind: "leaf", id: "budget",        label: "Budget",       icon: "⊡" },
-                { kind: "leaf", id: "domains",       label: "Domains",      icon: "⊛" },
+                { kind: "leaf", id: "domains",       label: "Institutions", icon: "⊛" },
                 { kind: "leaf", id: "documents",     label: "Documents",    icon: "§" },
             ],
         },
         {
             kind: "group", id: "jobs", label: "Jobs", icon: "◈",
-            activePages: ["vacancies", "nominations"],
+            activePages: ["vacancies", "schedule"],
             children: [
-                { kind: "leaf", id: "vacancies",   label: "Open Roles",  icon: "◈" },
-                { kind: "leaf", id: "nominations", label: "Nominations", icon: "◇" },
+                { kind: "leaf", id: "vacancies",   label: "Open Roles",    icon: "◈" },
+                { kind: "leaf", id: "schedule",    label: "Work Schedule", icon: "⊞" },
             ],
         },
         {
@@ -52,15 +45,15 @@
         },
         {
             kind: "group", id: "other", label: "Other", icon: "⊙",
-            activePages: ["locations", "nodes", "connections", "how-it-works", "settings", "growth", "timeline", "registry"],
+            activePages: ["locations", "nodes", "connections", "how-it-works", "settings", "timeline", "registry", "calendar"],
             children: [
+                { kind: "leaf", id: "calendar",     label: "Events",        icon: "◷" },
                 { kind: "leaf", id: "timeline",     label: "Timeline",      icon: "◷" },
                 { kind: "leaf", id: "locations",    label: "Locations",     icon: "⊕" },
                 { kind: "leaf", id: "nodes",        label: "Nodes",         icon: "⬡" },
                 { kind: "leaf", id: "connections",  label: "Connections",   icon: "⬡" },
-                { kind: "leaf", id: "growth",       label: "Growth Path",   icon: "⊛" },
                 { kind: "leaf", id: "registry",     label: "Type Registry", icon: "⊟" },
-                { kind: "leaf", id: "how-it-works", label: "How It Works",  icon: "⊙" },
+                { kind: "leaf", id: "how-it-works", label: "Our Charter",   icon: "⊜" },
                 { kind: "leaf", id: "settings",     label: "Settings",      icon: "⚙" },
             ],
         },

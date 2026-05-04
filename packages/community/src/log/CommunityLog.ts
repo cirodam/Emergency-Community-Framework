@@ -20,6 +20,8 @@ export type CommunityLogType =
     | "unit-type-added"
     | "unit-type-removed"
     | "unit-deployed"
+    | "association-created"
+    | "pool-member-added"
     | "marketplace-founded";
 
 export interface CommunityLogEntry {

@@ -1,16 +1,16 @@
 <script lang="ts">
-    import { submitPublicApplication, type ApplicationDto } from "../lib/api.js";
+    import { submitPublicApplication, type MotionDto } from "../lib/api.js";
 
     const { onBack }: { onBack: () => void } = $props();
 
-    // ── Form state ─────────────────────────────────────────────────────────────
+    // ── Form state ──────────────────────────────────────────────────────
     let firstName = $state("");
     let lastName  = $state("");
     let birthDate = $state("");
     let message   = $state("");
     let submitting = $state(false);
     let error      = $state("");
-    let submitted: ApplicationDto | null = $state(null);
+    let submitted: MotionDto | null = $state(null);
     let agreed     = $state(false);
 
     // ── Submit ─────────────────────────────────────────────────────────────────
@@ -48,19 +48,19 @@
     {#if submitted}
         <div class="apply-body success-card">
             <div class="success-icon">✓</div>
-            <h2>Application submitted!</h2>
+            <h2>Petition submitted!</h2>
             <p>
-                Thank you, <strong>{submitted.firstName}</strong>. Your application has been received and is now visible to community members.
+                Thank you, <strong>{firstName}</strong>. Your membership petition is now open for community approval.
             </p>
             <div class="what-next">
                 <h3>What happens next</h3>
                 <ol>
-                    <li>Community members will review your application.</li>
-                    <li>You need <strong>{submitted.vouchesRequired}</strong> members to vouch for you.</li>
-                    <li>Once you have enough vouches you will be automatically admitted and receive a community account.</li>
+                    <li>Community members will read your introduction and vote on your petition.</li>
+                    <li>Once <strong>{submitted.minApprovals}</strong> member{submitted.minApprovals !== 1 ? "s" : ""} approve, you will be admitted and receive a community account.</li>
+                    <li>You’ll be notified when your account is ready.</li>
                 </ol>
             </div>
-            <p class="app-ref">Application ID: <code>{submitted.id}</code></p>
+            <p class="app-ref">Petition ID: <code>{submitted.id}</code></p>
             <button class="btn-ghost" onclick={onBack}>← Back to sign in</button>
         </div>
     {:else}

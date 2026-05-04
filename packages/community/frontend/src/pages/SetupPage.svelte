@@ -82,24 +82,24 @@
         <div class="logo">⊚</div>
 
         {#if step === 1}
-            <h1>Welcome to ECF</h1>
-            <p class="subtitle">Let's set up your community.</p>
+            <h1>Found a Society</h1>
+            <p class="subtitle">Charter a mutual aid society.</p>
 
             <ErrorBanner message={error} />
 
             <form onsubmit={(e) => { e.preventDefault(); nextStep(); }}>
                 <label class="field">
-                    <span>Community name</span>
+                    <span>Society name</span>
                     <input
                         type="text"
                         bind:value={communityName}
-                        placeholder="e.g. Sunridge Community"
+                        placeholder="e.g. Benjamin Franklin Society"
                         autocomplete="off"
                     />
                 </label>
 
                 <label class="field">
-                    <span>Community handle</span>
+                    <span>Society handle</span>
                     <input
                         type="text"
                         bind:value={communityHandle}
@@ -122,7 +122,7 @@
 
         {:else if step === 2}
             <h1>{communityName}</h1>
-            <p class="subtitle">Create the first member account.</p>
+            <p class="subtitle">Enroll as the founding member.</p>
 
             <ErrorBanner message={error} />
 
@@ -184,7 +184,7 @@
                         ← Back
                     </button>
                     <button type="submit" class="btn-primary" disabled={loading}>
-                        {loading ? (seedPopulation ? "Seeding population…" : "Setting up…") : "Create community"}
+                        {loading ? (seedPopulation ? "Seeding population…" : "Chartering…") : "Charter society"}
                     </button>
                 </div>
             </form>
@@ -192,8 +192,8 @@
         {:else}
             <div class="done">
                 <div class="done-icon">✓</div>
-                <h2>{communityName} is ready</h2>
-                <p>Welcome, {firstName}. Sign in to get started.</p>
+                <h2>{communityName} is chartered</h2>
+                <p>Welcome, {firstName}. The society is open.</p>
                 {#if seededCount > 0}
                     <p class="seeded-note">{seededCount} sample people added to the community.</p>
                 {/if}

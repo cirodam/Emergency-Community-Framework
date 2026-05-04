@@ -11,7 +11,8 @@ export type MotionOutcome = "passed" | "failed" | "withdrawn" | "referred";
 export type VoteThresholdKey =
     | "thresholdSimpleMajority"
     | "thresholdSupermajority"
-    | "thresholdNearConsensus";
+    | "thresholdNearConsensus"
+    | "petition";
 
 // ── Serialisation shape (common fields) ───────────────────────────────────────
 
@@ -32,6 +33,7 @@ export interface AssemblyMotionData<TVote, TComment> {
     votingOpensAt:         string | null;
     votingClosesAt:        string | null;
     thresholdKey:          VoteThresholdKey | null;
+    minApprovals:          number | null;
     votes:                 TVote[];
     comments:              TComment[];
     outcome:               MotionOutcome | null;
@@ -72,6 +74,7 @@ export abstract class AssemblyMotion<
     votingOpensAt:         string | null          = null;
     votingClosesAt:        string | null          = null;
     thresholdKey:          VoteThresholdKey | null = null;
+    minApprovals:          number | null          = null;
     votes:                 TVote[]                = [];
     comments:              TComment[]             = [];
     outcome:               MotionOutcome | null   = null;
@@ -129,6 +132,7 @@ export abstract class AssemblyMotion<
             votingOpensAt:         this.votingOpensAt,
             votingClosesAt:        this.votingClosesAt,
             thresholdKey:          this.thresholdKey,
+            minApprovals:          this.minApprovals,
             votes:                 this.votes,
             comments:              this.comments,
             outcome:               this.outcome,
@@ -148,6 +152,7 @@ export abstract class AssemblyMotion<
         this.votingOpensAt         = d.votingOpensAt;
         this.votingClosesAt        = d.votingClosesAt;
         this.thresholdKey          = d.thresholdKey;
+        this.minApprovals          = d.minApprovals ?? null;
         this.votes                 = d.votes;
         this.comments              = d.comments;
         this.outcome               = d.outcome;

@@ -20,12 +20,13 @@ function toDto(m: Motion) {
     };
 }
 
-// GET /api/motions?body=referendum&stage=deliberating
+// GET /api/motions?body=referendum&stage=deliberating&kind=add-person
 export function listMotions(req: Request, res: Response): void {
-    const { body, stage } = req.query;
+    const { body, stage, kind } = req.query;
     let results = svc().getAll();
     if (typeof body  === "string") results = results.filter(m => m.body  === body);
     if (typeof stage === "string") results = results.filter(m => m.stage === stage);
+    if (typeof kind  === "string") results = results.filter(m => m.kind  === kind);
     results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     res.json(results.map(toDto));
 }
@@ -88,26 +89,36 @@ export function createMotion(req: AuthedRequest, res: Response): void {
 }
 
 // POST /api/motions/:id/deliberate
-// Body: { thresholdKey? }
+// Body: { thresholdKey?, minApprovals? }
 export function submitForDeliberation(req: AuthedRequest, res: Response): void {
     const personId = req.personId;
     if (!personId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-    const { thresholdKey } = req.body ?? {};
+    const { thresholdKey, minApprovals } = req.body ?? {};
     const validKeys: VoteThresholdKey[] = [
         "thresholdSimpleMajority",
         "thresholdSupermajority",
         "thresholdNearConsensus",
+        "petition",
     ];
     if (thresholdKey !== undefined && !validKeys.includes(thresholdKey as VoteThresholdKey)) {
         res.status(400).json({ error: `thresholdKey must be one of: ${validKeys.join(", ")}` }); return;
+    }
+
+    const key = (thresholdKey as VoteThresholdKey | undefined) ?? "thresholdSimpleMajority";
+
+    if (key === "petition") {
+        if (!Number.isInteger(minApprovals) || (minApprovals as number) < 1) {
+            res.status(400).json({ error: "minApprovals must be a positive integer for petition threshold" }); return;
+        }
     }
 
     try {
         const motion = svc().submitForDeliberation(
             req.params.id as string,
             personId,
-            (thresholdKey as VoteThresholdKey | undefined) ?? "thresholdSimpleMajority",
+            key,
+            key === "petition" ? (minApprovals as number) : undefined,
         );
         res.json(toDto(motion));
     } catch (err) {

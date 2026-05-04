@@ -138,7 +138,7 @@
 <div class="page">
     <div class="page-header">
         <button class="back-btn" onclick={() => currentPage.go("leadership")}>‹ Leadership</button>
-        <h1 class="page-title">The Assembly</h1>
+        <h1 class="page-title">The Community Assembly</h1>
         <p class="page-sub">Members drawn by sortition to govern this term.</p>
     </div>
 

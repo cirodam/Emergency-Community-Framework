@@ -1,17 +1,18 @@
 <script lang="ts">
-    import { currentPage } from "../lib/session.js";
-    import { addPerson } from "../lib/api.js";
-    import type { PersonDto } from "../lib/api.js";
+    import { currentPage, selectedMotionId } from "../lib/session.js";
+    import { createMotion, submitMotionForDeliberation } from "../lib/api.js";
+    import type { MotionDto } from "../lib/api.js";
     import ErrorBanner from "../components/ErrorBanner.svelte";
 
-    let firstName     = $state("");
-    let lastName      = $state("");
-    let birthDate     = $state("");
-    let phone         = $state("");
+    let firstName    = $state("");
+    let lastName     = $state("");
+    let birthDate    = $state("");
+    let phone        = $state("");
+    let minApprovals = $state("3");
 
     let error   = $state("");
     let loading = $state(false);
-    let created: PersonDto | null = $state(null);
+    let motion: MotionDto | null = $state(null);
 
     const suggestedHandle = $derived(
         firstName && lastName
@@ -24,30 +25,46 @@
         if (!firstName.trim()) { error = "First name is required"; return; }
         if (!lastName.trim())  { error = "Last name is required"; return; }
         if (!birthDate)        { error = "Date of birth is required"; return; }
+        const count = parseInt(minApprovals, 10);
+        if (!count || count < 1) { error = "Approvals required must be at least 1"; return; }
 
         loading = true;
         try {
-            created = await addPerson({
-                firstName: firstName.trim(),
-                lastName:  lastName.trim(),
-                birthDate,
-                phone: phone.trim() || null,
+            const m = await createMotion({
+                body:        "referendum",
+                title:       `Add ${firstName.trim()} ${lastName.trim()} to the community`,
+                description: `Petition to add ${firstName.trim()} ${lastName.trim()} as a community member.`,
+                kind:        "add-person",
+                payload: {
+                    firstName: firstName.trim(),
+                    lastName:  lastName.trim(),
+                    birthDate,
+                    ...(phone.trim() ? { phone: phone.trim() } : {}),
+                },
             });
+            motion = await submitMotionForDeliberation(m.id, "petition", count);
         } catch (e) {
-            error = e instanceof Error ? e.message : "Failed to add person";
+            error = e instanceof Error ? e.message : "Failed to submit petition";
         } finally {
             loading = false;
         }
     }
 
     function addAnother() {
-        firstName = "";
-        lastName  = "";
-        birthDate = "";
-        phone     = "";
-        bornIn    = false;
-        error     = "";
-        created   = null;
+        firstName    = "";
+        lastName     = "";
+        birthDate    = "";
+        phone        = "";
+        minApprovals = "3";
+        error        = "";
+        motion       = null;
+    }
+
+    function viewMotion() {
+        if (motion) {
+            selectedMotionId.set(motion.id);
+            currentPage.go("motion");
+        }
     }
 </script>
 
@@ -57,17 +74,16 @@
         <h2 class="page-title">Add Person</h2>
     </div>
 
-    {#if created}
+    {#if motion}
         <div class="success-card">
             <div class="success-icon">✓</div>
-            <div class="success-name">{created.firstName} {created.lastName}</div>
-            <div class="success-handle">@{created.handle}</div>
+            <div class="success-name">{firstName} {lastName}</div>
             <p class="success-note">
-                Person added. They can set a password from the directory.
+                Petition submitted. Once {motion.minApprovals} member{motion.minApprovals !== 1 ? "s" : ""} approve, they’ll be added to the community.
             </p>
             <div class="success-actions">
                 <button class="btn-secondary" onclick={addAnother}>Add another</button>
-                <button class="btn-primary" onclick={() => currentPage.go("directory")}>Done</button>
+                <button class="btn-primary" onclick={viewMotion}>View petition</button>
             </div>
         </div>
 
@@ -119,9 +135,19 @@
                     />
                 </label>
 
+                <label class="field">
+                    <span>Approvals needed to pass</span>
+                    <input
+                        type="number"
+                        bind:value={minApprovals}
+                        min="1"
+                        disabled={loading}
+                        placeholder="3"
+                    />
+                </label>
 
             <button type="submit" class="btn-primary btn-full" disabled={loading}>
-                {loading ? "Adding…" : "Add person"}
+                {loading ? "Submitting…" : "Submit petition"}
             </button>
         </form>
     {/if}
@@ -283,7 +309,6 @@
     }
 
     .success-name { font-size: 1.2rem; font-weight: 700; color: #0f172a; }
-    .success-handle { font-size: 0.9rem; color: #64748b; }
 
     .success-note {
         font-size: 0.85rem;

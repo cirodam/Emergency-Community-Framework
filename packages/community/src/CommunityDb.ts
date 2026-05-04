@@ -136,11 +136,6 @@ export class CommunityDb {
                 data TEXT NOT NULL
             );
 
-            CREATE TABLE IF NOT EXISTS member_applications (
-                id   TEXT PRIMARY KEY,
-                data TEXT NOT NULL
-            );
-
             CREATE TABLE IF NOT EXISTS calendar_events (
                 id   TEXT PRIMARY KEY,
                 data TEXT NOT NULL

@@ -11,6 +11,7 @@
         thresholdSimpleMajority: "Simple majority (51%)",
         thresholdSupermajority:  "Supermajority (67%)",
         thresholdNearConsensus:  "Near consensus (90%)",
+        petition:                "Petition",
     };
 
     let motion:  MotionDto | null = $state(null);
@@ -160,7 +161,9 @@
             <span>{formatDate(motion.createdAt)}</span>
         </div>
 
-        {#if motion.thresholdKey}
+        {#if motion.thresholdKey === "petition" && motion.minApprovals}
+            <p class="threshold-note">Petition — needs <strong>{motion.minApprovals}</strong> approval{motion.minApprovals !== 1 ? "s" : ""} to pass</p>
+        {:else if motion.thresholdKey}
             <p class="threshold-note">{THRESHOLD_LABELS[motion.thresholdKey]}</p>
         {/if}
 
@@ -179,16 +182,29 @@
         <!-- Vote summary (referendum) -->
         {#if isReferendum && (motion.stage === "voting" || motion.stage === "resolved")}
             <div class="vote-summary">
-                <div class="vote-bar-wrap">
-                    <div class="vote-bar">
-                        <div class="bar-approve" style="width: {motion.votes.length ? Math.round(motion.approvalCount / motion.votes.length * 100) : 0}%"></div>
+                {#if motion.thresholdKey === "petition" && motion.minApprovals}
+                    {@const pct = Math.min(100, Math.round(motion.approvalCount / motion.minApprovals * 100))}
+                    <div class="vote-bar-wrap">
+                        <div class="vote-bar">
+                            <div class="bar-approve" style="width: {pct}%"></div>
+                        </div>
                     </div>
-                </div>
-                <div class="vote-counts">
-                    <span class="vc-approve">{motion.approvalCount} approve</span>
-                    <span class="vc-reject">{motion.rejectionCount} reject</span>
-                    <span class="vc-total">{motion.votes.length} total</span>
-                </div>
+                    <div class="vote-counts">
+                        <span class="vc-approve">{motion.approvalCount} / {motion.minApprovals} approvals</span>
+                        <span class="vc-total">{motion.votes.length} voted</span>
+                    </div>
+                {:else}
+                    <div class="vote-bar-wrap">
+                        <div class="vote-bar">
+                            <div class="bar-approve" style="width: {motion.votes.length ? Math.round(motion.approvalCount / motion.votes.length * 100) : 0}%"></div>
+                        </div>
+                    </div>
+                    <div class="vote-counts">
+                        <span class="vc-approve">{motion.approvalCount} approve</span>
+                        <span class="vc-reject">{motion.rejectionCount} reject</span>
+                        <span class="vc-total">{motion.votes.length} total</span>
+                    </div>
+                {/if}
             </div>
         {/if}
 

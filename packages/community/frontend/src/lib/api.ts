@@ -1,7 +1,7 @@
 // Typed API wrappers for the community backend.
 // All calls use relative URLs — Vite proxies /api → http://localhost:3002 in dev.
 
-import { getToken, session } from "./session.js";
+import { getToken, session, sessionExpired } from "./session.js";
 
 /**
  * Authenticated fetch — attaches the Bearer credential token when present.
@@ -14,6 +14,7 @@ async function apiFetch(input: string, init: RequestInit = {}): Promise<Response
     if (token) headers.set("Authorization", `Bearer ${token}`);
     const res = await fetch(input, { ...init, headers });
     if (res.status === 401) {
+        sessionExpired.set(true);
         session.logout();
     }
     return res;
@@ -992,59 +993,13 @@ export async function deletePool(poolId: string): Promise<void> {
     }
 }
 
-// ── Member applications ───────────────────────────────────────────────────────
-
-export interface ApplicationVoucher {
-    handle: string | null;
-    name:   string;
-}
-
-export interface ApplicationDto {
-    id:                string;
-    firstName:         string;
-    lastName:          string;
-    birthDate:         string;
-    message:           string;
-    status:            "pending" | "admitted" | "withdrawn";
-    voucherHandles:    string[];
-    vouchers:          ApplicationVoucher[];
-    vouchesRequired:   number;
-    submittedByHandle: string | null;
-    submittedByName:   string;
-    submittedAt:       string;
-    admittedAt:        string | null;
-}
-
-export async function listApplications(): Promise<ApplicationDto[]> {
-    const res = await apiFetch("/api/applications");
-    if (!res.ok) throw new Error("Failed to load applications");
-    return res.json() as Promise<ApplicationDto[]>;
-}
-
-export async function submitApplication(payload: {
-    firstName: string;
-    lastName: string;
-    birthDate: string;
-    message: string;
-}): Promise<ApplicationDto> {
-    const res = await apiFetch("/api/applications", {
-        method: "POST",
-        body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Failed to submit application");
-    }
-    return res.json() as Promise<ApplicationDto>;
-}
-
 // Public (no auth required) — applicant submits their own application.
 export async function submitPublicApplication(payload: {
     firstName: string;
     lastName: string;
     birthDate: string;
     message: string;
-}): Promise<ApplicationDto> {
+}): Promise<MotionDto> {
     const res = await apiFetch("/api/apply", {
         method: "POST",
         body: JSON.stringify(payload),
@@ -1053,40 +1008,7 @@ export async function submitPublicApplication(payload: {
         const body = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Failed to submit application");
     }
-    return res.json() as Promise<ApplicationDto>;
-}
-
-export async function vouchForApplication(applicationId: string): Promise<ApplicationDto> {
-    const res = await apiFetch(`/api/applications/${encodeURIComponent(applicationId)}/vouch`, {
-        method: "POST",
-    });
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Failed to vouch");
-    }
-    return res.json() as Promise<ApplicationDto>;
-}
-
-export async function removeApplicationVouch(applicationId: string): Promise<ApplicationDto> {
-    const res = await apiFetch(`/api/applications/${encodeURIComponent(applicationId)}/vouch`, {
-        method: "DELETE",
-    });
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Failed to remove vouch");
-    }
-    return res.json() as Promise<ApplicationDto>;
-}
-
-export async function withdrawApplication(applicationId: string): Promise<ApplicationDto> {
-    const res = await apiFetch(`/api/applications/${encodeURIComponent(applicationId)}/withdraw`, {
-        method: "POST",
-    });
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Failed to withdraw application");
-    }
-    return res.json() as Promise<ApplicationDto>;
+    return res.json() as Promise<MotionDto>;
 }
 
 // ── Locations ─────────────────────────────────────────────────────────────────
@@ -1309,7 +1231,7 @@ export async function listExpiringRoles(days = 60): Promise<ExpiringRoleDto[]> {
 
 export type MotionStage   = "draft" | "deliberating" | "voting" | "resolved" | "proposed" | "discussed" | "voted";
 export type MotionOutcome = "passed" | "failed" | "withdrawn" | "referred";
-export type VoteThresholdKey = "thresholdSimpleMajority" | "thresholdSupermajority" | "thresholdNearConsensus";
+export type VoteThresholdKey = "thresholdSimpleMajority" | "thresholdSupermajority" | "thresholdNearConsensus" | "petition";
 
 export interface MotionComment {
     id:           string;
@@ -1342,6 +1264,7 @@ export interface MotionDto {
     votingOpensAt:        string | null;
     votingClosesAt:       string | null;
     thresholdKey:         VoteThresholdKey | null;
+    minApprovals:         number | null;
     votes:                MotionVote[];
     comments:             MotionComment[];
     outcome:              MotionOutcome | null;
@@ -1356,10 +1279,11 @@ export interface MotionDto {
     payload:              string | null;
 }
 
-export async function listMotions(opts: { body?: string; stage?: string } = {}): Promise<MotionDto[]> {
+export async function listMotions(opts: { body?: string; stage?: string; kind?: string } = {}): Promise<MotionDto[]> {
     const params = new URLSearchParams();
     if (opts.body)  params.set("body",  opts.body);
     if (opts.stage) params.set("stage", opts.stage);
+    if (opts.kind)  params.set("kind",  opts.kind);
     const qs = params.toString();
     const res = await apiFetch(`/api/motions${qs ? `?${qs}` : ""}`);
     if (!res.ok) throw new Error("Failed to load motions");
@@ -1398,11 +1322,11 @@ export async function createMotion(data: {
     return res.json() as Promise<MotionDto>;
 }
 
-export async function submitMotionForDeliberation(id: string, thresholdKey?: VoteThresholdKey): Promise<MotionDto> {
+export async function submitMotionForDeliberation(id: string, thresholdKey?: VoteThresholdKey, minApprovals?: number): Promise<MotionDto> {
     const res = await apiFetch(`/api/motions/${encodeURIComponent(id)}/deliberate`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ thresholdKey }),
+        body:    JSON.stringify({ thresholdKey, ...(minApprovals !== undefined ? { minApprovals } : {}) }),
     });
     if (!res.ok) {
         const b = await res.json().catch(() => ({})) as { error?: string };

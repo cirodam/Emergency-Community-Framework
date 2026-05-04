@@ -9,8 +9,6 @@ import { clusterRoutes } from "./routes/clusterRoutes.js";
 import { PersonLoader } from "./person/PersonLoader.js";
 import { PersonService } from "./person/PersonService.js";
 import { Person } from "./person/Person.js";
-import { MemberApplicationLoader } from "./applications/MemberApplicationLoader.js";
-import { MemberApplicationService } from "./applications/MemberApplicationService.js";
 import { pushCensus } from "./census/CensusService.js";
 import { AssociationLoader } from "./association/AssociationLoader.js";
 import { AssociationService } from "./association/AssociationService.js";
@@ -151,10 +149,6 @@ async function main(): Promise<void> {
     PersonService.getInstance().init(personLoader);
     PersonService.getInstance().setCommunitySigner(communitySigner);
 
-    // ── Member applications ────────────────────────────────────────────────
-    const appLoader = new MemberApplicationLoader();
-    MemberApplicationService.getInstance().init(appLoader);
-
     // ── Associations ───────────────────────────────────────────────────────
     const associationLoader = new AssociationLoader();
     AssociationService.getInstance().init(associationLoader);
@@ -199,26 +193,6 @@ async function main(): Promise<void> {
         routableAddress = parseRoutableAddress(raw);
     }
     PaymentTokenService.getInstance().init(resolve(DATA_DIR, "payment-tokens"), routableAddress);
-
-    // When an application collects enough vouches, admit the applicant as a full Person.
-    MemberApplicationService.getInstance().onAdmitted(async (app) => {
-        const person = new Person(
-            app.firstName,
-            app.lastName,
-            new Date(app.birthDate),
-        );
-        await PersonService.getInstance().add(person);
-        logger.info(`[community] admitted ${app.firstName} ${app.lastName} via application ${app.id}`);
-
-        // Push updated census to federation (no-op if not a federation member).
-        pushCensus().then(result => {
-            if (result?.duplicates.length) {
-                logger.warn(`[census] duplicate nullifiers detected across communities: ${result.duplicates.join(", ")}`);
-            }
-        }).catch(err => {
-            logger.warn(`[census] failed to push census after admission: ${(err as Error).message}`);
-        });
-    });
 
     // ── Domain registries ──────────────────────────────────────────────────
     const domainSvc = DomainService.getInstance();

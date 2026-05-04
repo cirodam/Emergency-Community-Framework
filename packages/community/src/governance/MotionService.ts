@@ -76,9 +76,10 @@ export class MotionService {
      * Sets the minimum deliberation period before voting can open.
      */
     submitForDeliberation(
-        motionId:    string,
-        callerId:    string,
+        motionId:     string,
+        callerId:     string,
         thresholdKey: VoteThresholdKey = "thresholdSimpleMajority",
+        minApprovals?: number,
     ): Motion {
         const m = this.require(motionId);
         if (!m.isReferendum)    throw new Error("Only referendum motions use deliberation");
@@ -96,6 +97,11 @@ export class MotionService {
         m.deliberationStartedAt = now.toISOString();
         m.votingOpensAt         = votingOpens.toISOString();
         m.thresholdKey          = thresholdKey;
+        if (thresholdKey === "petition") {
+            if (!minApprovals || minApprovals < 1)
+                throw new Error("minApprovals must be at least 1 for petition threshold");
+            m.minApprovals = minApprovals;
+        }
         this.loader.save(m);
         return m;
     }
@@ -227,13 +233,16 @@ export class MotionService {
     }
 
     private resolveByDeadline(m: Motion): void {
-        const totalMembers = PersonService.getInstance().getAll().length;
-        const threshold = this.getThresholdFraction(m.thresholdKey ?? "thresholdSimpleMajority");
-        const needed = Math.ceil(totalMembers * threshold);
+        const needed = this.getNeededApprovals(m);
         m.outcome    = m.approvalCount >= needed ? "passed" : "failed";
         m.stage      = "resolved";
         m.resolvedAt = new Date().toISOString();
-        m.outcomeNote = `Resolved at deadline. ${m.approvalCount}/${totalMembers} approved (needed ${needed}).`;
+        if (m.thresholdKey === "petition") {
+            m.outcomeNote = `Resolved at deadline. ${m.approvalCount}/${needed} approvals received.`;
+        } else {
+            const totalMembers = PersonService.getInstance().getAll().length;
+            m.outcomeNote = `Resolved at deadline. ${m.approvalCount}/${totalMembers} approved (needed ${needed}).`;
+        }
         if (m.outcome === "passed") effectRegistry.dispatch(m);
         this.loader.save(m);
         try {
@@ -244,31 +253,46 @@ export class MotionService {
     }
 
     private checkReferendumResolution(m: Motion): void {
-        const totalMembers = PersonService.getInstance().getAll().length;
-        const threshold = this.getThresholdFraction(m.thresholdKey ?? "thresholdSimpleMajority");
-        const needed = Math.ceil(totalMembers * threshold);
+        const needed = this.getNeededApprovals(m);
 
         if (m.approvalCount >= needed) {
             m.outcome    = "passed";
             m.stage      = "resolved";
             m.resolvedAt = new Date().toISOString();
-            m.outcomeNote = `Passed with ${m.approvalCount}/${totalMembers} approvals.`;
+            if (m.thresholdKey === "petition") {
+                m.outcomeNote = `Petition passed with ${m.approvalCount} approval${m.approvalCount !== 1 ? "s" : ""}.`;
+            } else {
+                const totalMembers = PersonService.getInstance().getAll().length;
+                m.outcomeNote = `Passed with ${m.approvalCount}/${totalMembers} approvals.`;
+            }
             effectRegistry.dispatch(m);
             this.loader.save(m);
             try { CommunityLogService.getInstance().write("motion-passed", `Motion passed: ${m.title}`, { refId: m.id }); } catch { /* */ }
             return;
         }
 
-        // Early rejection: strict majority voted reject and threshold cannot be met
-        const rejectThreshold = Math.floor(totalMembers / 2) + 1;
-        if (m.rejectionCount >= rejectThreshold) {
-            m.outcome    = "failed";
-            m.stage      = "resolved";
-            m.resolvedAt = new Date().toISOString();
-            m.outcomeNote = `Rejected with ${m.rejectionCount}/${totalMembers} rejections.`;
-            this.loader.save(m);
-            try { CommunityLogService.getInstance().write("motion-failed", `Motion failed: ${m.title}`, { refId: m.id }); } catch { /* */ }
+        // Early rejection: only for majority-based thresholds
+        if (m.thresholdKey !== "petition") {
+            const totalMembers = PersonService.getInstance().getAll().length;
+            const rejectThreshold = Math.floor(totalMembers / 2) + 1;
+            if (m.rejectionCount >= rejectThreshold) {
+                m.outcome    = "failed";
+                m.stage      = "resolved";
+                m.resolvedAt = new Date().toISOString();
+                m.outcomeNote = `Rejected with ${m.rejectionCount}/${totalMembers} rejections.`;
+                this.loader.save(m);
+                try { CommunityLogService.getInstance().write("motion-failed", `Motion failed: ${m.title}`, { refId: m.id }); } catch { /* */ }
+            }
         }
+    }
+
+    private getNeededApprovals(m: Motion): number {
+        if (m.thresholdKey === "petition") {
+            return m.minApprovals ?? 1;
+        }
+        const totalMembers = PersonService.getInstance().getAll().length;
+        const fraction = this.getThresholdFraction(m.thresholdKey ?? "thresholdSimpleMajority");
+        return Math.ceil(totalMembers * fraction);
     }
 
     private getThresholdFraction(key: string): number {

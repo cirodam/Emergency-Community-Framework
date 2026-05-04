@@ -1,6 +1,5 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { requireAuth } from "./middleware.js";
 import * as applications from "./ApplicationController.js";
 
 const applyRateLimit = rateLimit({
@@ -13,12 +12,6 @@ const applyRateLimit = rateLimit({
 
 const router = Router();
 
-router.post(  "/apply",                     applyRateLimit, applications.publicSubmitApplication);
-router.get(   "/applications",              requireAuth, applications.listApplications);
-router.post(  "/applications",              requireAuth, applications.submitApplication);
-router.get(   "/applications/:id",          requireAuth, applications.getApplication);
-router.post(  "/applications/:id/vouch",    requireAuth, applications.vouchForApplication);
-router.delete("/applications/:id/vouch",    requireAuth, applications.removeVouch);
-router.post(  "/applications/:id/withdraw", requireAuth, applications.withdrawApplication);
+router.post("/apply", applyRateLimit, applications.publicSubmitApplication);
 
 export default router;

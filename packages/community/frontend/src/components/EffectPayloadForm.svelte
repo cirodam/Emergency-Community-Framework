@@ -39,6 +39,9 @@
             if (!roleTypes.length) listRoleTypes().then(r => { roleTypes = r; }).catch(() => {});
             if (!unitTypes.length) listUnitTypes().then(u => { unitTypes = u; }).catch(() => {});
             if (!domains.length)   listDomains().then(d => { domains = d; }).catch(() => {});
+        } else if (kind === "add-pool-member") {
+            if (!pools.length)   listPools().then(p => { pools = p; }).catch(() => {});
+            if (!persons.length) listPersons().then(p => { persons = p; }).catch(() => {});
         }
     });
 
@@ -106,6 +109,21 @@
     let mpLocationName    = $state("");
     let mpLocationAddress = $state("");
     let mpDescription     = $state("");
+
+    // create-association fields
+    let assocName        = $state("");
+    let assocHandle      = $state("");
+    let assocDescription = $state("");
+
+    // add-pool-member fields
+    let addPoolMemberPoolId   = $state("");
+    let addPoolMemberPersonId = $state("");
+
+    function autoAssocHandle() {
+        if (!assocHandle) {
+            assocHandle = assocName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+        }
+    }
 
     // schedule-community-event fields
     let evtTitle            = $state("");
@@ -242,6 +260,19 @@
                 ...(deployUnitDesc.trim() ? { description: deployUnitDesc.trim() } : {}),
                 ...(validRoles.length     ? { roles: validRoles }                  : {}),
             };
+        } else if (kind === "create-association") {
+            const name   = assocName.trim();
+            const handle = assocHandle.trim();
+            if (!name || !handle) { payload = {}; return; }
+            payload = {
+                name,
+                handle,
+                ...(assocDescription.trim() ? { description: assocDescription.trim() } : {}),
+            };
+        } else if (kind === "add-pool-member") {
+            payload = (addPoolMemberPoolId && addPoolMemberPersonId)
+                ? { poolId: addPoolMemberPoolId, personId: addPoolMemberPersonId }
+                : {};
         } else if (kind === "found-marketplace") {
             const name    = mpName.trim();
             const locName = mpLocationName.trim();
@@ -476,7 +507,7 @@
         <p class="hint">Loading…</p>
     {:else}
         <select class="input select" bind:value={deployDomainId}>
-            <option value="">— choose domain —</option>
+            <option value="">— choose institution —</option>
             {#each domains as d (d.id)}
                 <option value={d.id}>{d.name}</option>
             {/each}
@@ -511,6 +542,27 @@
     <input class="input" type="text" placeholder="Location name * (e.g. Riverside Park)" bind:value={mpLocationName} />
     <input class="input" type="text" placeholder="Location address *" bind:value={mpLocationAddress} />
     <textarea class="input textarea" placeholder="Description (optional)" bind:value={mpDescription} rows="2"></textarea>
+{:else if kind === "create-association"}
+    <input class="input" type="text" placeholder="Association name * (e.g. First Baptist Church)" bind:value={assocName} onblur={autoAssocHandle} />
+    <input class="input" type="text" placeholder="Handle * (unique, letters/numbers/underscores)" bind:value={assocHandle} autocapitalize="none" />
+    <textarea class="input textarea" placeholder="Description (optional)" bind:value={assocDescription} rows="2"></textarea>
+{:else if kind === "add-pool-member"}
+    {#if !pools.length || !persons.length}
+        <p class="hint">Loading…</p>
+    {:else}
+        <select class="input select" bind:value={addPoolMemberPoolId}>
+            <option value="">— choose pool —</option>
+            {#each pools as p (p.id)}
+                <option value={p.id}>{p.name}</option>
+            {/each}
+        </select>
+        <select class="input select" bind:value={addPoolMemberPersonId}>
+            <option value="">— choose person —</option>
+            {#each persons as p (p.id)}
+                <option value={p.id}>{p.firstName} {p.lastName} (@{p.handle})</option>
+            {/each}
+        </select>
+    {/if}
 {/if}
 
 <style>

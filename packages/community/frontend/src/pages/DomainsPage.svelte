@@ -35,8 +35,8 @@
 </script>
 
 <div class="domains-page">
-    <h2 class="page-title">Domains</h2>
-    <p class="page-subtitle">Domains provide services to the community.</p>
+    <h2 class="page-title">Institutions</h2>
+    <p class="page-subtitle">Institutions provide services to the community.</p>
 
     {#if loading}
         <div class="card-grid">
@@ -48,7 +48,7 @@
     {:else if error}
         <div class="error-msg">{error}</div>
     {:else if domains.length === 0}
-        <div class="empty-msg">No domains registered.</div>
+        <div class="empty-msg">No institutions registered.</div>
     {:else}
         <div class="card-grid">
             {#each domains as d (d.id)}
@@ -69,7 +69,7 @@
                 </button>
             {/each}
         </div>
-        <p class="count">{domains.length} domain{domains.length !== 1 ? "s" : ""}</p>
+        <p class="count">{domains.length} institution{domains.length !== 1 ? "s" : ""}</p>
     {/if}
 </div>
 
