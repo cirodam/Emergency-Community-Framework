@@ -70,7 +70,7 @@ function createSessionStore() {
 
 export const session = createSessionStore();
 
-export type Page = "directory" | "constitution" | "settings" | "domains" | "domain" | "unit" | "leadership" | "assembly" | "pool" | "motion" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations" | "proposals" | "proposal" | "nodes" | "central-bank" | "social-insurance" | "vacancies" | "nominations" | "connections" | "growth" | "schedule" | "documents" | "bylaw" | "timeline" | "calendar" | "registry";
+export type Page = "directory" | "constitution" | "settings" | "domains" | "domain" | "unit" | "leadership" | "assembly" | "pool" | "motion" | "applications" | "how-it-works" | "budget" | "associations" | "association" | "add-person" | "locations" | "proposals" | "proposal" | "nodes" | "central-bank" | "social-insurance" | "vacancies" | "nominations" | "connections" | "growth" | "schedule" | "documents" | "bylaw" | "timeline" | "calendar" | "registry" | "role-type";
 
 function createPageStore() {
     const { subscribe, set } = writable<Page>("schedule");
@@ -99,3 +99,6 @@ export const selectedMotionId = writable<string | null>(null);
 
 /** ID of the bylaw currently being viewed in the bylaw detail page. */
 export const selectedBylawId = writable<string | null>(null);
+
+/** ID of the role type currently being viewed in the role type detail page. */
+export const selectedRoleTypeId = writable<string | null>(null);

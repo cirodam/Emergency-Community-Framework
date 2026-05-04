@@ -37,6 +37,7 @@ import MotionPage        from "./pages/MotionPage.svelte";
     import CalendarPage        from "./pages/CalendarPage.svelte";
     import BottomNav           from "./components/BottomNav.svelte";
     import RegistryPage        from "./pages/RegistryPage.svelte";
+    import RoleTypePage        from "./pages/RoleTypePage.svelte";
 
     type AppState = "loading" | "setup" | "login" | "apply" | "app";
     let appState: AppState = $state("loading");
@@ -138,6 +139,8 @@ import MotionPage        from "./pages/MotionPage.svelte";
             <TimelinePage />
         {:else if $currentPage === "registry"}
             <RegistryPage />
+        {:else if $currentPage === "role-type"}
+            <RoleTypePage />
         {/if}
     </main>
     <BottomNav />

@@ -42,6 +42,18 @@ Not to grow. Not to attract investment. Not to balance a budget. The only measur
 
 **M-Pesa** — Mobile money in Kenya, built on the insight that most people don't need a bank — they need a way to store and send value using the device they already have. It worked because it met people where they were, required no existing financial infrastructure, and spread through social trust networks.
 
+## Contributing
+
+Every change to this project — code, documentation, governance design — should be able to answer yes to at least one of these questions, and no to none of them:
+
+**Does it make the system more pragmatic?** Does it solve a real problem that real communities face, in the simplest way that actually works? If it's clever but fragile, or theoretically correct but hard to use, it's probably not the right direction.
+
+**Does it make the system more resilient?** Can communities keep functioning if a piece fails — a server goes down, a federation disappears, the internet is slow? Complexity that creates single points of failure works against this.
+
+**Does it make the system more cooperative?** Does it make it easier for members to work together, for communities to trust each other, for the whole to be worth more than the sum of its parts? Features that concentrate power or create dependency work against this.
+
+A change that makes the system more efficient but less resilient is probably the wrong trade. A change that adds capability but makes cooperation harder is probably the wrong trade. When in doubt, do less and do it well.
+
 ## What's in the repo
 
 - `packages/community` — the core community node: bank, market, mail, census, governance

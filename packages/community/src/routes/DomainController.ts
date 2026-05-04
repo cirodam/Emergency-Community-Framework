@@ -446,6 +446,9 @@ function toRoleTypeDto(rt: RoleType) {
         description:        rt.description,
         defaultKinPerMonth: rt.defaultKinPerMonth,
         preferredUnitTypes: rt.preferredUnitTypes,
+        category:           rt.category,
+        responsibilities:   rt.responsibilities,
+        qualifications:     rt.qualifications,
     };
 }
 

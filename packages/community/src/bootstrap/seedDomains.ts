@@ -48,13 +48,30 @@ import { LeaderPool } from "../governance/LeaderPool.js";
  * Called once during startup, after DomainService.init() and initRoleTypes().
  */
 export function seedDomains(domainSvc: DomainService): void {
-    // Seed defaults on first boot (once any custom types exist we leave them alone)
-    if (domainSvc.getRoleTypes().length === 0) {
-        for (const def of DEFAULT_ROLE_TYPES) {
-            domainSvc.createRoleType(new RoleType(def.title, def.description, def.defaultKinPerMonth));
+    // Upsert default role types on every boot so that new fields (responsibilities,
+    // qualifications, category, etc.) are backfilled into existing records.
+    const existingByTitle = new Map(domainSvc.getRoleTypes().map(rt => [rt.title, rt]));
+    let seeded = 0;
+    for (const def of DEFAULT_ROLE_TYPES) {
+        const existing = existingByTitle.get(def.title);
+        if (!existing) {
+            domainSvc.createRoleType(new RoleType(
+                def.title, def.description, def.defaultKinPerMonth, undefined,
+                def.preferredUnitTypes ?? [], def.category ?? "",
+                def.responsibilities ?? [], def.qualifications ?? [],
+            ));
+            seeded++;
+        } else {
+            // Backfill any fields that are missing or empty on the persisted record
+            let dirty = false;
+            if (!existing.category && def.category)                         { existing.category        = def.category;        dirty = true; }
+            if (!existing.responsibilities?.length && def.responsibilities) { existing.responsibilities = def.responsibilities; dirty = true; }
+            if (!existing.qualifications?.length  && def.qualifications)    { existing.qualifications   = def.qualifications;  dirty = true; }
+            if (!existing.preferredUnitTypes?.length && def.preferredUnitTypes?.length) { existing.preferredUnitTypes = def.preferredUnitTypes; dirty = true; }
+            if (dirty) { domainSvc.saveRoleType(existing); seeded++; }
         }
-        logger.info(`[community] seeded ${DEFAULT_ROLE_TYPES.length} default role types`);
     }
+    if (seeded > 0) logger.info(`[community] upserted ${seeded} default role type(s)`);
 
     // Register the four monetary/financial domains so they participate in
     // governance — they get leader pools, roles, and appear in the domain API.

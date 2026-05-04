@@ -833,6 +833,15 @@ export interface RoleTypeDto {
     description:        string;
     defaultKinPerMonth: number;
     preferredUnitTypes: string[];
+    category:           string;
+    responsibilities:   string[];
+    qualifications:     string[];
+}
+
+export async function getRoleType(id: string): Promise<RoleTypeDto> {
+    const res = await fetch(`/api/role-types/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error("Failed to load role type");
+    return res.json() as Promise<RoleTypeDto>;
 }
 
 export async function listRoles(): Promise<RoleDto[]> {

@@ -1,6 +1,7 @@
 <script lang="ts">
     import { listUnitTypes, listRoleTypes } from "../lib/api.js";
     import type { UnitTypeDto, RoleTypeDto } from "../lib/api.js";
+    import { currentPage, selectedRoleTypeId } from "../lib/session.js";
 
     let unitTypes: UnitTypeDto[] = $state([] as UnitTypeDto[]);
     let roleTypes: RoleTypeDto[] = $state([] as RoleTypeDto[]);
@@ -25,6 +26,11 @@
 
     function fmt(n: number): string {
         return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    }
+
+    function openRoleType(id: string) {
+        selectedRoleTypeId.set(id);
+        currentPage.go("role-type");
     }
 </script>
 
@@ -87,7 +93,7 @@
             {:else}
                 <div class="card-grid">
                     {#each roleTypes as rt (rt.id)}
-                        <div class="type-card">
+                        <button class="type-card type-card-btn" onclick={() => openRoleType(rt.id)}>
                             <div class="card-header">
                                 <span class="type-label">{rt.title}</span>
                                 <span class="kin-badge">{fmt(rt.defaultKinPerMonth)} kin/mo</span>
@@ -103,7 +109,7 @@
                                     {/each}
                                 </div>
                             {/if}
-                        </div>
+                        </button>
                     {/each}
                 </div>
                 <p class="count">{roleTypes.length} role type{roleTypes.length !== 1 ? "s" : ""}</p>
@@ -163,6 +169,18 @@
         display: flex;
         flex-direction: column;
         gap: 0.4rem;
+    }
+
+    .type-card-btn {
+        cursor: pointer;
+        text-align: left;
+        transition: border-color 0.15s, box-shadow 0.15s;
+        font: inherit;
+    }
+
+    .type-card-btn:hover {
+        border-color: #94a3b8;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
 
     .card-header {
