@@ -2,9 +2,9 @@
 
 ## Overview
 
-Each ECF community should be structured as a **worker cooperative** — a member-owned entity where governance follows the one-member-one-vote principle and surplus is distributed by labor contribution, not capital. This maps directly onto the pool/assembly governance model in the software.
+Each Benjamin Franklin Society should be structured as a **worker cooperative** — a member-owned entity where governance follows the one-member-one-vote principle and surplus is distributed by labor contribution, not capital. This maps directly onto the pool/assembly governance model in the software.
 
-Land is held separately in a **community land trust (CLT)** to protect it from sale, debt seizure, or individual extraction. A thin **cooperative federation** holds shared infrastructure (software, services) across multiple communities without having authority over any of them.
+Land is held separately in a **community land trust (CLT)** to protect it from sale, debt seizure, or individual extraction. A thin **cooperative association** holds shared infrastructure (software, services) across multiple communities without having authority over any of them.
 
 ---
 
@@ -76,13 +76,13 @@ The community will need to acquire some goods externally (specialized equipment,
 
 ---
 
-## Federation Layer
+## Association Layer
 
-When multiple communities federate, a thin umbrella entity holds shared infrastructure without governing member communities.
+When multiple communities join together, a thin umbrella entity holds shared infrastructure without governing member communities.
 
 ### Recommended form
 
-A **cooperative federation** or **nonprofit** that:
+A **cooperative association** or **nonprofit** that:
 - Holds the software, shared services, and brand
 - Has no authority over member community governance
 - Is funded by member community contributions (flat fee or per-member)
@@ -100,7 +100,7 @@ A **cooperative federation** or **nonprofit** that:
 1. **Form an LLC** with a democratic operating agreement — fast, cheap, sufficient for early organizing
 2. **Convert to a worker cooperative** once membership is stable and the operating model is proven
 3. **Set up a CLT** as soon as land acquisition is on the table — do not acquire land in the cooperative's name
-4. **Federate** under a thin umbrella once multiple communities are operating
+4. **Form an association** under a thin umbrella once multiple communities are operating
 
 ---
 

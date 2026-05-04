@@ -1,6 +1,7 @@
 {
   "name": "emergency-community-framework",
   "private": true,
+  "license": "AGPL-3.0-only",
   "scripts": {
     "build": "npm run build -w @ecf/core && npm run build -w @ecf/bank && npm run build -w @ecf/community && npm run build -w @ecf/federation && npm run build -w @ecf/market && npm run build -w @ecf/mail",
     "docker:build:bank": "docker build -f packages/bank/Dockerfile -t ecf-bank .",
