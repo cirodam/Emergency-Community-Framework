@@ -40,6 +40,8 @@ import { CourierDomain } from "../domains/courier/CourierDomain.js";
 import { CourierUnitTemplates } from "../domains/courier/CourierUnitTemplates.js";
 import { MarketDomain } from "../domains/market/MarketDomain.js";
 import { MarketUnitTemplates } from "../domains/market/MarketUnitTemplates.js";
+import { GovernanceDomain } from "../domains/governance/GovernanceDomain.js";
+import { GovernanceUnitTemplates } from "../domains/governance/GovernanceUnitTemplates.js";
 import { CommunityRole } from "../common/CommunityRole.js";
 import { LeaderPool } from "../governance/LeaderPool.js";
 
@@ -203,6 +205,32 @@ export function seedDomains(domainSvc: DomainService): void {
         );
     }
 
+    domainSvc.registerDomain(GovernanceDomain.getInstance());
+    if (GovernanceDomain.getInstance().unitIds.length === 0) {
+        const assemblyUnit = new FunctionalUnit(
+            "Assembly",
+            "The seated community assembly drawn by sortition each term. Deliberates on motions, records outcomes, and upholds procedural rules.",
+            "assembly",
+        );
+        domainSvc.createUnit(assemblyUnit, GovernanceDomain.getInstance().id);
+        domainSvc.createRole(
+            new CommunityRole(
+                "Clerk",
+                "Records the proceedings and outcomes of every assembly session. Maintains the official minutes, files motions into the record, and certifies the results of votes. The institutional memory of the assembly.",
+                2_500,
+            ),
+            assemblyUnit.id,
+        );
+        domainSvc.createRole(
+            new CommunityRole(
+                "Parliamentarian",
+                "Advises the assembly on points of order, interprets the constitution and bylaws when disputes arise, and ensures proceedings follow agreed procedure. Does not vote — rules on process only.",
+                2_500,
+            ),
+            assemblyUnit.id,
+        );
+    }
+
     // Register all unit templates so POST /api/units can instantiate them by type.
     FoodUnitTemplates.register();
     AgricultureUnitTemplates.register();
@@ -221,6 +249,7 @@ export function seedDomains(domainSvc: DomainService): void {
     TransitUnitTemplates.register();
     CourierUnitTemplates.register();
     MarketUnitTemplates.register();
+    GovernanceUnitTemplates.register();
 
     // Seed default leader pools on first boot.
     if (domainSvc.getPools().length === 0) {
