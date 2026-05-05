@@ -207,6 +207,92 @@ FarmContract
 
 ---
 
+## Community Grain Storage
+
+After harvest, the community holds a staple grain reserve separate from the market. This reserve provides a buffer against supply disruption and is managed by the Food Security pool.
+
+### Target reserve
+
+The reserve is sized to feed the full community for at least 8 weeks from stored staples alone — grains and legumes primarily. The Food Security pool is responsible for maintaining this level and may spend from its treasury allocation without a motion for any purchase below a defined threshold.
+
+### The storage structure
+
+Community-scale grain storage (5,000–10,000 bushels, enough for 100–200 people for a year) can be built from dimensional lumber available at any hardware store. The design uses a **flat storage** approach — a shed-like building with reinforced walls that resist the significant lateral pressure grain exerts.
+
+**The core engineering constraint:** grain pushes outward on walls with roughly 200–300 lbs per square foot at the base of a 6-foot pile. Standard stud walls fail. The solution is plank-on-edge walls with heavy exterior posts.
+
+#### Wall construction
+
+- Exterior posts: 6×6 lumber (or doubled 2×6), set in concrete, 4 ft on center
+- Wall sheathing: 2×10 or 2×12 planks stood on edge horizontally, spiked to posts — the posts take the lateral grain load, not the planks
+- Diagonal bracing on the exterior face of each post bay
+
+#### Floor
+
+The floor is the most critical detail. Grain sitting on an impermeable surface sweats moisture from below and rots at the bottom first.
+
+**Option A — Raised wood floor on piers (simpler to build):**
+- 2×6 or 2×8 joists on concrete piers or treated posts, 18"–24" off grade
+- 2×6 T&G decking, gaps sealed with hardware cloth to prevent grain loss
+- Open underside allows air circulation and visual inspection for pests and moisture
+
+**Option B — Concrete slab with aeration channels:**
+- 4" perforated PVC pipe in gravel below slab, manifolded to passive vents or a fan
+- Requires more planning but is more durable long-term
+
+#### Roof
+
+- Standard shed roof, 4/12 pitch minimum for drainage
+- Metal roofing strongly preferred — shingles can leak at seams over time and moisture is catastrophic
+- Perforated soffit at eaves + ridge vent at peak creates passive stack-effect airflow through stored grain
+
+#### Ventilation
+
+Passive airflow is sufficient for most climates if the grain is dry on entry:
+- Vented soffit around the perimeter, covered with hardware cloth
+- Ridge vent along the full peak
+- No electricity required
+
+A small electric fan on a timer (running for 2–4 hours after sunrise each day) dramatically improves moisture management if power is available, but is not essential.
+
+#### Pest management
+
+This is the genuine weakness of timber vs. steel bins. Mitigations:
+- 1/4" hardware cloth behind every vent opening, no gaps
+- Metal flashing at the base perimeter where siding meets foundation (rats cannot chew through it)
+- All exterior joints caulked and painted
+- Diatomaceous earth dusted along all interior wall-floor joints each season — kills insects without toxins or residue
+- Raised floor design allows underside inspection, which sealed steel bins do not
+
+#### Approximate materials for a 20×30 ft structure (~5,000 bushels)
+
+| Component | Material | Rough quantity |
+|---|---|---|
+| Posts | 6×6×12 ft | 16 |
+| Wall planks | 2×10×16 ft | ~200 |
+| Roof framing | 2×8 rafters, 24" OC | standard shed calc |
+| Floor decking | 2×6 T&G | 600 sq ft |
+| Roofing | Metal panel | 700 sq ft |
+| Hardware | Lag screws, post bases, hardware cloth | — |
+
+**Rough material cost:** $8,000–14,000 at current lumber prices. A crew of 4 with basic carpentry skills can frame and dry-in the structure in 2–3 weekends.
+
+### Drying grain before storage
+
+Getting grain into storage dry is the knowledge bottleneck. Storing grain above ~14% moisture causes mold within weeks. Commercial elevators use propane dryers. Community alternatives:
+
+- **Field drying** — harvest late, after grain has dried on the stalk. Weather-dependent and not always possible.
+- **Solar dryer** — a shallow tray under glass or clear plastic sheeting, with a dark base to absorb heat. Grain spread 2–3" deep, stirred daily, dried over several days of sun. Scalable with multiple trays.
+- **Forced air at ambient temperature** — a fan pushing unheated air through a perforated floor bin. Slow but effective if the air is dry. Works best in low-humidity climates.
+
+A handheld moisture meter ($40–80) is essential equipment. Test grain before it enters storage. If it reads above 14%, it is not ready.
+
+### Reserve management
+
+The Food Security pool tracks inventory with a simple ledger: crop, variety, quantity in bushels, date stored, estimated shelf life, and location in the structure. Grain is rotated — oldest stock used first, new harvest added at the back. The pool reports reserve levels to the community monthly, and sounds the alarm if the reserve falls below the 4-week threshold.
+
+---
+
 ## Comparison to the Current System
 
 | Problem for small farms today | Community model |
