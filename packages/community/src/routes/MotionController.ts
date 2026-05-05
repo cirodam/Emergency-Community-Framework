@@ -1,8 +1,9 @@
 import { Request, Response } from "express";
 import { MotionService } from "../governance/MotionService.js";
-import { Motion, type VoteThresholdKey } from "../governance/Motion.js";
+import { Motion } from "../governance/Motion.js";
 import { PersonService } from "../person/PersonService.js";
 import { effectRegistry } from "../governance/EffectRegistry.js";
+import { getVoteRule, listVoteRules } from "@ecf/core";
 
 type AuthedRequest = Request & { personId?: string };
 
@@ -49,7 +50,7 @@ export function createMotion(req: AuthedRequest, res: Response): void {
     const personId = req.personId;
     if (!personId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-    const { body, title, description, parentId, kind, payload } = req.body ?? {};
+    const { body, title, description, parentId, kind, payload, premises, expectedOutcome } = req.body ?? {};
 
     if (typeof body  !== "string" || !body.trim())  { res.status(400).json({ error: "body is required" }); return; }
     if (typeof title !== "string" || !title.trim()) { res.status(400).json({ error: "title is required" }); return; }
@@ -73,14 +74,16 @@ export function createMotion(req: AuthedRequest, res: Response): void {
 
     try {
         const motion = svc().create({
-            body:           body.trim(),
-            title:          title.trim(),
-            description:    description.trim(),
-            proposerId:     personId,
-            proposerHandle: handle,
-            parentId:       typeof parentId === "string" ? parentId : undefined,
-            kind:           typeof kind === "string" && kind.trim() ? kind.trim() : null,
-            payload:        payloadJson,
+            body:            body.trim(),
+            title:           title.trim(),
+            description:     description.trim(),
+            proposerId:      personId,
+            proposerHandle:  handle,
+            parentId:        typeof parentId === "string" ? parentId : undefined,
+            kind:            typeof kind === "string" && kind.trim() ? kind.trim() : null,
+            payload:         payloadJson,
+            premises:        typeof premises === "string" && premises.trim() ? premises.trim() : null,
+            expectedOutcome: typeof expectedOutcome === "string" && expectedOutcome.trim() ? expectedOutcome.trim() : null,
         });
         res.status(201).json(toDto(motion));
     } catch (err) {
@@ -88,28 +91,33 @@ export function createMotion(req: AuthedRequest, res: Response): void {
     }
 }
 
+// GET /api/motions/vote-rules
+export function listVoteRulesList(_req: Request, res: Response): void {
+    res.json(listVoteRules());
+}
+
 // POST /api/motions/:id/deliberate
-// Body: { thresholdKey?, minApprovals? }
+// Body: { voteRuleId, minApprovals? }
 export function submitForDeliberation(req: AuthedRequest, res: Response): void {
     const personId = req.personId;
     if (!personId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-    const { thresholdKey, minApprovals } = req.body ?? {};
-    const validKeys: VoteThresholdKey[] = [
-        "thresholdSimpleMajority",
-        "thresholdSupermajority",
-        "thresholdNearConsensus",
-        "petition",
-    ];
-    if (thresholdKey !== undefined && !validKeys.includes(thresholdKey as VoteThresholdKey)) {
-        res.status(400).json({ error: `thresholdKey must be one of: ${validKeys.join(", ")}` }); return;
+    const { voteRuleId, minApprovals } = req.body ?? {};
+
+    if (typeof voteRuleId !== "string" || !voteRuleId.trim()) {
+        res.status(400).json({ error: "voteRuleId is required" }); return;
     }
 
-    const key = (thresholdKey as VoteThresholdKey | undefined) ?? "thresholdSimpleMajority";
+    let rule: ReturnType<typeof getVoteRule>;
+    try {
+        rule = getVoteRule(voteRuleId.trim());
+    } catch {
+        res.status(400).json({ error: `Unknown voteRuleId. Valid values: ${listVoteRules().map(r => r.id).join(", ")}` }); return;
+    }
 
-    if (key === "petition") {
+    if (rule.legitimacy === "petition") {
         if (!Number.isInteger(minApprovals) || (minApprovals as number) < 1) {
-            res.status(400).json({ error: "minApprovals must be a positive integer for petition threshold" }); return;
+            res.status(400).json({ error: "minApprovals must be a positive integer for petition rule" }); return;
         }
     }
 
@@ -117,8 +125,8 @@ export function submitForDeliberation(req: AuthedRequest, res: Response): void {
         const motion = svc().submitForDeliberation(
             req.params.id as string,
             personId,
-            key,
-            key === "petition" ? (minApprovals as number) : undefined,
+            voteRuleId.trim(),
+            rule.legitimacy === "petition" ? (minApprovals as number) : undefined,
         );
         res.json(toDto(motion));
     } catch (err) {
@@ -163,8 +171,32 @@ export function castVote(req: AuthedRequest, res: Response): void {
 }
 
 // POST /api/motions/:id/comment
-// Body: { body: string }
+// Body: { body: string, kind?: "evidence" | "challenge" | "general" }
 export function addComment(req: AuthedRequest, res: Response): void {
+    const personId = req.personId;
+    if (!personId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const { body, kind } = req.body ?? {};
+    if (typeof body !== "string" || !body.trim()) {
+        res.status(400).json({ error: "body is required" }); return;
+    }
+    const validKinds = ["evidence", "challenge", "general"];
+    const commentKind = validKinds.includes(kind) ? kind : "general";
+
+    const person = ppl().get(personId);
+    const handle = person?.handle ?? personId;
+
+    try {
+        const motion = svc().addComment(req.params.id as string, personId, handle, body.trim(), commentKind);
+        res.json(toDto(motion));
+    } catch (err) {
+        res.status(400).json({ error: (err as Error).message });
+    }
+}
+
+// POST /api/motions/:id/dissent
+// Body: { body: string }
+export function recordDissent(req: AuthedRequest, res: Response): void {
     const personId = req.personId;
     if (!personId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
@@ -177,7 +209,7 @@ export function addComment(req: AuthedRequest, res: Response): void {
     const handle = person?.handle ?? personId;
 
     try {
-        const motion = svc().addComment(req.params.id as string, personId, handle, body.trim());
+        const motion = svc().recordDissent(req.params.id as string, handle, body.trim());
         res.json(toDto(motion));
     } catch (err) {
         res.status(400).json({ error: (err as Error).message });

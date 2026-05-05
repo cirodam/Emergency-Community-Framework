@@ -18,7 +18,6 @@
 import AssemblyPage      from "./pages/AssemblyPage.svelte";
 import PoolPage          from "./pages/PoolPage.svelte";
 import MotionPage        from "./pages/MotionPage.svelte";
-    import ApplicationsPage   from "./pages/ApplicationsPage.svelte";
     import CharterPage         from "./pages/HowItWorksPage.svelte";
     import BudgetPage          from "./pages/BudgetPage.svelte";
     import AssociationsPage    from "./pages/AssociationsPage.svelte";
@@ -119,8 +118,6 @@ import MotionPage        from "./pages/MotionPage.svelte";
             <PoolPage />
         {:else if $currentPage === "motion"}
             <MotionPage />
-        {:else if $currentPage === "applications"}
-            <ApplicationsPage />
         {:else if $currentPage === "how-it-works"}
             <CharterPage />
         {:else if $currentPage === "budget"}

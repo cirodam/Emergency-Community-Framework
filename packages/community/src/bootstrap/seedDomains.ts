@@ -42,6 +42,8 @@ import { MarketDomain } from "../domains/market/MarketDomain.js";
 import { MarketUnitTemplates } from "../domains/market/MarketUnitTemplates.js";
 import { GovernanceDomain } from "../domains/governance/GovernanceDomain.js";
 import { GovernanceUnitTemplates } from "../domains/governance/GovernanceUnitTemplates.js";
+import { MediationDomain } from "../domains/mediation/MediationDomain.js";
+import { MediationUnitTemplates } from "../domains/mediation/MediationUnitTemplates.js";
 import { CommunityRole } from "../common/CommunityRole.js";
 import { LeaderPool } from "../governance/LeaderPool.js";
 
@@ -205,6 +207,20 @@ export function seedDomains(domainSvc: DomainService): void {
         );
     }
 
+    domainSvc.registerDomain(MediationDomain.getInstance());
+    if (MediationDomain.getInstance().unitIds.length === 0) {
+        const mediationPanel = new FunctionalUnit(
+            "Mediation Panel",
+            "A small panel of trained community mediators who facilitate structured conversations between parties in conflict. Mediators hold space for mutual understanding — they do not rule or impose outcomes.",
+            "mediation-panel",
+        );
+        domainSvc.createUnit(mediationPanel, MediationDomain.getInstance().id);
+        domainSvc.createRole(
+            new CommunityRole("Mediator", "Facilitates structured, confidential dialogue between parties in conflict. Does not impose outcomes. Trained in active listening, de-escalation, and restorative practice.", 3_000),
+            mediationPanel.id,
+        );
+    }
+
     domainSvc.registerDomain(GovernanceDomain.getInstance());
     if (GovernanceDomain.getInstance().unitIds.length === 0) {
         const assemblyUnit = new FunctionalUnit(
@@ -249,6 +265,7 @@ export function seedDomains(domainSvc: DomainService): void {
     TransitUnitTemplates.register();
     CourierUnitTemplates.register();
     MarketUnitTemplates.register();
+    MediationUnitTemplates.register();
     GovernanceUnitTemplates.register();
 
     // Seed default leader pools on first boot.
@@ -270,6 +287,8 @@ export function seedDomains(domainSvc: DomainService): void {
              "Govern decisions related to childcare, eldercare, disability support, and the childcare and dependency care domains."],
             ["Couriers",    "Transit and delivery workers.",
              "Govern decisions related to transportation, goods delivery, route planning, and the transit and courier domains."],
+            ["Mediators",   "Community mediators and restorative practice facilitators.",
+             "Govern decisions related to conflict resolution processes, restorative practice standards, and the mediation domain."],
         ];
         for (const [name, description, mandate] of defaultPools) {
             const pool = new LeaderPool(name, description);

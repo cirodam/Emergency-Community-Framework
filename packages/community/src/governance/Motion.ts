@@ -5,11 +5,10 @@ import {
     type ReferendumStage,
     type MotionStage,
     type MotionOutcome,
-    type VoteThresholdKey,
 } from "@ecf/core";
 
 // Re-export shared types so existing consumers of this module keep working.
-export type { ClerkStage, ReferendumStage, MotionStage, MotionOutcome, VoteThresholdKey };
+export type { ClerkStage, ReferendumStage, MotionStage, MotionOutcome };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,11 +20,14 @@ export type { ClerkStage, ReferendumStage, MotionStage, MotionOutcome, VoteThres
  */
 export type MotionBody = "referendum" | "assembly" | string;
 
+export type CommentKind = "evidence" | "challenge" | "general";
+
 export interface MotionComment {
     id:           string;
     authorId:     string;
     authorHandle: string;
     body:         string;
+    kind:         CommentKind;
     createdAt:    string; // ISO 8601
 }
 
@@ -46,19 +48,23 @@ export class Motion extends AssemblyMotion<MotionVote, MotionComment> {
     readonly proposerId: string;
 
     constructor(opts: {
-        body:           MotionBody;
-        title:          string;
-        description:    string;
-        proposerId:     string;
-        proposerHandle: string;
-        parentId?:      string | null;
-        kind?:          string | null;
-        payload?:       string | null;
-        id?:            string;
-        createdAt?:     string;
+        body:            MotionBody;
+        title:           string;
+        description:     string;
+        proposerId:      string;
+        proposerHandle:  string;
+        parentId?:       string | null;
+        kind?:           string | null;
+        payload?:        string | null;
+        premises?:       string | null;
+        expectedOutcome?: string | null;
+        id?:             string;
+        createdAt?:      string;
     }) {
         super(opts);
-        this.proposerId = opts.proposerId;
+        this.proposerId      = opts.proposerId;
+        this.premises        = opts.premises        ?? null;
+        this.expectedOutcome = opts.expectedOutcome ?? null;
     }
 
     hasVoted(personId: string): boolean {

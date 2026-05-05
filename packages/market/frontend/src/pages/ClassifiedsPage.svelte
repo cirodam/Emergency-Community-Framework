@@ -97,7 +97,7 @@
 
     function goPage(p: number) { load(p); }
 
-    $effect(() => { if (tab === "mine" && myId && myItems.length === 0) load(page); });
+    $effect(() => { if (tab === "mine" && myId) load(page); });
     load(1);
 
     async function handleCreate() {

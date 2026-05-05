@@ -10,6 +10,7 @@ import { CommunityLogService } from "../log/CommunityLogService.js";
 const router = Router();
 const bylaws = new BylawLoader();
 
+router.get(   "/motions/vote-rules",          motions.listVoteRulesList);
 router.get(   "/motions/effects",            motions.listEffects);
 router.get(   "/motions",                    motions.listMotions);
 router.get(   "/motions/:id",                motions.getMotion);
@@ -18,6 +19,7 @@ router.post(  "/motions/:id/deliberate",     requireAuth,    motions.submitForDe
 router.post(  "/motions/:id/open-voting",    requireAuth,    motions.openVoting);
 router.post(  "/motions/:id/vote",           requireAuth,    motions.castVote);
 router.post(  "/motions/:id/comment",        requireAuth,    motions.addComment);
+router.post(  "/motions/:id/dissent",        requireAuth,    motions.recordDissent);
 router.post(  "/motions/:id/discuss",        requireSteward, motions.markDiscussed);
 router.post(  "/motions/:id/outcome",        requireSteward, motions.recordOutcome);
 router.delete("/motions/:id",                requireAuth,    motions.withdrawMotion);

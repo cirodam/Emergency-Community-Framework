@@ -1231,13 +1231,36 @@ export async function listExpiringRoles(days = 60): Promise<ExpiringRoleDto[]> {
 
 export type MotionStage   = "draft" | "deliberating" | "voting" | "resolved" | "proposed" | "discussed" | "voted";
 export type MotionOutcome = "passed" | "failed" | "withdrawn" | "referred";
-export type VoteThresholdKey = "thresholdSimpleMajority" | "thresholdSupermajority" | "thresholdNearConsensus" | "petition";
+
+export type VoteLegitimacy   = "absolute-majority" | "majority-of-votes" | "petition";
+export type VoteJurisdiction = "referendum" | "assembly" | "pool";
+export type VoteEligibility  = "all-members" | "assembly-members" | "pool-members";
+
+export interface VoteRule {
+    id:                string;
+    label:             string;
+    jurisdiction:      VoteJurisdiction;
+    eligibility:       VoteEligibility;
+    legitimacy:        VoteLegitimacy;
+    thresholdFraction?: number;
+    deliberationDays:   number;
+    votingWindowDays:   number;
+}
+
+export type CommentKind = "evidence" | "challenge" | "general";
 
 export interface MotionComment {
     id:           string;
     authorHandle: string;
     body:         string;
+    kind:         CommentKind;
     createdAt:    string;
+}
+
+export interface MotionDissent {
+    authorHandle: string;
+    body:         string;
+    recordedAt:   string;
 }
 
 export interface MotionVote {
@@ -1263,10 +1286,13 @@ export interface MotionDto {
     deliberationStartedAt: string | null;
     votingOpensAt:        string | null;
     votingClosesAt:       string | null;
-    thresholdKey:         VoteThresholdKey | null;
     minApprovals:         number | null;
+    voteRuleId:           string | null;
+    premises:             string | null;
+    expectedOutcome:      string | null;
     votes:                MotionVote[];
     comments:             MotionComment[];
+    dissents:             MotionDissent[];
     outcome:              MotionOutcome | null;
     outcomeNote:          string;
     resolvedAt:           string | null;
@@ -1302,13 +1328,21 @@ export async function listMotionEffects(): Promise<MotionEffectKind[]> {
     return res.json() as Promise<MotionEffectKind[]>;
 }
 
+export async function listVoteRules(): Promise<VoteRule[]> {
+    const res = await apiFetch("/api/motions/vote-rules");
+    if (!res.ok) throw new Error("Failed to load vote rules");
+    return res.json() as Promise<VoteRule[]>;
+}
+
 export async function createMotion(data: {
-    body:        string;
-    title:       string;
-    description: string;
-    parentId?:   string;
-    kind?:       string | null;
-    payload?:    unknown;
+    body:            string;
+    title:           string;
+    description:     string;
+    parentId?:       string;
+    kind?:           string | null;
+    payload?:        unknown;
+    premises?:       string;
+    expectedOutcome?: string;
 }): Promise<MotionDto> {
     const res = await apiFetch("/api/motions", {
         method:  "POST",
@@ -1322,11 +1356,11 @@ export async function createMotion(data: {
     return res.json() as Promise<MotionDto>;
 }
 
-export async function submitMotionForDeliberation(id: string, thresholdKey?: VoteThresholdKey, minApprovals?: number): Promise<MotionDto> {
+export async function submitMotionForDeliberation(id: string, voteRuleId: string, minApprovals?: number): Promise<MotionDto> {
     const res = await apiFetch(`/api/motions/${encodeURIComponent(id)}/deliberate`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ thresholdKey, ...(minApprovals !== undefined ? { minApprovals } : {}) }),
+        body:    JSON.stringify({ voteRuleId, ...(minApprovals !== undefined ? { minApprovals } : {}) }),
     });
     if (!res.ok) {
         const b = await res.json().catch(() => ({})) as { error?: string };
@@ -1357,15 +1391,28 @@ export async function castMotionVote(id: string, vote: "approve" | "reject" | "a
     return res.json() as Promise<MotionDto>;
 }
 
-export async function addMotionComment(id: string, body: string): Promise<MotionDto> {
+export async function addMotionComment(id: string, body: string, kind: CommentKind = "general"): Promise<MotionDto> {
     const res = await apiFetch(`/api/motions/${encodeURIComponent(id)}/comment`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ body, kind }),
+    });
+    if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(b.error ?? "Failed to add comment");
+    }
+    return res.json() as Promise<MotionDto>;
+}
+
+export async function recordMotionDissent(id: string, body: string): Promise<MotionDto> {
+    const res = await apiFetch(`/api/motions/${encodeURIComponent(id)}/dissent`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ body }),
     });
     if (!res.ok) {
         const b = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(b.error ?? "Failed to add comment");
+        throw new Error(b.error ?? "Failed to record dissent");
     }
     return res.json() as Promise<MotionDto>;
 }

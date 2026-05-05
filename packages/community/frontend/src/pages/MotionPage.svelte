@@ -1,18 +1,24 @@
 <script lang="ts">
     import {
-        getMotion, castMotionVote, addMotionComment,
+        getMotion, castMotionVote, addMotionComment, recordMotionDissent,
         submitMotionForDeliberation, openMotionVoting,
         markMotionDiscussed, recordMotionOutcome, withdrawMotion,
     } from "../lib/api.js";
-    import type { MotionDto, MotionOutcome, VoteThresholdKey } from "../lib/api.js";
+    import type { MotionDto, MotionOutcome, CommentKind } from "../lib/api.js";
     import { session, currentPage, selectedMotionId } from "../lib/session.js";
 
-    const THRESHOLD_LABELS: Record<VoteThresholdKey, string> = {
-        thresholdSimpleMajority: "Simple majority (51%)",
-        thresholdSupermajority:  "Supermajority (67%)",
-        thresholdNearConsensus:  "Near consensus (90%)",
-        petition:                "Petition",
+    const RULE_LABELS: Record<string, string> = {
+        "referendum-constitutional": "Constitutional Referendum — requires 2/3 of all members",
+        "referendum-general":        "General Referendum — requires majority of all members",
+        "assembly-general":          "Assembly Motion — simple majority of seated assembly",
+        "assembly-supermajority":    "Assembly Supermajority — 2/3 of seated assembly",
+        "pool-general":              "Pool Vote — simple majority of pool members",
+        "petition":                  "Petition",
     };
+    function ruleLabel(m: MotionDto): string {
+        if (m.voteRuleId) return RULE_LABELS[m.voteRuleId] ?? m.voteRuleId;
+        return "";
+    }
 
     let motion:  MotionDto | null = $state(null);
     let loading  = $state(true);
@@ -21,7 +27,13 @@
 
     // comment form
     let commentText = $state("");
+    let commentKind = $state<CommentKind>("general");
     let commenting  = $state(false);
+
+    // dissent form
+    let dissentText        = $state("");
+    let showDissentForm    = $state(false);
+    let submittingDissent  = $state(false);
 
     // comment pagination
     const COMMENT_PAGE_SIZE = 10;
@@ -80,12 +92,22 @@
         if (!motion || !commentText.trim()) return;
         commenting = true; actionError = "";
         try {
-            motion = await addMotionComment(motion.id, commentText.trim());
-            commentText = "";
+            motion = await addMotionComment(motion.id, commentText.trim(), commentKind);
+            commentText = ""; commentKind = "general";
             // jump to last page so the new comment is visible
             commentPage = Math.max(1, Math.ceil(motion.comments.length / COMMENT_PAGE_SIZE));
         } catch (e) { actionError = e instanceof Error ? e.message : "Failed"; }
         finally { commenting = false; }
+    }
+
+    async function doDissent() {
+        if (!motion || !dissentText.trim()) return;
+        submittingDissent = true; actionError = "";
+        try {
+            motion = await recordMotionDissent(motion.id, dissentText.trim());
+            dissentText = ""; showDissentForm = false;
+        } catch (e) { actionError = e instanceof Error ? e.message : "Failed"; }
+        finally { submittingDissent = false; }
     }
 
     async function doOpenVoting() {
@@ -161,14 +183,32 @@
             <span>{formatDate(motion.createdAt)}</span>
         </div>
 
-        {#if motion.thresholdKey === "petition" && motion.minApprovals}
+        {#if motion.voteRuleId === "petition" && motion.minApprovals}
             <p class="threshold-note">Petition — needs <strong>{motion.minApprovals}</strong> approval{motion.minApprovals !== 1 ? "s" : ""} to pass</p>
-        {:else if motion.thresholdKey}
-            <p class="threshold-note">{THRESHOLD_LABELS[motion.thresholdKey]}</p>
+        {:else if motion.voteRuleId}
+            <p class="threshold-note">{ruleLabel(motion)}</p>
         {/if}
 
         <!-- Description -->
         <div class="description">{motion.description}</div>
+
+        <!-- Structured reasoning -->
+        {#if motion.premises || motion.expectedOutcome}
+            <div class="reasoning-block">
+                {#if motion.premises}
+                    <div class="reasoning-item">
+                        <span class="reasoning-label">Premises</span>
+                        <p class="reasoning-body">{motion.premises}</p>
+                    </div>
+                {/if}
+                {#if motion.expectedOutcome}
+                    <div class="reasoning-item">
+                        <span class="reasoning-label">Expected outcome</span>
+                        <p class="reasoning-body">{motion.expectedOutcome}</p>
+                    </div>
+                {/if}
+            </div>
+        {/if}
 
         <!-- Outcome banner -->
         {#if motion.stage === "resolved"}
@@ -182,7 +222,7 @@
         <!-- Vote summary (referendum) -->
         {#if isReferendum && (motion.stage === "voting" || motion.stage === "resolved")}
             <div class="vote-summary">
-                {#if motion.thresholdKey === "petition" && motion.minApprovals}
+                {#if motion.voteRuleId === "petition" && motion.minApprovals}
                     {@const pct = Math.min(100, Math.round(motion.approvalCount / motion.minApprovals * 100))}
                     <div class="vote-bar-wrap">
                         <div class="vote-bar">
@@ -281,6 +321,9 @@
                 <div class="comment">
                     <div class="comment-header">
                         <span class="comment-author">{c.authorHandle}</span>
+                        {#if c.kind && c.kind !== "general"}
+                            <span class="comment-kind comment-kind-{c.kind}">{c.kind === "evidence" ? "Evidence" : "Challenge"}</span>
+                        {/if}
                         <span class="comment-date">{formatDate(c.createdAt)}</span>
                     </div>
                     <p class="comment-body">{c.body}</p>
@@ -297,6 +340,16 @@
 
         {#if me && motion.stage !== "resolved" && motion.stage !== "draft"}
             <div class="comment-form">
+                {#if motion.stage === "deliberating"}
+                    <div class="comment-kind-row">
+                        <span class="comment-kind-label">Type</span>
+                        <div class="comment-kind-btns">
+                            <button type="button" class="kind-btn" class:kind-active={commentKind === "general"} onclick={() => commentKind = "general"}>Comment</button>
+                            <button type="button" class="kind-btn" class:kind-active={commentKind === "evidence"} onclick={() => commentKind = "evidence"}>Evidence</button>
+                            <button type="button" class="kind-btn" class:kind-active={commentKind === "challenge"} onclick={() => commentKind = "challenge"}>Challenge premises</button>
+                        </div>
+                    </div>
+                {/if}
                 <textarea class="input textarea" placeholder="Add a comment…" bind:value={commentText} rows="3"></textarea>
                 <button class="btn-primary" onclick={doComment} disabled={commenting || !commentText.trim()}>
                     {commenting ? "Posting…" : "Post"}
@@ -315,6 +368,38 @@
                     </div>
                 {/each}
             </details>
+        {/if}
+
+        <!-- Dissents -->
+        {#if motion.dissents && motion.dissents.length > 0}
+            <hr class="divider" />
+            <h2 class="section-heading">Minority Statements</h2>
+            {#each motion.dissents as d}
+                <div class="dissent">
+                    <div class="dissent-header">
+                        <span class="dissent-author">{d.authorHandle}</span>
+                        <span class="dissent-date">{formatDate(d.recordedAt)}</span>
+                    </div>
+                    <p class="dissent-body">{d.body}</p>
+                </div>
+            {/each}
+        {/if}
+
+        <!-- Record dissent (any member, resolved + passed only) -->
+        {#if me && motion.stage === "resolved" && motion.outcome === "passed"}
+            {#if !showDissentForm}
+                <button class="btn-dissent" onclick={() => showDissentForm = true}>Record minority statement</button>
+            {:else}
+                <div class="dissent-form">
+                    <textarea class="input textarea" placeholder="State your dissent…" bind:value={dissentText} rows="3"></textarea>
+                    <div class="dissent-form-btns">
+                        <button class="btn-primary" onclick={doDissent} disabled={submittingDissent || !dissentText.trim()}>
+                            {submittingDissent ? "Saving…" : "Submit dissent"}
+                        </button>
+                        <button class="btn-ghost" onclick={() => { showDissentForm = false; dissentText = ""; }}>Cancel</button>
+                    </div>
+                </div>
+            {/if}
         {/if}
     {/if}
 </div>
@@ -423,10 +508,23 @@
         padding: 0.75rem 1rem; background: #f8fafc; border: 1px solid #e2e8f0;
         border-radius: 0.75rem;
     }
-    .comment-header { display: flex; justify-content: space-between; margin-bottom: 0.3rem; }
+    .comment-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem; }
     .comment-author { font-size: 0.8rem; font-weight: 600; color: #0f172a; }
-    .comment-date   { font-size: 0.72rem; color: #94a3b8; }
+    .comment-date   { font-size: 0.72rem; color: #94a3b8; margin-left: auto; }
     .comment-body   { font-size: 0.875rem; color: #334155; margin: 0; line-height: 1.5; }
+
+    .comment-kind { font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+    .comment-kind-evidence  { background: #d1fae5; color: #065f46; }
+    .comment-kind-challenge { background: #fef3c7; color: #92400e; }
+
+    .comment-kind-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .comment-kind-label { font-size: 0.75rem; color: #64748b; font-weight: 500; white-space: nowrap; }
+    .comment-kind-btns { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+    .kind-btn {
+        font-size: 0.75rem; padding: 0.2rem 0.55rem; border-radius: 6px;
+        border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; color: #64748b;
+    }
+    .kind-btn.kind-active { border-color: #16a34a; background: #dcfce7; color: #15803d; font-weight: 600; }
 
     .comment-form { display: flex; flex-direction: column; gap: 0.5rem; }
     .comment-pagination {
@@ -455,6 +553,32 @@
     .vote-approve { color: #15803d; font-weight: 600; }
     .vote-reject  { color: #b91c1c; font-weight: 600; }
     .vote-abstain { color: #64748b; }
+
+    /* ── Structured reasoning ────────────────────────────────────────────────── */
+    .reasoning-block { display: flex; flex-direction: column; gap: 0.6rem; border-left: 3px solid #e2e8f0; padding-left: 0.85rem; }
+    .reasoning-item { display: flex; flex-direction: column; gap: 0.15rem; }
+    .reasoning-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; }
+    .reasoning-body { font-size: 0.85rem; color: #334155; margin: 0; line-height: 1.55; }
+
+    /* ── Dissents ─────────────────────────────────────────────────────────────── */
+    .dissent {
+        padding: 0.75rem 1rem; background: #fefce8; border: 1px solid #fde68a;
+        border-radius: 0.75rem;
+    }
+    .dissent-header { display: flex; justify-content: space-between; margin-bottom: 0.3rem; }
+    .dissent-author { font-size: 0.8rem; font-weight: 600; color: #92400e; }
+    .dissent-date   { font-size: 0.72rem; color: #a16207; }
+    .dissent-body   { font-size: 0.875rem; color: #78350f; margin: 0; line-height: 1.5; }
+
+    .btn-dissent {
+        align-self: flex-start; font-size: 0.8rem; padding: 0.35rem 0.8rem;
+        background: none; border: 1px solid #d97706; color: #b45309;
+        border-radius: 6px; cursor: pointer;
+    }
+    .btn-dissent:hover { background: #fef3c7; }
+
+    .dissent-form { display: flex; flex-direction: column; gap: 0.5rem; }
+    .dissent-form-btns { display: flex; gap: 0.5rem; }
 
     /* ── Inputs ──────────────────────────────────────────────────────────────── */
     .input {

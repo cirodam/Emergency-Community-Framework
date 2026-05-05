@@ -46,5 +46,27 @@ export class HealthcareUnitTemplates {
                 "mobile-clinic",
             ),
         });
+
+        UnitTemplateRegistry.register({
+            type:        "mental-health-unit",
+            label:       "Mental Health Unit",
+            description: "Provides counselling, crisis support, peer support coordination, and long-term mental health care for community members. Staffed by trained counsellors and peer support workers.",
+            factory: () => new FunctionalUnit(
+                "Mental Health Unit",
+                "Provides counselling, crisis support, peer support coordination, and long-term mental health care for community members. Staffed by trained counsellors and peer support workers.",
+                "mental-health-unit",
+            ),
+        });
+
+        UnitTemplateRegistry.register({
+            type:        "harm-reduction-unit",
+            label:       "Harm Reduction Unit",
+            description: "Supports community members experiencing substance dependence through harm reduction practice: overdose response, peer support, safe supply coordination, and connection to recovery pathways. Non-judgmental and unconditional.",
+            factory: () => new FunctionalUnit(
+                "Harm Reduction Unit",
+                "Supports community members experiencing substance dependence through harm reduction practice: overdose response, peer support, safe supply coordination, and connection to recovery pathways. Non-judgmental and unconditional.",
+                "harm-reduction-unit",
+            ),
+        });
     }
 }

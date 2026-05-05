@@ -35,5 +35,16 @@ export class HousingUnitTemplates {
                 "maintenance-workshop",
             ),
         });
+
+        UnitTemplateRegistry.register({
+            type:        "homelessness-outreach-team",
+            label:       "Homelessness Outreach Team",
+            description: "Identifies and supports community members without stable shelter. Coordinates emergency accommodation, transitional housing pathways, and wraparound support. Works in partnership with the Mental Health Unit and Harm Reduction Unit.",
+            factory: () => new FunctionalUnit(
+                "Homelessness Outreach Team",
+                "Identifies and supports community members without stable shelter. Coordinates emergency accommodation, transitional housing pathways, and wraparound support. Works in partnership with the Mental Health Unit and Harm Reduction Unit.",
+                "homelessness-outreach-team",
+            ),
+        });
     }
 }

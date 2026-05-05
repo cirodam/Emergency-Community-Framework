@@ -1,9 +1,9 @@
 <script lang="ts">
     import {
         listMotions, createMotion, submitMotionForDeliberation,
-        openMotionVoting, castMotionVote, withdrawMotion, listMotionEffects,
+        openMotionVoting, castMotionVote, withdrawMotion, listMotionEffects, listVoteRules,
     } from "../lib/api.js";
-    import type { MotionDto, VoteThresholdKey, MotionEffectKind } from "../lib/api.js";
+    import type { MotionDto, MotionEffectKind, VoteRule } from "../lib/api.js";
     import { session, currentPage, selectedMotionId } from "../lib/session.js";
     import EffectPayloadForm from "../components/EffectPayloadForm.svelte";
 
@@ -20,24 +20,23 @@
     let createError  = $state("");
     let newTitle     = $state("");
     let newDesc      = $state("");
-    let newThreshold    = $state<VoteThresholdKey>("thresholdSimpleMajority");
+    let newPremises  = $state("");
+    let newExpected  = $state("");
+    let voteRules    = $state<VoteRule[]>([]);
+    let newRuleId    = $state("referendum-general");
     let newMinApprovals = $state("");
     let effectKinds  = $state<MotionEffectKind[]>([]);
     let selectedKind = $state("");
-    let effectPayload = $state<Record<string, unknown>>({});
+    let effectPayload = $state<Record<string, unknown>>({})
 
     $effect(() => {
         if (showCreate && !effectKinds.length) {
             listMotionEffects().then(k => { effectKinds = k; }).catch(() => {});
         }
+        if (showCreate && !voteRules.length) {
+            listVoteRules().then(r => { voteRules = r; }).catch(() => {});
+        }
     });
-
-    const THRESHOLD_LABELS: Record<VoteThresholdKey, string> = {
-        thresholdSimpleMajority: "Simple majority (51%)",
-        thresholdSupermajority:  "Supermajority (67%)",
-        thresholdNearConsensus:  "Near consensus (90%)",
-        petition:                "Petition (fixed approval count)",
-    };
 
     async function load() {
         loading = true; error = "";
@@ -61,18 +60,22 @@
         creating = true; createError = "";
         try {
             const m = await createMotion({
-                body:        "referendum",
-                title:       newTitle.trim(),
-                description: newDesc.trim(),
-                kind:        selectedKind || null,
-                payload:     selectedKind ? effectPayload : undefined,
+                body:            "referendum",
+                title:           newTitle.trim(),
+                description:     newDesc.trim(),
+                kind:            selectedKind || null,
+                payload:         selectedKind ? effectPayload : undefined,
+                premises:        newPremises.trim() || undefined,
+                expectedOutcome: newExpected.trim() || undefined,
             });
-            const minApprovals = newThreshold === "petition" ? parseInt(newMinApprovals, 10) : undefined;
-            if (newThreshold === "petition" && (!minApprovals || minApprovals < 1)) {
+            const rule = voteRules.find(r => r.id === newRuleId);
+            const isPetition = rule?.legitimacy === "petition";
+            const minApprovals = isPetition ? parseInt(newMinApprovals, 10) : undefined;
+            if (isPetition && (!minApprovals || minApprovals < 1)) {
                 createError = "Enter a required approval count."; creating = false; return;
             }
-            await submitMotionForDeliberation(m.id, newThreshold, minApprovals);
-            showCreate = false; newTitle = ""; newDesc = ""; newMinApprovals = "";
+            await submitMotionForDeliberation(m.id, newRuleId, minApprovals);
+            showCreate = false; newTitle = ""; newDesc = ""; newPremises = ""; newExpected = ""; newMinApprovals = "";
             selectedKind = ""; effectPayload = {};
             await load();
         } catch (e) {
@@ -124,15 +127,20 @@
         <form class="create-form" onsubmit={(e) => { e.preventDefault(); handleCreate(); }}>
             <input class="input" type="text" placeholder="Title" bind:value={newTitle} required />
             <textarea class="input textarea" placeholder="Describe the motion…" bind:value={newDesc} rows="4" required></textarea>
+            <div class="reasoning-section">
+                <p class="reasoning-hint">Structured reasoning (optional — but encouraged)</p>
+                <textarea class="input textarea" placeholder="Premises — what do you believe to be true that makes this motion necessary?" bind:value={newPremises} rows="3"></textarea>
+                <textarea class="input textarea" placeholder="Expected outcome — what result do you predict if this passes?" bind:value={newExpected} rows="2"></textarea>
+            </div>
             <div class="threshold-row">
                 <label class="threshold-label" for="threshold-select">Required to pass</label>
-                <select id="threshold-select" class="input select" bind:value={newThreshold}>
-                    {#each Object.entries(THRESHOLD_LABELS) as [key, label]}
-                        <option value={key}>{label}</option>
+                <select id="threshold-select" class="input select" bind:value={newRuleId}>
+                    {#each voteRules as rule (rule.id)}
+                        <option value={rule.id}>{rule.label}</option>
                     {/each}
                 </select>
             </div>
-            {#if newThreshold === "petition"}
+            {#if voteRules.find(r => r.id === newRuleId)?.legitimacy === "petition"}
                 <div class="threshold-row">
                     <label class="threshold-label" for="min-approvals">Approvals required</label>
                     <input id="min-approvals" class="input" type="number" min="1" placeholder="e.g. 4" bind:value={newMinApprovals} />
@@ -260,6 +268,9 @@
     .threshold-row { display: flex; flex-direction: column; gap: 0.3rem; }
     .threshold-label { font-size: 0.78rem; color: #64748b; font-weight: 500; }
     .effect-fields { display: flex; flex-direction: column; gap: 0.4rem; }
+
+    .reasoning-section { display: flex; flex-direction: column; gap: 0.4rem; border-left: 2px solid #e2e8f0; padding-left: 0.75rem; }
+    .reasoning-hint { font-size: 0.75rem; color: #94a3b8; margin: 0 0 0.1rem; font-style: italic; }
 
     .form-error { font-size: 0.8rem; color: #dc2626; margin: 0; }
 

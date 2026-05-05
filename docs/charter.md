@@ -12,6 +12,8 @@ The Benjamin Franklin Society takes that as its model. Not as nostalgia, but as 
 
 Something has gone wrong with many of the institutions Americans were supposed to be able to rely on. The details are different depending on who you ask, but the experience is widespread: the systems that were supposed to work for ordinary people often don't. This is not an argument for despair. It is an argument for building.
 
+A core premise of this project is that Americans are, on the whole, good people. The national conversation suggests otherwise — polarization, bad faith, irreconcilable division. But that conversation is not the whole story, and it may not even be the most accurate part of the story. What the research on deliberative democracy consistently shows, and what Franklin's Junto demonstrated in practice, is that when ordinary people are given a fair setting, real information, enough time, and genuine stakes, they tend to reason carefully. They listen. They change their minds. They arrive at positions more nuanced than the ones they walked in with. The noise of national politics does not reflect what people are like when they are talking to their actual neighbors about things that actually affect them. This project bets on the quieter version.
+
 A Benjamin Franklin Society is a community that has decided to build.
 
 ---

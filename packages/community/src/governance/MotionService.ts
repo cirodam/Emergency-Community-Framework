@@ -1,14 +1,12 @@
 import { randomUUID } from "crypto";
-import { Motion, type MotionOutcome, type VoteThresholdKey } from "./Motion.js";
+import { Motion, type MotionOutcome, type CommentKind } from "./Motion.js";
 import { MotionLoader } from "./MotionLoader.js";
-import { Constitution } from "./Constitution.js";
 import { PersonService } from "../person/PersonService.js";
 import { effectRegistry } from "./EffectRegistry.js";
 import { CommunityLogService } from "../log/CommunityLogService.js";
+import { getVoteRule } from "@ecf/core";
 
-/** How long a referendum motion sits in deliberation before voting may open. */
-const DEFAULT_DELIBERATION_DAYS = 3;
-/** How long a referendum vote stays open. */
+/** Fallback voting window when no vote rule is present. */
 const DEFAULT_VOTING_DAYS = 7;
 
 export class MotionService {
@@ -56,14 +54,16 @@ export class MotionService {
      * - assembly/pool: starts in "proposed"
      */
     create(opts: {
-        body:           string;
-        title:          string;
-        description:    string;
-        proposerId:     string;
-        proposerHandle: string;
-        parentId?:      string;
-        kind?:          string | null;
-        payload?:       string | null;
+        body:            string;
+        title:           string;
+        description:     string;
+        proposerId:      string;
+        proposerHandle:  string;
+        parentId?:       string;
+        kind?:           string | null;
+        payload?:        string | null;
+        premises?:       string | null;
+        expectedOutcome?: string | null;
     }): Motion {
         const motion = new Motion(opts);
         this.motions.set(motion.id, motion);
@@ -73,35 +73,40 @@ export class MotionService {
 
     /**
      * Submit a referendum draft for deliberation.
-     * Sets the minimum deliberation period before voting can open.
+     * The vote rule governs eligibility, legitimacy standard, deliberation period, and voting window.
      */
     submitForDeliberation(
         motionId:     string,
         callerId:     string,
-        thresholdKey: VoteThresholdKey = "thresholdSimpleMajority",
+        voteRuleId:   string = "referendum-general",
         minApprovals?: number,
     ): Motion {
         const m = this.require(motionId);
-        if (!m.isReferendum)    throw new Error("Only referendum motions use deliberation");
-        if (m.stage !== "draft") throw new Error("Motion is not a draft");
-        if (m.proposerId !== callerId) throw new Error("Only the proposer can submit for deliberation");
+        if (!m.isReferendum)           throw new Error("Only referendum motions use deliberation");
+        if (m.stage !== "draft")        throw new Error("Motion is not a draft");
+        if (m.proposerId !== callerId)  throw new Error("Only the proposer can submit for deliberation");
 
-        const constitution = Constitution.getInstance();
-        const delayDays = constitution.deliberationPeriodDays ?? DEFAULT_DELIBERATION_DAYS;
+        const rule = getVoteRule(voteRuleId);
 
-        const now = new Date();
-        const votingOpens = new Date(now);
-        votingOpens.setDate(votingOpens.getDate() + delayDays);
-
-        m.stage                 = "deliberating";
-        m.deliberationStartedAt = now.toISOString();
-        m.votingOpensAt         = votingOpens.toISOString();
-        m.thresholdKey          = thresholdKey;
-        if (thresholdKey === "petition") {
+        if (rule.legitimacy === "petition") {
             if (!minApprovals || minApprovals < 1)
-                throw new Error("minApprovals must be at least 1 for petition threshold");
+                throw new Error("minApprovals must be at least 1 for a petition");
             m.minApprovals = minApprovals;
         }
+
+        const now = new Date();
+        m.voteRuleId            = voteRuleId;
+        m.stage                 = "deliberating";
+        m.deliberationStartedAt = now.toISOString();
+
+        if (rule.deliberationDays > 0) {
+            const votingOpens = new Date(now);
+            votingOpens.setDate(votingOpens.getDate() + rule.deliberationDays);
+            m.votingOpensAt = votingOpens.toISOString();
+        } else {
+            m.votingOpensAt = now.toISOString(); // no deliberation period; ready immediately
+        }
+
         this.loader.save(m);
         return m;
     }
@@ -119,11 +124,16 @@ export class MotionService {
             throw new Error("Deliberation period has not elapsed yet");
         }
 
-        const closes = new Date();
-        closes.setDate(closes.getDate() + DEFAULT_VOTING_DAYS);
+        const rule = m.voteRuleId ? getVoteRule(m.voteRuleId) : null;
+        const windowDays = rule?.votingWindowDays ?? DEFAULT_VOTING_DAYS;
 
-        m.stage          = "voting";
-        m.votingClosesAt = closes.toISOString();
+        m.stage = "voting";
+        if (windowDays > 0) {
+            const closes = new Date();
+            closes.setDate(closes.getDate() + windowDays);
+            m.votingClosesAt = closes.toISOString();
+        }
+        // petition (windowDays === 0): no deadline; closes on threshold hit
         this.loader.save(m);
         return m;
     }
@@ -153,7 +163,7 @@ export class MotionService {
     }
 
     /** Add a comment during deliberation or voting. */
-    addComment(motionId: string, authorId: string, authorHandle: string, body: string): Motion {
+    addComment(motionId: string, authorId: string, authorHandle: string, body: string, kind: CommentKind = "general"): Motion {
         const m = this.require(motionId);
         if (m.stage === "draft" || m.stage === "resolved") {
             throw new Error("Comments can only be added during deliberation or voting");
@@ -163,8 +173,19 @@ export class MotionService {
             authorId,
             authorHandle,
             body:         body.trim(),
+            kind,
             createdAt:    new Date().toISOString(),
         });
+        this.loader.save(m);
+        return m;
+    }
+
+    /** Record a dissent statement on a resolved passed motion. */
+    recordDissent(motionId: string, authorHandle: string, body: string): Motion {
+        const m = this.require(motionId);
+        if (m.stage !== "resolved") throw new Error("Dissents can only be recorded on resolved motions");
+        if (m.outcome !== "passed") throw new Error("Dissents are only recorded on passed motions");
+        m.dissents.push({ authorHandle, body: body.trim(), recordedAt: new Date().toISOString() });
         this.loader.save(m);
         return m;
     }
@@ -233,16 +254,21 @@ export class MotionService {
     }
 
     private resolveByDeadline(m: Motion): void {
-        const needed = this.getNeededApprovals(m);
+        const rule       = m.voteRuleId ? getVoteRule(m.voteRuleId) : null;
+        const legitimacy = rule?.legitimacy ?? "absolute-majority";
+        const needed     = this.getNeededApprovals(m);
+        const eligible   = PersonService.getInstance().getAll().filter(p => !p.disabled).length;
+
         m.outcome    = m.approvalCount >= needed ? "passed" : "failed";
         m.stage      = "resolved";
         m.resolvedAt = new Date().toISOString();
-        if (m.thresholdKey === "petition") {
+
+        if (legitimacy === "petition") {
             m.outcomeNote = `Resolved at deadline. ${m.approvalCount}/${needed} approvals received.`;
         } else {
-            const totalMembers = PersonService.getInstance().getAll().length;
-            m.outcomeNote = `Resolved at deadline. ${m.approvalCount}/${totalMembers} approved (needed ${needed}).`;
+            m.outcomeNote = `Resolved at deadline. ${m.approvalCount}/${eligible} approved (needed ${needed}).`;
         }
+
         if (m.outcome === "passed") effectRegistry.dispatch(m);
         this.loader.save(m);
         try {
@@ -253,17 +279,20 @@ export class MotionService {
     }
 
     private checkReferendumResolution(m: Motion): void {
-        const needed = this.getNeededApprovals(m);
+        const rule       = m.voteRuleId ? getVoteRule(m.voteRuleId) : null;
+        const legitimacy = rule?.legitimacy ?? "absolute-majority";
+        const needed     = this.getNeededApprovals(m);
+        const eligible   = PersonService.getInstance().getAll().filter(p => !p.disabled).length;
 
+        // Early pass
         if (m.approvalCount >= needed) {
             m.outcome    = "passed";
             m.stage      = "resolved";
             m.resolvedAt = new Date().toISOString();
-            if (m.thresholdKey === "petition") {
+            if (legitimacy === "petition") {
                 m.outcomeNote = `Petition passed with ${m.approvalCount} approval${m.approvalCount !== 1 ? "s" : ""}.`;
             } else {
-                const totalMembers = PersonService.getInstance().getAll().length;
-                m.outcomeNote = `Passed with ${m.approvalCount}/${totalMembers} approvals.`;
+                m.outcomeNote = `Passed with ${m.approvalCount}/${eligible} approvals (needed ${needed}).`;
             }
             effectRegistry.dispatch(m);
             this.loader.save(m);
@@ -271,15 +300,14 @@ export class MotionService {
             return;
         }
 
-        // Early rejection: only for majority-based thresholds
-        if (m.thresholdKey !== "petition") {
-            const totalMembers = PersonService.getInstance().getAll().length;
-            const rejectThreshold = Math.floor(totalMembers / 2) + 1;
-            if (m.rejectionCount >= rejectThreshold) {
+        // Early rejection for absolute-majority: mathematically impossible to reach threshold
+        if (legitimacy === "absolute-majority") {
+            const remaining = eligible - m.votes.length;
+            if (m.approvalCount + remaining < needed) {
                 m.outcome    = "failed";
                 m.stage      = "resolved";
                 m.resolvedAt = new Date().toISOString();
-                m.outcomeNote = `Rejected with ${m.rejectionCount}/${totalMembers} rejections.`;
+                m.outcomeNote = `Failed: cannot reach ${needed}/${eligible} approvals needed. ${m.approvalCount} approvals, ${remaining} votes remaining.`;
                 this.loader.save(m);
                 try { CommunityLogService.getInstance().write("motion-failed", `Motion failed: ${m.title}`, { refId: m.id }); } catch { /* */ }
             }
@@ -287,19 +315,9 @@ export class MotionService {
     }
 
     private getNeededApprovals(m: Motion): number {
-        if (m.thresholdKey === "petition") {
-            return m.minApprovals ?? 1;
-        }
-        const totalMembers = PersonService.getInstance().getAll().length;
-        const fraction = this.getThresholdFraction(m.thresholdKey ?? "thresholdSimpleMajority");
-        return Math.ceil(totalMembers * fraction);
-    }
-
-    private getThresholdFraction(key: string): number {
-        try {
-            return Constitution.getInstance().get<number>(key);
-        } catch {
-            return 0.51;
-        }
+        const eligible = PersonService.getInstance().getAll().filter(p => !p.disabled).length;
+        const rule = getVoteRule(m.voteRuleId ?? "referendum-general");
+        if (rule.legitimacy === "petition") return m.minApprovals ?? 1;
+        return Math.ceil(eligible * (rule.thresholdFraction ?? 0.51));
     }
 }

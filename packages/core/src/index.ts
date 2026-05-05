@@ -31,6 +31,7 @@ export * from "./storage/BaseLoader.js";
 export * from "./governance/AssemblyMotion.js";
 export * from "./governance/AssemblyTerm.js";
 export * from "./governance/BaseApplication.js";
+export * from "./governance/VoteRule.js";
 export * from "./common/BaseFunctionalDomain.js";
 export * from "./common/BaseDomainService.js";
 export * from "./BaseDemurrageScheduler.js";

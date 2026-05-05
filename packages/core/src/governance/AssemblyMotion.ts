@@ -16,6 +16,12 @@ export type VoteThresholdKey =
 
 // ── Serialisation shape (common fields) ───────────────────────────────────────
 
+export interface MotionDissent {
+    authorHandle: string;
+    body:         string;
+    recordedAt:   string;
+}
+
 /**
  * The common data shape shared by every motion regardless of governing body or
  * vote/comment identity type.  Package-specific data types extend this with
@@ -34,8 +40,12 @@ export interface AssemblyMotionData<TVote, TComment> {
     votingClosesAt:        string | null;
     thresholdKey:          VoteThresholdKey | null;
     minApprovals:          number | null;
+    voteRuleId:            string | null;
+    premises:              string | null;
+    expectedOutcome:       string | null;
     votes:                 TVote[];
     comments:              TComment[];
+    dissents:              MotionDissent[];
     outcome:               MotionOutcome | null;
     outcomeNote:           string;
     resolvedAt:            string | null;
@@ -75,8 +85,12 @@ export abstract class AssemblyMotion<
     votingClosesAt:        string | null          = null;
     thresholdKey:          VoteThresholdKey | null = null;
     minApprovals:          number | null          = null;
+    voteRuleId:            string | null          = null;
+    premises:              string | null          = null;
+    expectedOutcome:       string | null          = null;
     votes:                 TVote[]                = [];
     comments:              TComment[]             = [];
+    dissents:              MotionDissent[]        = [];
     outcome:               MotionOutcome | null   = null;
     outcomeNote:           string                 = "";
     resolvedAt:            string | null          = null;
@@ -133,8 +147,12 @@ export abstract class AssemblyMotion<
             votingClosesAt:        this.votingClosesAt,
             thresholdKey:          this.thresholdKey,
             minApprovals:          this.minApprovals,
+            voteRuleId:            this.voteRuleId,
+            premises:              this.premises,
+            expectedOutcome:       this.expectedOutcome,
             votes:                 this.votes,
             comments:              this.comments,
+            dissents:              this.dissents,
             outcome:               this.outcome,
             outcomeNote:           this.outcomeNote,
             resolvedAt:            this.resolvedAt,
@@ -153,8 +171,12 @@ export abstract class AssemblyMotion<
         this.votingClosesAt        = d.votingClosesAt;
         this.thresholdKey          = d.thresholdKey;
         this.minApprovals          = d.minApprovals ?? null;
+        this.voteRuleId            = d.voteRuleId ?? null;
+        this.premises              = d.premises ?? null;
+        this.expectedOutcome       = d.expectedOutcome ?? null;
         this.votes                 = d.votes;
         this.comments              = d.comments;
+        this.dissents              = d.dissents ?? [];
         this.outcome               = d.outcome;
         this.outcomeNote           = d.outcomeNote;
         this.resolvedAt            = d.resolvedAt;
