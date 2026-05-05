@@ -69,6 +69,7 @@ async function main(): Promise<void> {
             bankUrl:      process.env.PUBLIC_BANK_URL      ?? `http://localhost:${PORT}`,
             marketUrl:    process.env.PUBLIC_MARKET_URL    ?? "http://localhost:3003",
             mailUrl:      process.env.PUBLIC_MAIL_URL      ?? "http://localhost:3020",
+            atheneumUrl:  process.env.PUBLIC_ATHENEUM_URL  ?? "http://localhost:3004",
         });
     });
 

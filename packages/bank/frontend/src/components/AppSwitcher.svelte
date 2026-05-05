@@ -6,10 +6,11 @@
     import { session } from "../lib/session.js";
 
     interface AppConfig {
-        communityUrl: string;
-        bankUrl:      string;
-        marketUrl:    string;
-        mailUrl:      string;
+        communityUrl:  string;
+        bankUrl:       string;
+        marketUrl:     string;
+        mailUrl:       string;
+        atheneumUrl:   string;
     }
 
     let config = $state<AppConfig | null>(null);
@@ -45,9 +46,10 @@
 
     const apps = $derived(config ? [
         { id: "community", label: "Community", icon: "⊚", url: config.communityUrl },
-        { id: "bank",      label: "Bank",      icon: "◈", url: config.bankUrl,    current: true },
+        { id: "bank",      label: "Bank",      icon: "◈", url: config.bankUrl,       current: true },
         { id: "market",    label: "Market",    icon: "⊕", url: config.marketUrl },
         { id: "mail",      label: "Mail",      icon: "✉", url: config.mailUrl },
+        { id: "atheneum",  label: "Atheneum",  icon: "⊘", url: config.atheneumUrl },
     ] : []);
 </script>
 

@@ -20,7 +20,7 @@
     onMount(async () => {
         try {
             config = await fetch("/api/config").then(r => r.json()) as AppConfig;
-        } catch { /* silent */ }
+        } catch { /* silent — switcher won't render */ }
     });
 
     $effect(() => {
@@ -34,22 +34,22 @@
 
     function sessionHash(): string {
         if (!$session) return "";
-        const payload = btoa(encodeURIComponent(JSON.stringify({
+        const payload = btoa(JSON.stringify({
             token:     $session.token,
             id:        $session.personId,
             firstName: $session.firstName,
             lastName:  $session.lastName,
             handle:    $session.handle,
-        })));
+        }));
         return `#session=${payload}`;
     }
 
     const apps = $derived(config ? [
-        { id: "community", label: "Community", icon: "⊚", url: config.communityUrl, current: true },
+        { id: "community", label: "Community", icon: "⊚", url: config.communityUrl },
         { id: "bank",      label: "Bank",      icon: "◈", url: config.bankUrl },
         { id: "market",    label: "Market",    icon: "⊕", url: config.marketUrl },
         { id: "mail",      label: "Mail",      icon: "✉", url: config.mailUrl },
-        { id: "atheneum",  label: "Atheneum",  icon: "⊘", url: config.atheneumUrl },
+        { id: "atheneum",  label: "Atheneum",  icon: "⊘", url: config.atheneumUrl, current: true },
     ] : []);
 </script>
 
@@ -106,27 +106,27 @@
         background: none;
         cursor: pointer;
         font-size: 1.15rem;
-        color: #64748b;
+        color: #94a3b8;
         transition: background 0.1s, color 0.1s;
     }
 
     .trigger:hover,
     .trigger.open {
-        background: #f0fdf4;
-        color: #16a34a;
+        background: #334155;
+        color: #e2e8f0;
     }
 
     .dropdown {
         position: absolute;
-        top: calc(100% + 0.4rem);
-        left: 0;
+        top: 0;
+        left: calc(100% + 0.5rem);
         background: #fff;
         border: 1px solid #e2e8f0;
         border-radius: 10px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
         min-width: 11rem;
         padding: 0.35rem 0;
-        z-index: 9999;
+        z-index: 300;
     }
 
     .app-item {
@@ -148,8 +148,8 @@
     }
 
     span.app-item.current {
-        color: #16a34a;
-        background: #f0fdf4;
+        color: #3b82f6;
+        background: #eff6ff;
         font-weight: 600;
         cursor: default;
     }

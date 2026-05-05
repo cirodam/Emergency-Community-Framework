@@ -54,6 +54,7 @@ services:
       PUBLIC_BANK_URL: http://localhost:3001
       PUBLIC_MARKET_URL: http://localhost:3003
       PUBLIC_MAIL_URL: http://localhost:3020
+      PUBLIC_ATHENEUM_URL: http://localhost:3004
     volumes:
       - market-data:/app/data
     depends_on:
@@ -74,9 +75,32 @@ services:
       PUBLIC_BANK_URL: http://localhost:3001
       PUBLIC_MARKET_URL: http://localhost:3003
       PUBLIC_MAIL_URL: http://localhost:3020
+      PUBLIC_ATHENEUM_URL: http://localhost:3004
     volumes:
       - mail-data:/app/data
     depends_on:
+      - community
+
+  atheneum:
+    build:
+      context: .
+      dockerfile: packages/atheneum/Dockerfile
+    ports:
+      - "3004:3004"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      BANK_URL: http://bank:3001
+      COMMUNITY_URL: http://community:3002
+      PUBLIC_COMMUNITY_URL: http://localhost:3002
+      PUBLIC_BANK_URL: http://localhost:3001
+      PUBLIC_MARKET_URL: http://localhost:3003
+      PUBLIC_MAIL_URL: http://localhost:3020
+      PUBLIC_ATHENEUM_URL: http://localhost:3004
+    volumes:
+      - atheneum-data:/app/data
+    depends_on:
+      - bank
       - community
 
 volumes:
@@ -84,3 +108,4 @@ volumes:
   community-data:
   market-data:
   mail-data:
+  atheneum-data:

@@ -6,10 +6,11 @@
     import { session } from "../lib/session.js";
 
     interface AppConfig {
-        communityUrl: string;
-        bankUrl:      string;
-        marketUrl:    string;
-        mailUrl:      string;
+        communityUrl:  string;
+        bankUrl:       string;
+        marketUrl:     string;
+        mailUrl:       string;
+        atheneumUrl:   string;
     }
 
     let config = $state<AppConfig | null>(null);
@@ -48,6 +49,7 @@
         { id: "bank",      label: "Bank",      icon: "◈", url: config.bankUrl },
         { id: "market",    label: "Market",    icon: "⊕", url: config.marketUrl },
         { id: "mail",      label: "Mail",      icon: "✉", url: config.mailUrl, current: true },
+        { id: "atheneum",  label: "Atheneum",  icon: "⊘", url: config.atheneumUrl },
     ] : []);
 </script>
 
